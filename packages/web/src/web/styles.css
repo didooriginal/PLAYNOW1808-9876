@@ -1,0 +1,281 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-neon-red: var(--neon-red);
+  --color-neon-cyan: var(--neon-cyan);
+  --color-neon-purple: var(--neon-purple);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+
+  --font-display: "Sora", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
+}
+
+:root,
+.dark {
+  --radius: 1rem;
+  --background: #09090b;
+  --surface: #0f0f13;
+  --ink: #050507;
+  --foreground: #fafafa;
+  --card: rgba(255, 255, 255, 0.04);
+  --card-foreground: #fafafa;
+  --popover: #101014;
+  --popover-foreground: #fafafa;
+  --primary: #ff1f3d;
+  --primary-foreground: #ffffff;
+  --secondary: rgba(255, 255, 255, 0.06);
+  --secondary-foreground: #fafafa;
+  --muted: rgba(255, 255, 255, 0.05);
+  --muted-foreground: #8b8b96;
+  --accent: rgba(255, 255, 255, 0.08);
+  --accent-foreground: #fafafa;
+  --destructive: #ff1f3d;
+  --border: rgba(255, 255, 255, 0.08);
+  --input: rgba(255, 255, 255, 0.1);
+  --ring: rgba(255, 31, 61, 0.5);
+
+  --neon-red: #ff1f3d;
+  --neon-cyan: #22d3ee;
+  --neon-purple: #a855f7;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  .font-display {
+    font-family: var(--font-display);
+  }
+
+  ::selection {
+    background: rgba(255, 31, 61, 0.35);
+    color: #fff;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #09090b;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 31, 61, 0.5);
+  }
+}
+
+@utility glass {
+  background: linear-gradient(
+    150deg,
+    rgba(255, 255, 255, 0.07) 0%,
+    rgba(255, 255, 255, 0.025) 45%,
+    rgba(255, 255, 255, 0.01) 100%
+  );
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.08),
+    0 24px 60px -30px rgba(0, 0, 0, 0.9);
+}
+
+@utility glass-strong {
+  background: linear-gradient(
+    150deg,
+    rgba(20, 20, 26, 0.92) 0%,
+    rgba(12, 12, 16, 0.82) 100%
+  );
+  backdrop-filter: blur(28px) saturate(150%);
+  -webkit-backdrop-filter: blur(28px) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.07),
+    0 30px 70px -30px rgba(0, 0, 0, 0.95);
+}
+
+/* neon edges */
+@utility neon-red-edge {
+  border-color: rgba(255, 31, 61, 0.45);
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.08),
+    0 0 0 1px rgba(255, 31, 61, 0.15),
+    0 0 34px -6px rgba(255, 31, 61, 0.45);
+}
+
+@utility neon-cyan-edge {
+  border-color: rgba(34, 211, 238, 0.45);
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.08),
+    0 0 0 1px rgba(34, 211, 238, 0.15),
+    0 0 34px -6px rgba(34, 211, 238, 0.4);
+}
+
+@utility neon-purple-edge {
+  border-color: rgba(168, 85, 247, 0.45);
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.08),
+    0 0 0 1px rgba(168, 85, 247, 0.15),
+    0 0 34px -6px rgba(168, 85, 247, 0.4);
+}
+
+@utility glow-red {
+  text-shadow:
+    0 0 12px rgba(255, 31, 61, 0.75),
+    0 0 40px rgba(255, 31, 61, 0.45);
+}
+
+@utility glow-cyan {
+  text-shadow:
+    0 0 12px rgba(34, 211, 238, 0.7),
+    0 0 40px rgba(34, 211, 238, 0.35);
+}
+
+@utility stroke-title {
+  color: transparent;
+  -webkit-text-stroke: 2px rgba(255, 255, 255, 0.85);
+  text-shadow:
+    0 0 18px rgba(255, 31, 61, 0.6),
+    0 0 60px rgba(255, 31, 61, 0.35);
+}
+
+@utility grid-bg {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 56px 56px;
+}
+
+@utility noise {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+}
+
+@keyframes ppn-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes ppn-pulse-ring {
+  0% {
+    opacity: 0.5;
+    transform: scale(0.96);
+  }
+  70% {
+    opacity: 0;
+    transform: scale(1.25);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.25);
+  }
+}
+
+@keyframes ppn-rise {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ppn-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes ppn-flicker {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  92% {
+    opacity: 1;
+  }
+  94% {
+    opacity: 0.45;
+  }
+  96% {
+    opacity: 1;
+  }
+  97% {
+    opacity: 0.7;
+  }
+}
+
+@utility animate-float {
+  animation: ppn-float 6s ease-in-out infinite;
+}
+
+@utility animate-rise {
+  animation: ppn-rise 0.7s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+
+@utility animate-marquee {
+  animation: ppn-marquee 32s linear infinite;
+}
+
+@utility animate-flicker {
+  animation: ppn-flicker 7s linear infinite;
+}
+
+@utility animate-pulse-ring {
+  animation: ppn-pulse-ring 2.4s ease-out infinite;
+}
