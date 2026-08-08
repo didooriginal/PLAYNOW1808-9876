@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 /**
  * Banco real da PLAPLUSNOW (Turso/SQLite via Drizzle).
@@ -291,6 +291,50 @@ export const recompensasEventos = sqliteTable("recompensas_eventos", {
 
 export type RecompensaEvento = typeof recompensasEventos.$inferSelect;
 export type NovaRecompensaEvento = typeof recompensasEventos.$inferInsert;
+
+/* ------------------------------------------------------------------ */
+/* FATURAS                                                             */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Faturas do cliente. Geradas automaticamente a partir do historico
+ * (`clienteDesde` + ciclo + valor) e idempotentes pela chave
+ * `cliente_id + competencia` (competencia = "YYYY-MM").
+ */
+export const faturas = sqliteTable(
+  "faturas",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    clienteId: integer("cliente_id")
+      .notNull()
+      .references(() => usuarios.id, { onDelete: "cascade" }),
+    /** "YYYY-MM" — chave idempotente junto com cliente_id */
+    competencia: text("competencia").notNull(),
+    /** numero exibido, ex.: PPN-2026-08-0009 */
+    numero: text("numero").notNull().default(""),
+    descricao: text("descricao").notNull().default(""),
+    /** valor de tabela, antes do desconto */
+    valor: real("valor").notNull().default(0),
+    /** cupom aplicado (ex.: PPN15OFF) */
+    cupom: text("cupom").notNull().default(""),
+    /** percentual de desconto do cupom */
+    desconto: integer("desconto").notNull().default(0),
+    /** valor efetivamente cobrado, ja com desconto */
+    valorFinal: real("valor_final").notNull().default(0),
+    /** pago | aberto | vencido */
+    status: text("status").notNull().default("aberto"),
+    /** ISO YYYY-MM-DD */
+    vencimento: text("vencimento").notNull().default(""),
+    pagoEm: text("pago_em").notNull().default(""),
+    criadoEm: integer("criado_em", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (t) => [uniqueIndex("faturas_cliente_competencia_idx").on(t.clienteId, t.competencia)],
+);
+
+export type Fatura = typeof faturas.$inferSelect;
+export type NovaFatura = typeof faturas.$inferInsert;
 
 /* ------------------------------------------------------------------ */
 /* AUTENTICAÇÃO (Better Auth)                                          */

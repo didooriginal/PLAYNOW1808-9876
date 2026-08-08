@@ -5,7 +5,6 @@ import {
   CalendarClock,
   Check,
   Copy,
-  Download,
   Eye,
   EyeOff,
   Gift,
@@ -30,7 +29,6 @@ import { GlassCard, NeonButton, Pill, ProgressBar, accentHex, NeonBackdrop } fro
 import {
   brl,
   clientNews,
-  myInvoices,
   retailOf,
   serviceById,
   upgrades,
@@ -39,7 +37,7 @@ import {
 } from "@/lib/mock-data";
 import { usePainelCliente } from "../queries/usuarios";
 import { useMeusChamados } from "../queries/suporte";
-import { useMinhaJornada } from "../queries/recompensas";
+import { useMinhasFaturas, rotuloCompetencia, dataBr } from "../queries/faturas";
 
 /** dados vindos do banco (usuarios.painel) */
 type PainelCliente = NonNullable<ReturnType<typeof usePainelCliente>["data"]>;
@@ -281,20 +279,32 @@ function ActivePlanCard({
 /* ------------------------------------------------------------------ */
 
 function InvoicesView({ cliente }: { cliente: Cliente }) {
-  // cupom conquistado na Jornada (3 renovações em dia = 15% OFF)
-  const jornada = useMinhaJornada();
-  const cupom = jornada.data?.progresso.cupomAtivo ?? "";
-  const desconto = jornada.data?.progresso.cupomDesconto ?? 0;
-  const valorCheio = cliente.valor;
-  const valorComDesconto = cupom ? valorCheio * (1 - desconto / 100) : valorCheio;
+  // faturas reais, geradas no servidor a partir do historico do cliente.
+  // O cupom da Jornada (3 renovacoes em dia = 15% OFF) ja vem aplicado na
+  // fatura em aberto.
+  const { data, isPending, isError, error } = useMinhasFaturas();
 
-  const statusStyle = {
+  if (isPending || isError || !data) {
+    return (
+      <GlassCard className="p-8 text-center">
+        <p className="font-sans text-sm text-white/45">
+          {isPending
+            ? "Carregando faturas..."
+            : (error?.message ?? "Não foi possível carregar suas faturas.")}
+        </p>
+      </GlassCard>
+    );
+  }
+
+  const { faturas, aberta, totalPago, quitadas, economia } = data;
+  const cupom = aberta?.cupom ?? "";
+  const desconto = aberta?.desconto ?? 0;
+
+  const statusStyle: Record<string, string> = {
     pago: "border-emerald-400/35 bg-emerald-400/10 text-emerald-300",
     aberto: "border-amber-400/40 bg-amber-400/10 text-amber-300",
     vencido: "border-neon-red/40 bg-neon-red/10 text-neon-red",
-  } as const;
-
-  const total = myInvoices.filter((i) => i.status === "pago").reduce((s, i) => s + i.amount, 0);
+  };
 
   return (
     <div className="space-y-5">
@@ -302,14 +312,26 @@ function InvoicesView({ cliente }: { cliente: Cliente }) {
         {[
           {
             label: "Fatura em aberto",
-            value: brl(valorComDesconto),
-            sub: cupom
-              ? `${brl(valorCheio)} - ${desconto}% de desconto`
-              : `vence em ${cliente.proximaCobranca || "—"}`,
+            value: aberta ? brl(aberta.valorFinal) : "Tudo em dia",
+            sub: aberta
+              ? cupom
+                ? `${brl(aberta.valor)} - ${desconto}% de desconto`
+                : `vence em ${dataBr(aberta.vencimento)}`
+              : "nenhuma cobrança pendente",
             accent: "red" as const,
           },
-          { label: "Total pago em 2026", value: brl(total), sub: `${myInvoices.length - 1} faturas quitadas`, accent: "cyan" as const },
-          { label: "Método padrão", value: "PIX", sub: "desconto de 5% aplicado", accent: "purple" as const },
+          {
+            label: "Total pago",
+            value: brl(totalPago),
+            sub: `${quitadas} ${quitadas === 1 ? "fatura quitada" : "faturas quitadas"}`,
+            accent: "cyan" as const,
+          },
+          {
+            label: "Economia com a Jornada",
+            value: brl(economia),
+            sub: economia > 0 ? "descontos já aplicados" : "conquiste cupons na Jornada",
+            accent: "purple" as const,
+          },
         ].map((s) => (
           <GlassCard key={s.label} accent={s.accent} className="p-5">
             <div className="font-sans text-[11px] uppercase tracking-[0.2em] text-white/35">
@@ -323,27 +345,27 @@ function InvoicesView({ cliente }: { cliente: Cliente }) {
         ))}
       </div>
 
-      {cupom && (
+      {cupom && aberta && (
         <GlassCard accent="red" className="flex flex-wrap items-center gap-4 p-5">
           <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl border border-neon-red/40 bg-neon-red/10">
             <Gift className="size-5 text-neon-red" />
           </span>
           <div className="min-w-0 flex-1">
             <div className="font-display text-sm font-bold text-white">
-              Cupom da Jornada aplicado na próxima fatura
+              Cupom da Jornada aplicado nesta fatura
             </div>
             <div className="mt-0.5 font-sans text-[11px] text-white/45">
-              Você conquistou {desconto}% OFF com suas renovações em dia. O desconto entra
-              automaticamente na cobrança de {cliente.proximaCobranca || "—"}.
+              Você conquistou {desconto}% OFF com suas renovações em dia. O desconto já está na
+              cobrança de {dataBr(aberta.vencimento)}.
             </div>
           </div>
           <div className="text-right">
             <div className="font-mono text-sm font-bold tracking-widest text-neon-red">{cupom}</div>
             <div className="font-sans text-[11px] text-white/35 line-through">
-              {brl(valorCheio)}
+              {brl(aberta.valor)}
             </div>
             <div className="font-display text-lg font-extrabold text-white">
-              {brl(valorComDesconto)}
+              {brl(aberta.valorFinal)}
             </div>
           </div>
         </GlassCard>
@@ -352,13 +374,12 @@ function InvoicesView({ cliente }: { cliente: Cliente }) {
       <GlassCard className="overflow-hidden">
         <div className="flex items-center justify-between gap-3 border-b border-white/8 px-5 py-4">
           <div className="font-display text-sm font-bold text-white">Histórico de faturas</div>
-          <NeonButton accent="cyan" variant="ghost" size="sm">
-            <Download className="size-4" />
-            Exportar
-          </NeonButton>
+          <span className="font-sans text-[11px] text-white/30">
+            cliente desde {cliente.clienteDesde || "—"}
+          </span>
         </div>
         <div className="divide-y divide-white/6">
-          {myInvoices.map((inv) => (
+          {faturas.map((inv) => (
             <div
               key={inv.id}
               className="flex flex-wrap items-center gap-3 px-5 py-4 transition-colors hover:bg-white/[0.025]"
@@ -367,15 +388,22 @@ function InvoicesView({ cliente }: { cliente: Cliente }) {
                 <Receipt className="size-4 text-white/40" />
               </span>
               <div className="min-w-0 flex-1">
-                <div className="font-display text-sm font-semibold text-white">{inv.ref}</div>
-                <div className="font-mono text-[11px] text-white/30">{inv.id}</div>
+                <div className="font-display text-sm font-semibold text-white">
+                  {rotuloCompetencia(inv.competencia)}
+                </div>
+                <div className="font-mono text-[11px] text-white/30">{inv.numero}</div>
               </div>
               <div className="hidden w-32 font-sans text-xs text-white/40 sm:block">
-                {inv.method}
+                {inv.cupom ? `${inv.cupom} · ${inv.desconto}% OFF` : "sem desconto"}
               </div>
-              <div className="w-24 font-sans text-xs text-white/40">{inv.due}</div>
-              <div className="w-24 text-right font-display text-sm font-bold text-white">
-                {brl(inv.amount)}
+              <div className="w-24 font-sans text-xs text-white/40">{dataBr(inv.vencimento)}</div>
+              <div className="w-28 text-right font-display text-sm font-bold text-white">
+                {inv.desconto > 0 && (
+                  <span className="mr-1.5 font-sans text-[11px] font-medium text-white/30 line-through">
+                    {brl(inv.valor)}
+                  </span>
+                )}
+                {brl(inv.valorFinal)}
               </div>
               <span
                 className={cn(
@@ -385,21 +413,30 @@ function InvoicesView({ cliente }: { cliente: Cliente }) {
               >
                 {inv.status}
               </span>
-              {inv.status === "aberto" ? (
-                <NeonButton accent="red" size="sm">
-                  Pagar
-                </NeonButton>
+              {inv.status === "pago" ? (
+                <span className="font-sans text-[11px] text-white/25">
+                  pago em {dataBr(inv.pagoEm)}
+                </span>
               ) : (
-                <button
-                  type="button"
-                  className="flex size-8 items-center justify-center rounded-lg border border-white/10 text-white/35 transition-colors hover:text-white"
-                  aria-label="Baixar recibo"
+                <a
+                  href={whatsappLink(
+                    `Olá! Quero pagar a fatura ${inv.numero} de ${brl(inv.valorFinal)} da PLAPLUSNOW.`,
+                  )}
+                  target="_blank"
+                  rel="noreferrer"
                 >
-                  <Download className="size-3.5" />
-                </button>
+                  <NeonButton accent="red" size="sm">
+                    Pagar
+                  </NeonButton>
+                </a>
               )}
             </div>
           ))}
+          {faturas.length === 0 && (
+            <p className="px-5 py-6 font-sans text-sm text-white/35">
+              Nenhuma fatura gerada ainda.
+            </p>
+          )}
         </div>
       </GlassCard>
     </div>

@@ -50,7 +50,13 @@ import { useContas, useCriarConta, useResumoEstoque } from "../queries/contas";
 import { useMapaAlocacoes } from "../queries/alocacoes";
 import { useAplicativos } from "../queries/aplicativos";
 import { useResumoSuporte } from "../queries/suporte";
-import { useResumoRecompensas, useAfiliados } from "../queries/recompensas";
+import { useResumoRecompensas } from "../queries/recompensas";
+import {
+  useFaturas,
+  useResumoFaturas,
+  useRegistrarPagamento,
+  dataBr,
+} from "../queries/faturas";
 import { usePacotes, useCriarPacote, useRemoverPacote } from "../queries/pacotes";
 import {
   useCriarUsuario,
@@ -1036,27 +1042,30 @@ function NovoClienteForm() {
 /* ------------------------------------------------------------------ */
 
 function InvoicesAdminView() {
-  const { data, isPending, isError, error } = useUsuarios();
-  const resumo = useResumoClientes();
-  const afiliados = useAfiliados();
-
-  const cupons = useMemo(() => {
-    const mapa = new Map<number, { cupom: string; desconto: number }>();
-    for (const linha of afiliados.data ?? []) {
-      if (linha.cupomAtivo && linha.cupomDesconto > 0) {
-        mapa.set(linha.clienteId, { cupom: linha.cupomAtivo, desconto: linha.cupomDesconto });
-      }
-    }
-    return mapa;
-  }, [afiliados.data]);
+  // faturas reais vindas do banco (geradas a partir do historico de cada
+  // cliente), ja com o cupom da Jornada aplicado quando houver.
+  const { data, isPending, isError, error } = useFaturas();
+  const resumo = useResumoFaturas();
+  const clientes = useUsuarios();
+  const baixa = useRegistrarPagamento();
+  const [filtro, setFiltro] = useState<"pendentes" | "todas" | "pagas">("pendentes");
 
   if (isPending) return <Loading label="Carregando faturas..." />;
   if (isError) return <ErrorBox message={error?.message} />;
 
-  const clientes = data ?? [];
-  const pending = clientes.filter((c) => c.statusPagamento !== "ativo");
-  const mrr = resumo.data?.mrr ?? 0;
-  const ticket = clientes.length ? mrr / clientes.length : 0;
+  const todas = data ?? [];
+  const pendentes = todas.filter((f) => f.status !== "pago");
+  const lista =
+    filtro === "pendentes" ? pendentes : filtro === "pagas" ? todas.filter((f) => f.status === "pago") : todas;
+
+  const totalClientes = (clientes.data ?? []).length;
+  const ticket = totalClientes ? (resumo.data?.recebido ?? 0) / Math.max(1, totalClientes) : 0;
+
+  const statusStyle: Record<string, string> = {
+    pago: "border-emerald-400/35 bg-emerald-400/10 text-emerald-300",
+    aberto: "border-amber-400/40 bg-amber-400/10 text-amber-300",
+    vencido: "border-neon-red/40 bg-neon-red/10 text-neon-red",
+  };
 
   return (
     <div className="space-y-5">
@@ -1064,18 +1073,28 @@ function InvoicesAdminView() {
         {[
           {
             label: "Faturas a vencer",
-            value: String(resumo.data?.vencendo ?? 0),
-            sub: "próximos vencimentos",
+            value: String(resumo.data?.aVencer ?? 0),
+            sub: `${brl(resumo.data?.totalEmAberto ?? 0)} em aberto`,
             accent: "purple" as const,
           },
-          { label: "MRR previsto", value: brl(mrr), sub: "receita recorrente", accent: "cyan" as const },
           {
-            label: "Inadimplentes",
-            value: String(resumo.data?.inadimplentes ?? 0),
-            sub: `${brl(resumo.data?.emAtraso ?? 0)} em atraso`,
+            label: "Recebido",
+            value: brl(resumo.data?.recebido ?? 0),
+            sub: "faturas quitadas",
+            accent: "cyan" as const,
+          },
+          {
+            label: "Vencidas",
+            value: String(resumo.data?.vencidas ?? 0),
+            sub: `${brl(resumo.data?.totalVencido ?? 0)} em atraso`,
             accent: "red" as const,
           },
-          { label: "Ticket médio", value: brl(ticket), sub: `${clientes.length} clientes`, accent: "cyan" as const },
+          {
+            label: "Desconto concedido",
+            value: brl(resumo.data?.descontoConcedido ?? 0),
+            sub: `ticket médio ${brl(ticket)}`,
+            accent: "cyan" as const,
+          },
         ].map((s) => (
           <GlassCard key={s.label} accent={s.accent} className="p-5">
             <div className="font-sans text-[11px] uppercase tracking-[0.2em] text-white/35">
@@ -1089,62 +1108,98 @@ function InvoicesAdminView() {
         ))}
       </div>
 
-      <GlassCard accent="red" className="p-5">
-        <div className="flex items-center gap-2">
-          <CircleDollarSign className="size-4 text-neon-red" />
-          <div className="font-display text-sm font-bold text-white">Cobranças pendentes</div>
+      <GlassCard accent="red" className="overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/8 px-5 py-4">
+          <div className="flex items-center gap-2">
+            <CircleDollarSign className="size-4 text-neon-red" />
+            <div className="font-display text-sm font-bold text-white">
+              Faturas ({lista.length})
+            </div>
+          </div>
+          <div className="flex gap-1.5">
+            {(["pendentes", "pagas", "todas"] as const).map((f) => (
+              <button
+                key={f}
+                type="button"
+                onClick={() => setFiltro(f)}
+                className={cn(
+                  "rounded-full border px-3 py-1 font-sans text-[11px] capitalize transition-colors",
+                  filtro === f
+                    ? "border-neon-red/40 bg-neon-red/10 text-neon-red"
+                    : "border-white/10 text-white/40 hover:text-white",
+                )}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="mt-4 space-y-2.5">
-          {pending.map((c) => {
-            const cupom = cupons.get(c.id);
-            const valorFinal = cupom ? c.valor * (1 - cupom.desconto / 100) : c.valor;
-            return (
+
+        <div className="divide-y divide-white/6">
+          {lista.map((f) => (
             <div
-              key={c.id}
-              className="flex flex-wrap items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.03] p-3.5"
+              key={f.id}
+              className="flex flex-wrap items-center gap-3 px-5 py-3.5 transition-colors hover:bg-white/[0.025]"
             >
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-neon-red/30 bg-neon-red/10">
-                <Receipt className="size-4 text-neon-red" />
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04]">
+                <Receipt className="size-4 text-white/40" />
               </span>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <div className="font-display text-xs font-bold text-white">{c.nome}</div>
-                  {cupom && (
+                  <div className="font-display text-xs font-bold text-white">{f.clienteNome}</div>
+                  {f.cupom && (
                     <span className="rounded-full border border-neon-cyan/30 bg-neon-cyan/10 px-2 py-0.5 font-sans text-[10px] font-semibold text-neon-cyan">
-                      {cupom.cupom} · {cupom.desconto}% OFF
+                      {f.cupom} · {f.desconto}% OFF
                     </span>
                   )}
                 </div>
-                <div className="font-sans text-[11px] text-white/35">
-                  {c.pacoteNome ?? "sem pacote"} · vencimento {c.proximaCobranca || "—"}
+                <div className="font-mono text-[11px] text-white/30">
+                  {f.numero} · vence {dataBr(f.vencimento)}
                 </div>
               </div>
               <span className="font-display text-sm font-bold text-white">
-                {cupom && (
+                {f.desconto > 0 && (
                   <span className="mr-2 font-sans text-[11px] font-medium text-white/30 line-through">
-                    {brl(c.valor)}
+                    {brl(f.valor)}
                   </span>
                 )}
-                {brl(valorFinal)}
+                {brl(f.valorFinal)}
               </span>
-              <a
-                href={whatsappLink(
-                  cupom
-                    ? `Olá ${c.nome}! Sua fatura da PLAPLUSNOW está em aberto. Com o cupom ${cupom.cupom} (${cupom.desconto}% OFF) da sua Jornada, o valor fica ${brl(valorFinal)} em vez de ${brl(c.valor)}.`
-                    : `Olá ${c.nome}! Passando para lembrar da sua fatura de ${brl(c.valor)} na PLAPLUSNOW.`,
+              <span
+                className={cn(
+                  "w-20 shrink-0 rounded-full border px-2 py-1 text-center font-sans text-[10px] uppercase tracking-widest",
+                  statusStyle[f.status],
                 )}
-                target="_blank"
-                rel="noreferrer"
               >
-                <NeonButton accent="red" variant="outline" size="sm">
-                  Cobrar no WhatsApp
-                </NeonButton>
-              </a>
+                {f.status}
+              </span>
+              <button
+                type="button"
+                disabled={baixa.isPending}
+                onClick={() => baixa.mutate({ id: f.id, pago: f.status !== "pago" })}
+                className="rounded-lg border border-white/10 px-2.5 py-1.5 font-sans text-[11px] text-white/45 transition-colors hover:border-white/25 hover:text-white disabled:opacity-40"
+              >
+                {f.status === "pago" ? "Reabrir" : "Dar baixa"}
+              </button>
+              {f.status !== "pago" && (
+                <a
+                  href={whatsappLink(
+                    f.cupom
+                      ? `Olá ${f.clienteNome}! Sua fatura ${f.numero} está em aberto. Com o cupom ${f.cupom} (${f.desconto}% OFF) da sua Jornada, o valor fica ${brl(f.valorFinal)} em vez de ${brl(f.valor)}.`
+                      : `Olá ${f.clienteNome}! Passando para lembrar da fatura ${f.numero}, de ${brl(f.valorFinal)}, na PLAPLUSNOW.`,
+                  )}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <NeonButton accent="red" variant="outline" size="sm">
+                    Cobrar
+                  </NeonButton>
+                </a>
+              )}
             </div>
-            );
-          })}
-          {pending.length === 0 && (
-            <p className="font-sans text-sm text-white/35">Nenhuma cobrança pendente.</p>
+          ))}
+          {lista.length === 0 && (
+            <p className="px-5 py-6 font-sans text-sm text-white/35">Nenhuma fatura aqui.</p>
           )}
         </div>
       </GlassCard>
