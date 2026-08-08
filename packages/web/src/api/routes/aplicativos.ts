@@ -30,7 +30,11 @@ const aplicativoInput = z.object({
     .regex(/^#[0-9a-fA-F]{6}$/, "Use uma cor hex, ex.: #22d3ee")
     .default("#22d3ee"),
   tipo: z.enum(["video", "musica", "extra"]).default("video"),
+  categoria: z
+    .enum(["streaming", "esportes", "produtividade", "musica", "iptv", "asiatico"])
+    .default("streaming"),
   precoAvulso: z.number().nonnegative().default(0),
+  preco: z.number().nonnegative().default(0),
   ativo: z.boolean().default(true),
 });
 

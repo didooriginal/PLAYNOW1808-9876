@@ -24,6 +24,8 @@ import { AppIcon } from "../components/app-icon";
 import { RelatarProblema } from "../components/cliente/relatar-problema";
 import { SuporteClienteView } from "../components/cliente/suporte-view";
 import { JornadaCliente } from "../components/cliente/jornada";
+import { CodigoRecente } from "../components/cliente/codigo-recente";
+import { CombosSugeridos } from "../components/cliente/combos-sugeridos";
 import { PanelShell, type NavItem } from "../components/panel-shell";
 import { GlassCard, NeonButton, Pill, ProgressBar, accentHex, NeonBackdrop } from "../components/ui/kit";
 import {
@@ -448,6 +450,7 @@ function InvoicesView({ cliente }: { cliente: Cliente }) {
 function UpgradesView() {
   return (
     <div className="space-y-5">
+      <CombosSugeridos />
       <div className="grid gap-4 lg:grid-cols-2">
         {upgrades.map((u) => (
           <GlassCard key={u.title} accent={u.accent} hover className="flex flex-col p-5">
@@ -603,6 +606,7 @@ export default function DashboardPage() {
           {active === "acessos" && (
             <>
               <ActivePlanCard cliente={cliente} pacote={pacote} apps={acessos.length} />
+              <CodigoRecente />
               {acessos.length > 0 ? (
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                   {acessos.map((cred) => (

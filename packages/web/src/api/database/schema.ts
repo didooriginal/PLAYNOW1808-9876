@@ -140,8 +140,12 @@ export const aplicativos = sqliteTable("aplicativos", {
   cor: text("cor").notNull().default("#22d3ee"),
   /** video | musica | extra */
   tipo: text("tipo").notNull().default("video"),
+  /** streaming | esportes | produtividade | musica | iptv | asiatico */
+  categoria: text("categoria").notNull().default("streaming"),
   /** preço avulso de mercado — usado no comparativo de economia */
   precoAvulso: real("preco_avulso").notNull().default(0),
+  /** preço de venda PLAPLUSNOW (tabela oficial) */
+  preco: real("preco").notNull().default(0),
   ativo: integer("ativo", { mode: "boolean" }).notNull().default(true),
   criadoEm: integer("criado_em", { mode: "timestamp" })
     .notNull()
@@ -291,6 +295,76 @@ export const recompensasEventos = sqliteTable("recompensas_eventos", {
 
 export type RecompensaEvento = typeof recompensasEventos.$inferSelect;
 export type NovaRecompensaEvento = typeof recompensasEventos.$inferInsert;
+
+/* ------------------------------------------------------------------ */
+/* COMBOS INTELIGENTES                                                 */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Combo promocional montado no admin: escolhe 2+ apps e define um preco
+ * abaixo da soma dos avulsos. `apps` guarda a lista de slugs em JSON.
+ */
+export const combos = sqliteTable("combos", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  nome: text("nome").notNull(),
+  descricao: text("descricao").notNull().default(""),
+  /** JSON com os slugs de `aplicativos` que compoem o combo */
+  apps: text("apps", { mode: "json" }).$type<string[]>().notNull().default([]),
+  /** preco promocional cobrado pelo combo */
+  preco: real("preco").notNull().default(0),
+  /** soma dos avulsos no momento do cadastro — congela a comparacao */
+  precoCheio: real("preco_cheio").notNull().default(0),
+  /** mensal | anual */
+  ciclo: text("ciclo").notNull().default("mensal"),
+  /** aparece na landing para visitantes */
+  visivelLanding: integer("visivel_landing", { mode: "boolean" }).notNull().default(true),
+  /** aparece no painel do cliente como upgrade sugerido */
+  visivelCliente: integer("visivel_cliente", { mode: "boolean" }).notNull().default(true),
+  destaque: integer("destaque", { mode: "boolean" }).notNull().default(false),
+  ativo: integer("ativo", { mode: "boolean" }).notNull().default(true),
+  criadoEm: integer("criado_em", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+export type Combo = typeof combos.$inferSelect;
+export type NovoCombo = typeof combos.$inferInsert;
+
+/* ------------------------------------------------------------------ */
+/* CENTRAL DE CODIGOS (OTP)                                            */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Codigos de verificacao extraidos de e-mails recebidos (webhook de inbound
+ * email ou colagem manual no admin). Sao efemeros por design: tudo com mais
+ * de 1 hora e apagado automaticamente a cada leitura da central.
+ */
+export const codigosOtp = sqliteTable("codigos_otp", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  /** codigo numerico de 4 a 6 digitos extraido do corpo do e-mail */
+  codigo: text("codigo").notNull(),
+  /** slug do app identificado (ou "desconhecido") */
+  servicoSlug: text("servico_slug").notNull().default("desconhecido"),
+  /** nome exibido do servico */
+  servico: text("servico").notNull().default("Desconhecido"),
+  /** cliente vinculado pelo e-mail de destino, quando identificado */
+  clienteId: integer("cliente_id").references(() => usuarios.id, { onDelete: "set null" }),
+  /** remetente do e-mail */
+  remetente: text("remetente").notNull().default(""),
+  /** destinatario — usado para casar com a conta matriz / cliente */
+  destinatario: text("destinatario").notNull().default(""),
+  assunto: text("assunto").notNull().default(""),
+  /** trecho do corpo em volta do codigo, para conferencia */
+  trecho: text("trecho").notNull().default(""),
+  /** webhook | manual */
+  origem: text("origem").notNull().default("webhook"),
+  recebidoEm: integer("recebido_em", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+export type CodigoOtp = typeof codigosOtp.$inferSelect;
+export type NovoCodigoOtp = typeof codigosOtp.$inferInsert;
 
 /* ------------------------------------------------------------------ */
 /* FATURAS                                                             */

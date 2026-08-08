@@ -137,3 +137,58 @@
 ### Verificações
 - `bun run typecheck` OK · `bun run build` OK · `db:push` aplicado
 - E2E: landing, cliente (Faturas) e admin (Visão Geral, Faturas) com `errors: []`
+
+## Fase 9 — Catálogo oficial (33 produtos), Combo Inteligente e Central de Códigos
+
+### 1. Catálogo com preços oficiais e categorias
+- `aplicativos.preco` (novo campo) = preço de venda PLAPLUSNOW. `precoAvulso` continua
+  sendo o preço de mercado, usado só no comparativo de economia.
+- `aplicativos.categoria`: `streaming | esportes | produtividade | musica | iptv | asiatico`.
+- 33 produtos da tabela oficial cadastrados (21 novos + 14 atualizados). Total 35 linhas:
+  `star` e `iptv` foram MANTIDOS porque `pacotes.servicos` e `contas_matrizes.servico`
+  ainda apontam para eles — remover quebraria o histórico. Nunca deletados.
+- Admin › Aplicativos: filtro por categoria + seções agrupadas, com preço PPN e avulso.
+
+### 2. Combo Inteligente
+- Tabela `combos` + `api/routes/combos.ts` (`vitrine` pública, `paraCliente`, `listar`,
+  `criar`, `atualizar`, `remover`).
+- `precoCheio` NUNCA é digitado: é a soma dos `aplicativos.preco` dos apps do combo,
+  recalculada no servidor a cada gravação — o "de/por" e o % OFF são sempre reais.
+- Admin: monta o combo marcando 2+ apps (mínimo validado no schema) e digitando o preço;
+  toggles de visibilidade (landing / painel do cliente / ativo / destaque).
+- Aparece nos três lugares pedidos: admin, landing (`#combos`) e painel do cliente
+  (aba Novidades/Upgrades, como upgrade sugerido).
+- 5 combos de demonstração semeados (Cinéfilo Total em destaque).
+
+### 3. Central de Códigos (OTP)
+- Tabela `codigos_otp` + `api/routes/codigos.ts`.
+- Duas portas de entrada, mesmo pipeline:
+  1. `POST /api/webhooks/email` — webhook genérico (aceita `from/to/subject/text` e os
+     apelidos comuns dos provedores; header `x-webhook-token` se `EMAIL_WEBHOOK_TOKEN`).
+  2. Colagem manual no admin — o parser lê as linhas `De:/Para:/Assunto:` do texto colado.
+- Extração: busca número de 4 a 6 dígitos perto de rótulos ("código", "verification code",
+  "OTP"...), depois padrão invertido, depois fallback ignorando o que parece ano.
+- Serviço identificado pelo remetente/assunto (peso 2) ou corpo (peso 1), cruzando slug,
+  nome e apelidos de domínio do catálogo.
+- Cliente identificado pelo destinatário: e-mail do próprio cliente → dele; conta matriz
+  com uma única vaga ativa → do ocupante; conta compartilhada → sem dono (admin vincula
+  no dropdown).
+- Limpeza automática: tudo com mais de 1 hora é apagado a cada leitura da central.
+- Cliente: card "Seu código de acesso recente" no topo de Meus Acessos, com contagem de
+  expiração e botão copiar. Vê códigos vinculados a ele OU endereçados a uma matriz em que
+  tem vaga ativa — sem nunca expor o e-mail/senha da matriz.
+
+### 4. Itens já entregues em fases anteriores (revalidados aqui)
+- Gamificação: `/signup?ref=CODIGO`, Jornada com 7 níveis, 3 renovações = 15% OFF,
+  3 indicações = HBO Max, 12 meses = prêmio surpresa.
+- Admin/Segurança: editar vagas, tarja de vencimento < 5 dias, "Repor conta" sem apagar
+  histórico (`alocacoes.status`), aba Suporte, e o cliente nunca vê total de vagas nem
+  contagem de usuários da matriz.
+
+### Verificações
+- `bun run typecheck` OK · `bun run build` OK
+- `ALTER TABLE aplicativos ADD COLUMN preco` aplicado à mão (db:push exige TTY para
+  coluna NOT NULL sem default) · `db:push` aplicado para `combos` e `codigos_otp`
+- Webhook testado: 200 com código extraído, 422 quando o e-mail não tem código
+- E2E `errors: []` e `http_errors: []` em landing, admin (Aplicativos, Central de Códigos)
+  e cliente (Meus Acessos, Novidades) + suítes antigas (gamificação, faturas, visão geral)

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { AlertTriangle, Check, Loader2, Plus, Power, Trash2 } from "lucide-react";
 import { AppIcon } from "../app-icon";
 import { GlassCard, NeonButton, accentHex } from "../ui/kit";
@@ -9,12 +9,28 @@ import {
   useCriarAplicativo,
   useRemoverAplicativo,
 } from "../../queries/aplicativos";
+import { ComboBuilder } from "./combo-builder";
 
 const TIPOS = [
   { id: "video", label: "Vídeo" },
   { id: "musica", label: "Música" },
   { id: "extra", label: "Extra" },
 ] as const;
+
+/** categorias comerciais do catálogo — organizam a vitrine e o painel */
+export const CATEGORIAS = [
+  { id: "streaming", label: "Streaming", accent: "red" as const },
+  { id: "esportes", label: "Esportes", accent: "cyan" as const },
+  { id: "produtividade", label: "Produtividade", accent: "purple" as const },
+  { id: "musica", label: "Música", accent: "cyan" as const },
+  { id: "iptv", label: "IPTV", accent: "red" as const },
+  { id: "asiatico", label: "Conteúdo Asiático", accent: "purple" as const },
+] as const;
+
+export type CategoriaId = (typeof CATEGORIAS)[number]["id"];
+
+export const rotuloCategoria = (id: string) =>
+  CATEGORIAS.find((c) => c.id === id)?.label ?? "Outros";
 
 const inputCls =
   "w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 font-sans text-sm text-white placeholder:text-white/25 focus:border-neon-purple/50 focus:outline-none";
@@ -26,6 +42,8 @@ function NovoAppForm({ onClose }: { onClose: () => void }) {
     mono: "",
     cor: "#22d3ee",
     tipo: "video" as (typeof TIPOS)[number]["id"],
+    categoria: "streaming" as CategoriaId,
+    preco: 0,
     precoAvulso: 0,
   });
   const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) =>
@@ -44,7 +62,7 @@ function NovoAppForm({ onClose }: { onClose: () => void }) {
         </button>
       </div>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <input
           className={inputCls}
           placeholder="Nome (ex.: Max)"
@@ -75,6 +93,7 @@ function NovoAppForm({ onClose }: { onClose: () => void }) {
         </div>
         <select
           className={inputCls}
+          aria-label="Tipo de mídia"
           value={form.tipo}
           onChange={(e) => set("tipo", e.target.value as typeof form.tipo)}
         >
@@ -84,14 +103,38 @@ function NovoAppForm({ onClose }: { onClose: () => void }) {
             </option>
           ))}
         </select>
-        <input
+        <select
           className={inputCls}
-          type="number"
-          step="0.01"
-          placeholder="Preço avulso"
-          value={form.precoAvulso}
-          onChange={(e) => set("precoAvulso", Number(e.target.value))}
-        />
+          aria-label="Categoria"
+          value={form.categoria}
+          onChange={(e) => set("categoria", e.target.value as CategoriaId)}
+        >
+          {CATEGORIAS.map((c) => (
+            <option key={c.id} value={c.id} className="bg-[#09090b]">
+              {c.label}
+            </option>
+          ))}
+        </select>
+        <div className="grid grid-cols-2 gap-3">
+          <input
+            className={inputCls}
+            type="number"
+            step="0.01"
+            aria-label="Preço PLAPLUSNOW"
+            placeholder="Preço PPN"
+            value={form.preco}
+            onChange={(e) => set("preco", Number(e.target.value))}
+          />
+          <input
+            className={inputCls}
+            type="number"
+            step="0.01"
+            aria-label="Preço avulso de mercado"
+            placeholder="Avulso mercado"
+            value={form.precoAvulso}
+            onChange={(e) => set("precoAvulso", Number(e.target.value))}
+          />
+        </div>
       </div>
 
       {criar.isError && (
@@ -117,6 +160,21 @@ export function AppsView() {
   const atualizar = useAtualizarAplicativo();
   const remover = useRemoverAplicativo();
   const [criando, setCriando] = useState(false);
+  const [filtro, setFiltro] = useState<"todas" | CategoriaId>("todas");
+
+  const apps = data ?? [];
+  const ativos = apps.filter((a) => a.ativo).length;
+
+  /** apps agrupados por categoria, respeitando a ordem comercial de CATEGORIAS */
+  const grupos = useMemo(() => {
+    const visiveis = filtro === "todas" ? apps : apps.filter((a) => a.categoria === filtro);
+    return CATEGORIAS.map((cat) => ({
+      ...cat,
+      itens: visiveis
+        .filter((a) => a.categoria === cat.id)
+        .sort((a, b) => a.preco - b.preco || a.nome.localeCompare(b.nome)),
+    })).filter((g) => g.itens.length > 0);
+  }, [apps, filtro]);
 
   if (isError)
     return (
@@ -129,15 +187,22 @@ export function AppsView() {
       </GlassCard>
     );
 
-  const apps = data ?? [];
-  const ativos = apps.filter((a) => a.ativo).length;
-
   return (
     <div className="space-y-5">
       <div className="grid gap-4 sm:grid-cols-3">
         {[
-          { label: "Aplicativos", value: String(apps.length), sub: "no catálogo", accent: "cyan" as const },
-          { label: "Ativos", value: String(ativos), sub: "disponíveis para pacotes", accent: "purple" as const },
+          {
+            label: "Aplicativos",
+            value: String(apps.length),
+            sub: `${CATEGORIAS.length} categorias`,
+            accent: "cyan" as const,
+          },
+          {
+            label: "Ativos",
+            value: String(ativos),
+            sub: "disponíveis para pacotes",
+            accent: "purple" as const,
+          },
           {
             label: "Valor avulso somado",
             value: brl(apps.reduce((s, a) => s + a.precoAvulso, 0)),
@@ -157,7 +222,31 @@ export function AppsView() {
         ))}
       </div>
 
-      <div className="flex justify-end">
+      <ComboBuilder apps={apps} />
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-2">
+          {[{ id: "todas" as const, label: "Todas" }, ...CATEGORIAS].map((c) => {
+            const total =
+              c.id === "todas" ? apps.length : apps.filter((a) => a.categoria === c.id).length;
+            const on = filtro === c.id;
+            return (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => setFiltro(c.id)}
+                className={
+                  on
+                    ? "rounded-full border border-neon-purple/60 bg-neon-purple/[0.12] px-3.5 py-1.5 font-sans text-xs font-semibold text-white"
+                    : "rounded-full border border-white/10 px-3.5 py-1.5 font-sans text-xs text-white/45 transition-colors hover:border-white/25 hover:text-white"
+                }
+              >
+                {c.label} <span className="text-white/30">{total}</span>
+              </button>
+            );
+          })}
+        </div>
+
         {!criando && (
           <NeonButton accent="purple" size="sm" onClick={() => setCriando(true)}>
             <Plus className="size-4" />
@@ -174,40 +263,64 @@ export function AppsView() {
           <span className="font-sans text-sm text-white/45">Carregando catálogo...</span>
         </GlassCard>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {apps.map((app) => (
-            <GlassCard key={app.id} hover className="flex items-center gap-3 p-4">
-              <AppIcon id={app.slug} size="sm" active={app.ativo} />
-              <div className="min-w-0 flex-1">
-                <div className="truncate font-display text-sm font-bold text-white">{app.nome}</div>
-                <div className="truncate font-mono text-[10px] text-white/30">
-                  {app.slug} · {TIPOS.find((t) => t.id === app.tipo)?.label ?? app.tipo} ·{" "}
-                  {brl(app.precoAvulso)}
-                </div>
-              </div>
-              <button
-                type="button"
-                aria-label={app.ativo ? "Desativar app" : "Ativar app"}
-                title={app.ativo ? "Desativar" : "Ativar"}
-                disabled={atualizar.isPending}
-                onClick={() => atualizar.mutate({ id: app.id, ativo: !app.ativo })}
-                className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-white/10 text-white/40 transition-colors hover:text-white"
-                style={app.ativo ? { color: "#34d399", borderColor: "#34d39955" } : undefined}
+        grupos.map((grupo) => (
+          <section key={grupo.id} className="space-y-3">
+            <div className="flex items-center gap-3">
+              <h3 className="font-display text-sm font-bold tracking-tight text-white">
+                {grupo.label}
+              </h3>
+              <span
+                className="rounded-full px-2 py-0.5 font-sans text-[10px] font-semibold"
+                style={{
+                  color: accentHex[grupo.accent],
+                  background: `${accentHex[grupo.accent]}18`,
+                }}
               >
-                {app.ativo ? <Check className="size-3.5" /> : <Power className="size-3.5" />}
-              </button>
-              <button
-                type="button"
-                aria-label="Remover app"
-                disabled={remover.isPending}
-                onClick={() => remover.mutate({ id: app.id })}
-                className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-white/10 text-white/40 transition-colors hover:border-neon-red/50 hover:text-neon-red"
-              >
-                <Trash2 className="size-3.5" />
-              </button>
-            </GlassCard>
-          ))}
-        </div>
+                {grupo.itens.length}
+              </span>
+              <div className="h-px flex-1 bg-white/[0.07]" />
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {grupo.itens.map((app) => (
+                <GlassCard key={app.id} hover className="flex items-center gap-3 p-4">
+                  <AppIcon id={app.slug} size="sm" active={app.ativo} />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate font-display text-sm font-bold text-white">
+                      {app.nome}
+                    </div>
+                    <div className="truncate font-mono text-[10px] text-white/30">
+                      {app.slug} · {brl(app.preco)}
+                      {app.precoAvulso > app.preco && (
+                        <span className="text-white/20"> · avulso {brl(app.precoAvulso)}</span>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    aria-label={app.ativo ? "Desativar app" : "Ativar app"}
+                    title={app.ativo ? "Desativar" : "Ativar"}
+                    disabled={atualizar.isPending}
+                    onClick={() => atualizar.mutate({ id: app.id, ativo: !app.ativo })}
+                    className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-white/10 text-white/40 transition-colors hover:text-white"
+                    style={app.ativo ? { color: "#34d399", borderColor: "#34d39955" } : undefined}
+                  >
+                    {app.ativo ? <Check className="size-3.5" /> : <Power className="size-3.5" />}
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Remover app"
+                    disabled={remover.isPending}
+                    onClick={() => remover.mutate({ id: app.id })}
+                    className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-white/10 text-white/40 transition-colors hover:border-neon-red/50 hover:text-neon-red"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </button>
+                </GlassCard>
+              ))}
+            </div>
+          </section>
+        ))
       )}
 
       {remover.isError && (

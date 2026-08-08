@@ -19,6 +19,7 @@ import {
   Trash2,
   TrendingUp,
   Trophy,
+  KeyRound,
   UserPlus,
   Users,
 } from "lucide-react";
@@ -27,6 +28,7 @@ import { AppIcon } from "../components/app-icon";
 import { ContaMatrizCard, diasParaVencer } from "../components/admin/conta-card";
 import { AppsView } from "../components/admin/apps-view";
 import { AfiliadosView } from "../components/admin/afiliados-view";
+import { CodigosView } from "../components/admin/codigos-view";
 import { SuporteView } from "../components/admin/suporte-view";
 import { PanelShell, type NavItem } from "../components/panel-shell";
 import {
@@ -50,6 +52,7 @@ import { useMapaAlocacoes } from "../queries/alocacoes";
 import { useAplicativos } from "../queries/aplicativos";
 import { useResumoSuporte } from "../queries/suporte";
 import { useResumoRecompensas } from "../queries/recompensas";
+import { useCodigos } from "../queries/codigos";
 import {
   useFaturas,
   useResumoFaturas,
@@ -1234,6 +1237,7 @@ export default function AdminPage() {
   const aplicativos = useAplicativos();
   const suporte = useResumoSuporte();
   const gamificacao = useResumoRecompensas();
+  const codigos = useCodigos();
 
   const esgotadas = (contas.data ?? []).filter((c) => c.vagasOcupadas >= c.totalVagas).length;
   const pendentesSuporte = (suporte.data?.abertos ?? 0) + (suporte.data?.emAndamento ?? 0);
@@ -1274,6 +1278,12 @@ export default function AdminPage() {
       badge: pendentesSuporte ? String(pendentesSuporte) : undefined,
     },
     { id: "faturas", label: "Faturas", icon: Receipt, badge: aVencer ? String(aVencer) : undefined },
+    {
+      id: "codigos",
+      label: "Central de Códigos",
+      icon: KeyRound,
+      badge: codigos.data?.length ? String(codigos.data.length) : undefined,
+    },
   ];
 
   const titles: Record<string, { title: string; sub: string }> = {
@@ -1297,6 +1307,10 @@ export default function AdminPage() {
       sub: "Quem indicou quem, XP acumulado, níveis e prêmios liberados — tudo calculado automaticamente.",
     },
     faturas: { title: "Faturas", sub: "Cobranças a vencer, recebimentos e inadimplência." },
+    codigos: {
+      title: "Central de Códigos",
+      sub: "Códigos de verificação dos streamings, extraídos do e-mail e entregues ao cliente. Expiram em 1 hora.",
+    },
   };
 
   return (
@@ -1349,6 +1363,7 @@ export default function AdminPage() {
           {active === "afiliados" && <AfiliadosView />}
           {active === "suporte" && <SuporteView />}
           {active === "faturas" && <InvoicesAdminView />}
+          {active === "codigos" && <CodigosView />}
         </div>
       </PanelShell>
     </div>
