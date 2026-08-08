@@ -15,6 +15,10 @@ export function useResumoFaturas() {
   return useQuery(orpc.faturas.resumo.queryOptions({ staleTime: 15_000 }));
 }
 
+export function useSerieReceita(meses = 7) {
+  return useQuery(orpc.faturas.serie.queryOptions({ input: { meses }, staleTime: 30_000 }));
+}
+
 export function useRegistrarPagamento() {
   const qc = useQueryClient();
   return useMutation(

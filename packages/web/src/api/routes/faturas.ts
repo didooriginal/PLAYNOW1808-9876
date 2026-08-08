@@ -248,6 +248,63 @@ export const faturasRoutes = {
     };
   }),
 
+  /**
+   * Serie historica de receita, derivada das faturas. Devolve os ultimos N
+   * meses de competencia com o valor efetivamente faturado (ja com desconto),
+   * usada no grafico de MRR do painel admin.
+   */
+  serie: adminOnly
+    .input(z.object({ meses: z.number().min(3).max(24).default(7) }).optional())
+    .handler(async ({ input }) => {
+      const meses = input?.meses ?? 7;
+      const todas = await db.select().from(faturas);
+      const clientes = await db
+        .select({ id: usuarios.id, ciclo: usuarios.ciclo })
+        .from(usuarios);
+      const ciclos = new Map(clientes.map((c) => [c.id, c.ciclo] as const));
+
+      const hoje = new Date();
+      const buckets: { competencia: string; rotulo: string; valor: number; faturas: number }[] = [];
+      const rotulos = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+
+      for (let i = meses - 1; i >= 0; i--) {
+        const d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+        buckets.push({
+          competencia: competenciaDe(d.getFullYear(), d.getMonth() + 1),
+          rotulo: rotulos[d.getMonth()],
+          valor: 0,
+          faturas: 0,
+        });
+      }
+
+      const porCompetencia = new Map(buckets.map((b) => [b.competencia, b] as const));
+
+      // Receita RECONHECIDA, nao caixa: uma fatura anual e rateada nos 12
+      // meses que ela cobre, senao o mes da cobranca vira um pico e os
+      // demais afundam. Assim a serie representa MRR de verdade.
+      for (const f of todas) {
+        const anual = ciclos.get(f.clienteId) === "anual";
+        const parcelas = anual ? 12 : 1;
+        const parcela = centavos(f.valorFinal / parcelas);
+        const [ano, mes] = f.competencia.split("-").map(Number);
+        if (!ano || !mes) continue;
+
+        for (let k = 0; k < parcelas; k++) {
+          const d = new Date(ano, mes - 1 + k, 1);
+          const bucket = porCompetencia.get(competenciaDe(d.getFullYear(), d.getMonth() + 1));
+          if (!bucket) continue;
+          bucket.valor = centavos(bucket.valor + parcela);
+          bucket.faturas += 1;
+        }
+      }
+
+      const primeiro = buckets[0]?.valor ?? 0;
+      const ultimo = buckets[buckets.length - 1]?.valor ?? 0;
+      const variacao = primeiro > 0 ? Math.round(((ultimo - primeiro) / primeiro) * 100) : 0;
+
+      return { serie: buckets, variacao };
+    }),
+
   /** Baixa manual do admin: marca a fatura como paga (ou reabre). */
   registrarPagamento: adminOnly
     .input(z.object({ id: z.number(), pago: z.boolean().default(true) }))

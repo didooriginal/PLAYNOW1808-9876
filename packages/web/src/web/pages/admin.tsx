@@ -39,7 +39,6 @@ import {
 } from "../components/ui/kit";
 import {
   brl,
-  revenueSeries,
   serviceById,
   services,
   whatsappLink,
@@ -55,6 +54,7 @@ import {
   useFaturas,
   useResumoFaturas,
   useRegistrarPagamento,
+  useSerieReceita,
   dataBr,
 } from "../queries/faturas";
 import { usePacotes, useCriarPacote, useRemoverPacote } from "../queries/pacotes";
@@ -705,39 +705,54 @@ function PackagesView() {
 /* ------------------------------------------------------------------ */
 
 function RevenueChart() {
-  const max = Math.max(...revenueSeries.map((r) => r.value));
+  // serie real: soma do que foi faturado por competencia (ja com desconto)
+  const { data, isPending } = useSerieReceita(7);
+  const serie = data?.serie ?? [];
+  const max = Math.max(1, ...serie.map((r) => r.valor));
+  const variacao = data?.variacao ?? 0;
+
   return (
-    <GlassCard className="p-5 sm:p-6">
+    <GlassCard className="flex h-full flex-col p-5 sm:p-6">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <div className="font-display text-sm font-bold text-white">Receita recorrente (MRR)</div>
+          <div className="font-display text-sm font-bold text-white">Receita faturada</div>
           <div className="mt-0.5 font-sans text-[11px] text-white/35">
-            série histórica ilustrativa · em R$ mil
+            últimos 7 meses · receita reconhecida (planos anuais rateados)
           </div>
         </div>
-        <Pill accent="cyan" icon={<BarChart3 className="size-3" />}>
-          +70% no período
+        <Pill accent={variacao >= 0 ? "cyan" : "red"} icon={<BarChart3 className="size-3" />}>
+          {variacao >= 0 ? "+" : ""}
+          {variacao}% no período
         </Pill>
       </div>
 
-      <div className="mt-7 flex h-52 items-end gap-2.5 sm:gap-4">
-        {revenueSeries.map((r, i) => {
-          const h = 20 + (r.value / max) * 140;
-          const isLast = i === revenueSeries.length - 1;
+      <div className="mt-7 flex min-h-52 flex-1 items-end gap-2.5 sm:gap-4">
+        {isPending && (
+          <p className="w-full self-center text-center font-sans text-sm text-white/30">
+            Calculando receita...
+          </p>
+        )}
+        {serie.map((r, i) => {
+          const h = 18 + (r.valor / max) * 74;
+          const isLast = i === serie.length - 1;
           return (
-            <div key={r.month} className="flex h-full flex-1 flex-col items-center justify-end gap-2">
+            <div
+              key={r.competencia}
+              className="group flex h-full flex-1 flex-col items-center justify-end gap-2"
+              title={`${r.faturas} fatura(s) · ${brl(r.valor)}`}
+            >
               <span
                 className={cn(
                   "font-display text-[10px] font-bold",
                   isLast ? "text-neon-red" : "text-white/35",
                 )}
               >
-                {r.value.toFixed(1)}
+                {(r.valor / 1000).toFixed(1)}k
               </span>
               <div
                 className="w-full shrink-0 rounded-t-lg transition-all duration-700"
                 style={{
-                  height: `${h}px`,
+                  height: `${h}%`,
                   background: isLast
                     ? "linear-gradient(180deg, #ff1f3d 0%, rgba(255,31,61,0.15) 100%)"
                     : "linear-gradient(180deg, rgba(34,211,238,0.85) 0%, rgba(34,211,238,0.06) 100%)",
@@ -747,7 +762,7 @@ function RevenueChart() {
                 }}
               />
               <span className="font-sans text-[10px] uppercase tracking-widest text-white/30">
-                {r.month}
+                {r.rotulo}
               </span>
             </div>
           );
