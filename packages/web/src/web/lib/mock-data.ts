@@ -1,9 +1,11 @@
-// CATÁLOGO ESTÁTICO + MOCKS RESTANTES.
-// Pacotes, contas matrizes e usuários agora vêm do BANCO REAL (src/api/database/schema.ts)
-// via os stores em src/web/queries/. Aqui ficam apenas:
-//  - o catálogo de serviços (nome, ícone, cor, preço avulso) usado pelos ícones e comparativos
-//  - conteúdo da landing (depoimentos, stats) e o que ainda não tem tabela
-//    (faturas, novidades, upgrades, série histórica de MRR).
+// CATÁLOGO ESTÁTICO + CONTEÚDO DE LANDING.
+// Pacotes, contas matrizes, usuários, alocações, chamados, gamificação e
+// faturas vêm do BANCO REAL (src/api/database/schema.ts) via os stores em
+// src/web/queries/. Aqui ficam apenas:
+//  - o catálogo de serviços (nome, ícone, cor, preço avulso), usado pelos
+//    ícones, pelo comparativo e pelo montador à la carte da landing;
+//  - conteúdo editorial da landing (depoimentos, stats) e as vitrines de
+//    upgrades/novidades do painel do cliente, que ainda não têm tabela.
 
 export const WHATSAPP_NUMBER = "5521964727746";
 
@@ -258,89 +260,6 @@ export const socialStats = [
 /* PAINEL DO CLIENTE                                                   */
 /* ------------------------------------------------------------------ */
 
-export type Credential = {
-  service: ServiceId;
-  email: string;
-  password: string;
-  profile: string;
-  pin?: string;
-  status: "ativo" | "manutencao";
-  screens: string;
-};
-
-export const currentUser = {
-  name: "Diego Dias Silva",
-  email: "diego.silva@email.com",
-  initials: "DS",
-  plan: "Mega Promo",
-  cycle: "Mensal",
-  price: 59.9,
-  memberSince: "12/03/2025",
-  nextCharge: "12/09/2026",
-  daysLeft: 36,
-  savedPerMonth: 158.4,
-  status: "Ativo" as const,
-};
-
-export const myAccess: Credential[] = [
-  {
-    service: "netflix",
-    email: "matriz.ntf07@plaplusnow.com",
-    password: "Ppn#N7x2026",
-    profile: "Perfil 3 — DIEGO",
-    pin: "4417",
-    status: "ativo",
-    screens: "1 tela · 4K HDR",
-  },
-  {
-    service: "disney",
-    email: "matriz.dsn12@plaplusnow.com",
-    password: "Dsn!2026plus",
-    profile: "Perfil DIEGO",
-    status: "ativo",
-    screens: "1 tela · Full HD",
-  },
-  {
-    service: "hbomax",
-    email: "matriz.max03@plaplusnow.com",
-    password: "MaxPpn@0399",
-    profile: "Perfil 2 — DIEGO",
-    status: "manutencao",
-    screens: "1 tela · Full HD",
-  },
-  {
-    service: "prime",
-    email: "matriz.prv21@plaplusnow.com",
-    password: "Prv#2026ppn",
-    profile: "Perfil DIEGO",
-    status: "ativo",
-    screens: "1 tela · 4K",
-  },
-  {
-    service: "spotify",
-    email: "matriz.spt09@plaplusnow.com",
-    password: "Spt$Fam2026",
-    profile: "Membro família 4",
-    status: "ativo",
-    screens: "Conta individual",
-  },
-  {
-    service: "youtube",
-    email: "matriz.ytb05@plaplusnow.com",
-    password: "Ytb@Prem26!",
-    profile: "Membro família 2",
-    status: "ativo",
-    screens: "Sem anúncios + Music",
-  },
-  {
-    service: "crunchyroll",
-    email: "matriz.crl02@plaplusnow.com",
-    password: "Crl!Mega2026",
-    profile: "Perfil DIEGO",
-    status: "ativo",
-    screens: "1 tela · Mega Fan",
-  },
-];
 
 export type Upgrade = {
   title: string;
@@ -381,22 +300,6 @@ export const upgrades: Upgrade[] = [
   },
 ];
 
-export type Invoice = {
-  id: string;
-  ref: string;
-  amount: number;
-  due: string;
-  status: "pago" | "aberto" | "vencido";
-  method: string;
-};
-
-export const myInvoices: Invoice[] = [
-  { id: "#PPN-2026-0842", ref: "Setembro/2026", amount: 59.9, due: "12/09/2026", status: "aberto", method: "PIX" },
-  { id: "#PPN-2026-0761", ref: "Agosto/2026", amount: 59.9, due: "12/08/2026", status: "pago", method: "PIX" },
-  { id: "#PPN-2026-0688", ref: "Julho/2026", amount: 59.9, due: "12/07/2026", status: "pago", method: "Cartão ••4417" },
-  { id: "#PPN-2026-0604", ref: "Junho/2026", amount: 59.9, due: "12/06/2026", status: "pago", method: "PIX" },
-  { id: "#PPN-2026-0531", ref: "Maio/2026", amount: 54.9, due: "12/05/2026", status: "pago", method: "PIX" },
-];
 
 export const clientNews = [
   {
@@ -416,81 +319,6 @@ export const clientNews = [
   },
 ];
 
-/* ------------------------------------------------------------------ */
-/* PAINEL ADMIN                                                        */
-/* ------------------------------------------------------------------ */
-
-export const adminStats = [
-  { label: "Clientes ativos", value: "1.248", delta: "+8,4% no mês", accent: "cyan" as Accent, icon: "users" },
-  { label: "Faturas a vencer", value: "37", delta: "R$ 2.412 previstos", accent: "purple" as Accent, icon: "receipt" },
-  { label: "Receita mensal (MRR)", value: "R$ 74.9k", delta: "+R$ 6.1k vs. julho", accent: "cyan" as Accent, icon: "trending" },
-  { label: "Contas esgotadas", value: "6", delta: "reposição pendente", accent: "red" as Accent, icon: "alert" },
-];
-
-export type MasterAccount = {
-  id: string;
-  service: ServiceId;
-  label: string;
-  login: string;
-  used: number;
-  total: number;
-  renewal: string;
-  cost: number;
-  region: string;
-};
-
-export const masterAccounts: MasterAccount[] = [
-  { id: "ntf-01", service: "netflix", label: "Netflix — Conta Matriz 01", login: "matriz.ntf01@plaplusnow.com", used: 5, total: 5, renewal: "18/08/2026", cost: 59.9, region: "BR" },
-  { id: "ntf-07", service: "netflix", label: "Netflix — Conta Matriz 07", login: "matriz.ntf07@plaplusnow.com", used: 4, total: 5, renewal: "24/08/2026", cost: 59.9, region: "BR" },
-  { id: "dsn-12", service: "disney", label: "Disney+ — Conta Matriz 12", login: "matriz.dsn12@plaplusnow.com", used: 3, total: 4, renewal: "02/09/2026", cost: 43.9, region: "BR" },
-  { id: "max-03", service: "hbomax", label: "HBO Max — Conta Matriz 03", login: "matriz.max03@plaplusnow.com", used: 5, total: 5, renewal: "11/08/2026", cost: 55.9, region: "BR" },
-  { id: "spt-09", service: "spotify", label: "Spotify — Família 09", login: "matriz.spt09@plaplusnow.com", used: 5, total: 6, renewal: "29/08/2026", cost: 34.9, region: "BR" },
-  { id: "prv-21", service: "prime", label: "Prime Video — Matriz 21", login: "matriz.prv21@plaplusnow.com", used: 2, total: 4, renewal: "07/09/2026", cost: 19.9, region: "BR" },
-  { id: "ytb-05", service: "youtube", label: "YouTube — Família 05", login: "matriz.ytb05@plaplusnow.com", used: 5, total: 5, renewal: "15/08/2026", cost: 45.9, region: "BR" },
-  { id: "crl-02", service: "crunchyroll", label: "Crunchyroll — Matriz 02", login: "matriz.crl02@plaplusnow.com", used: 1, total: 4, renewal: "21/09/2026", cost: 16.9, region: "BR" },
-  { id: "glb-04", service: "globoplay", label: "Globoplay — Matriz 04", login: "matriz.glb04@plaplusnow.com", used: 4, total: 5, renewal: "03/09/2026", cost: 49.9, region: "BR" },
-  { id: "par-08", service: "paramount", label: "Paramount+ — Matriz 08", login: "matriz.par08@plaplusnow.com", used: 2, total: 5, renewal: "27/08/2026", cost: 19.9, region: "BR" },
-  { id: "iptv-01", service: "iptv", label: "IPTV — Servidor Alpha 01", login: "srv-alpha01.ppn", used: 48, total: 60, renewal: "01/09/2026", cost: 320, region: "BR/US" },
-  { id: "cnv-01", service: "canva", label: "Canva Pro — Equipe 01", login: "matriz.cnv01@plaplusnow.com", used: 5, total: 5, renewal: "19/08/2026", cost: 34.9, region: "Global" },
-];
-
-export type AdminClient = {
-  name: string;
-  email: string;
-  plan: string;
-  apps: number;
-  value: number;
-  status: "ativo" | "vencendo" | "inadimplente";
-  next: string;
-};
-
-export const adminClients: AdminClient[] = [
-  { name: "Diego Dias Silva", email: "diego.silva@email.com", plan: "Mega Promo", apps: 7, value: 59.9, status: "ativo", next: "12/09/2026" },
-  { name: "Camila Ribeiro", email: "camila.rib@email.com", plan: "15 em 1", apps: 14, value: 99.9, status: "ativo", next: "20/09/2026" },
-  { name: "Lucas Ferraz", email: "lucas.ferraz@email.com", plan: "Pacote 03", apps: 3, value: 34.9, status: "vencendo", next: "09/08/2026" },
-  { name: "Juliana Prado", email: "ju.prado@email.com", plan: "Combo montado", apps: 4, value: 41.5, status: "ativo", next: "28/08/2026" },
-  { name: "Rafael Monteiro", email: "rafa.monteiro@email.com", plan: "Mega Promo (anual)", apps: 7, value: 574.8, status: "ativo", next: "02/02/2027" },
-  { name: "Beatriz Aguiar", email: "bia.aguiar@email.com", plan: "15 em 1 (anual)", apps: 14, value: 958.8, status: "ativo", next: "17/11/2026" },
-  { name: "Marcos Tavares", email: "marcos.tv@email.com", plan: "Pacote 03", apps: 3, value: 34.9, status: "inadimplente", next: "26/07/2026" },
-  { name: "Fernanda Lopes", email: "fer.lopes@email.com", plan: "Combo montado", apps: 6, value: 55.2, status: "vencendo", next: "10/08/2026" },
-];
-
-export const adminQueue = [
-  { title: "Repor Netflix Matriz 01", detail: "5/5 vagas ocupadas · 3 clientes na fila de espera", accent: "red" as Accent },
-  { title: "Trocar senha HBO Max Matriz 03", detail: "Login em manutenção desde 06/08 às 03:10", accent: "purple" as Accent },
-  { title: "Cobrar Marcos Tavares", detail: "Fatura #PPN-2026-0712 vencida há 12 dias", accent: "red" as Accent },
-  { title: "Renovar IPTV Servidor Alpha 01", detail: "Vence em 01/09 · 48/60 conexões ativas", accent: "cyan" as Accent },
-];
-
-export const revenueSeries = [
-  { month: "Fev", value: 44 },
-  { month: "Mar", value: 51 },
-  { month: "Abr", value: 49 },
-  { month: "Mai", value: 58 },
-  { month: "Jun", value: 63 },
-  { month: "Jul", value: 68.8 },
-  { month: "Ago", value: 74.9 },
-];
 
 /* ------------------------------------------------------------------ */
 

@@ -118,3 +118,22 @@
 ### Dados de demonstração
 - Camila Ribeiro, Lucas Ferraz e Juliana Prado foram vinculados como indicados do
   Diego (id 9) só para a aba Afiliados não nascer vazia — pode ser removido a pedido.
+
+## Fase 8 — Faturas reais (fim dos mocks de cobrança)
+
+- Tabela `faturas` (`cliente_id + competencia` único) + rota `api/routes/faturas.ts`.
+- `gerarFaturas()` deriva a série completa de `clienteDesde` + `ciclo` + `valor`; idempotente,
+  roda a cada carga de painel. Passadas = `pago`, corrente = `aberto`/`vencido`.
+- Cupom da Jornada reaplicado sempre na fatura em aberto mais recente.
+- Cliente: histórico real, total pago, KPI "Economia com a Jornada", pagar via WhatsApp.
+- Admin: KPIs sobre a tabela, filtro pendentes/pagas/todas, `Dar baixa`/`Reabrir`
+  (reajusta `statusPagamento`), cobrança com valor já com desconto.
+- Gráfico "Receita faturada" (`faturas.serie`) com receita reconhecida — plano anual
+  rateado em 12 meses para não virar pico isolado.
+- Mocks removidos de `lib/mock-data.ts`: `myInvoices`, `revenueSeries`, `adminStats`,
+  `masterAccounts`, `adminClients`, `adminQueue`, `myAccess`, `currentUser` e os tipos
+  órfãos. Restam só catálogo de serviços + conteúdo editorial da landing.
+
+### Verificações
+- `bun run typecheck` OK · `bun run build` OK · `db:push` aplicado
+- E2E: landing, cliente (Faturas) e admin (Visão Geral, Faturas) com `errors: []`
