@@ -2,7 +2,7 @@
 
 SaaS brasileiro de venda e gestão de pacotes de streaming compartilhados. Ships on **web** (Vite + React + Tailwind 4). Visual: dark-mode futurista/tech, glassmorphism intenso, luzes neon (vermelho elétrico, ciano, roxo). Job: converter visitante em assinante de combo de streamings e dar a ele/ao admin um painel de gestão dos acessos.
 
-Escopo atual: **backend real** em Turso/SQLite + Drizzle. `pacotes`, `contas_matrizes` e `usuarios` vêm do banco (landing, painel do cliente e admin). Seguem em mock (`src/web/lib/mock-data.ts`): catálogo de serviços/ícones, depoimentos, stats, faturas, novidades/upgrades e série de MRR. Sem auth ainda.
+Escopo atual: **backend real** em Turso/SQLite + Drizzle, com autenticacao (Better Auth) e papeis cliente/admin. Vem do banco: `pacotes`, `contas_matrizes`, `usuarios`, `aplicativos`, `alocacoes`, `chamados`, `recompensas_progresso` e `recompensas_eventos`. Seguem em mock (`src/web/lib/mock-data.ts`): depoimentos, stats de landing, novidades/upgrades e serie de MRR.
 
 ## Brand & Colors
 
@@ -33,20 +33,34 @@ Regras de neon: brilho vem de `box-shadow` colorido de baixa opacidade + borda 1
 
 ## Pages
 
-- **Landing** (`src/web/pages/index.tsx`) — header, hero de economia, comparativo caro vs. combo, toggle Mensal/Anual + 3 pacotes prontos, montador à la carte com calculadora flutuante, prova social, footer.
-- **Painel do Cliente** (`src/web/pages/dashboard.tsx`) — sidebar (Meus Acessos / Novidades e Upgrades / Faturas), pacote ativo, grade de cards de app com e-mail + ver/copiar senha.
-- **Painel Admin** (`src/web/pages/admin.tsx`) — KPIs, gestão de estoque/contas matrizes com progress bar de lotação (vermelho + tag "Esgotado" em 5/5), lista de clientes e faturas.
+- **Landing** (`src/web/pages/index.tsx`) - header, hero de economia, comparativo caro vs. combo, toggle Mensal/Anual + pacotes prontos, montador a la carte com calculadora flutuante, prova social, footer.
+- **Login / Signup** (`pages/login.tsx`, `pages/signup.tsx`) - Better Auth por e-mail e senha. O signup le `?ref=CODIGO`, valida o codigo na API e mostra o banner "Voce foi indicado por X" antes de vincular a indicacao.
+- **Painel do Cliente** (`pages/dashboard.tsx`) - sidebar: Meus Acessos, Jornada, Novidades e Upgrades, Faturas, Suporte. Cards de app com e-mail + ver/copiar senha, alertas de vencimento, abertura de chamados.
+- **Painel Admin** (`pages/admin.tsx`) - sidebar: Visao Geral, Contas, Apps, Clientes, Pacotes, Faturas, Afiliados, Suporte. KPIs, lotacao das contas matrizes, edicao de vagas, cobrancas pendentes e gestao de premios.
+
+## Gamificacao e Indicacoes
+
+- **Fonte de verdade derivada**: `recalcularProgresso(clienteId)` (`api/routes/recompensas.ts`) recalcula tudo a partir do historico real (tempo de assinatura, status de pagamento, indicados convertidos). Nada e pontuado a mao.
+- **Idempotencia**: cada marco vira um evento em `recompensas_eventos` com `chave` unica por cliente (`renovacao:3`, `indicacao:12`, `missao:m5`). Rodar de novo nunca duplica XP e o livro-razao serve de auditoria. O recalculo faz batch (1 SELECT + 1 INSERT) para nao pesar a aba do admin.
+- **XP**: renovacao em dia +50, indicacao que vira assinante +150. `XP_POR_NIVEL = 250`. Niveis: Iniciante, Bronze, Prata, Ouro, Platina, Diamante, Lenda PPN.
+- **7 missoes** (trilha visual numerada em `components/cliente/jornada.tsx`): m1 1 renovacao - m2 3 renovacoes (cupom `PPN15OFF`, 15% OFF) - m3 5 renovacoes - m4 1 indicacao assinante - m5 3 indicacoes (mes de HBO Max) - m6 10 renovacoes - m7 12 meses ativo (presente surpresa). Os tres ultimos premios notificam o admin.
+- **Cupom**: quando ativo, aparece na fatura em aberto do cliente (valor cheio riscado + valor final) e na cobranca pendente do admin, inclusive na mensagem de WhatsApp.
+- **Link de indicacao**: `usuarios.referral_code` gerado sob demanda; o convidado entra por `/signup?ref=CODIGO` e grava `usuarios.indicado_por`.
 
 ## Key User Flows
 
-1. Landing → escolhe ciclo (mensal/anual) → clica "Garantir Vaga" em um pacote → abre WhatsApp com mensagem pré-preenchida.
-2. Landing → montador: seleciona apps na grade → calculadora flutuante soma em tempo real (desconto progressivo por quantidade) → "Finalizar via WhatsApp".
-3. Cliente entra em `/dashboard` → vê pacote ativo → revela/copia senha de cada app.
-4. Admin em `/admin` → vê lotação das contas matrizes → identifica contas esgotadas e faturas a vencer.
+1. Landing -> escolhe ciclo -> "Garantir Vaga" -> WhatsApp com mensagem pre-preenchida.
+2. Landing -> montador a la carte -> calculadora soma em tempo real -> "Finalizar via WhatsApp".
+3. Cliente em `/dashboard` -> ve pacote ativo -> revela/copia senha de cada app -> abre chamado no Suporte.
+4. Cliente na aba Jornada -> ve nivel, XP e trilha de missoes -> copia/compartilha o link de indicacao -> acompanha premios liberados.
+5. Convidado abre `/signup?ref=` -> se cadastra -> vira assinante -> +150 XP para quem indicou, visivel na aba Afiliados.
+6. Admin em `/admin` -> lotacao das contas, cobrancas pendentes com desconto aplicado, aba Afiliados para ver quem indicou quem e marcar premios como entregues.
 
 ## Architecture
 
-- Rotas com Wouter em `app.tsx`: `/`, `/dashboard`, `/admin`.
-- Estado só no cliente (`useState`/`useMemo`), zero chamadas de API. Mocks tipados em `lib/mock-data.ts`.
-- Ícones: `lucide-react` para UI; `react-icons/si` para as marcas dos streamings (lucide não tem logos de marca).
-- Componentes compartilhados em `src/web/components/` (`logo`, `glass`, `site-header`, `app-icon`, `progress`).
+- Rotas com Wouter em `app.tsx`: `/`, `/login`, `/signup`, `/dashboard`, `/admin`.
+- API em Hono + oRPC (`src/api/routes/*`), tipada ponta a ponta; queries do cliente com TanStack Query em `src/web/queries/*`.
+- Middlewares em `api/middleware/auth.ts`: `base` (publico), `withUser`, `authed`, `adminOnly`.
+- Banco: Turso/SQLite via Drizzle (`api/database/schema.ts`); migracoes com `bun run db:push`.
+- Icones: `lucide-react` para UI; `react-icons/si` para as marcas dos streamings.
+- Kit visual reutilizavel em `components/ui/kit.tsx`: `GlassCard`, `NeonButton`, `Pill`, `ProgressBar`, `SectionTitle`, `NeonBackdrop`, `accentHex`.
