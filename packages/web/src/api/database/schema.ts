@@ -30,6 +30,14 @@ export const pacotes = sqliteTable("pacotes", {
     .notNull()
     .$type<string[]>()
     .$defaultFn(() => []),
+  /**
+   * benefícios exibidos no card do pacote na landing — JSON de strings.
+   * ex.: ["3 apps liberados","Suporte no WhatsApp"]
+   */
+  perks: text("perks", { mode: "json" })
+    .notNull()
+    .$type<string[]>()
+    .$defaultFn(() => []),
   /** cor de destaque no site: red | cyan | purple */
   accent: text("accent").notNull().default("cyan"),
   badge: text("badge"),
@@ -96,6 +104,8 @@ export const usuarios = sqliteTable("usuarios", {
   proximaCobranca: text("proxima_cobranca").notNull().default(""),
   clienteDesde: text("cliente_desde").notNull().default(""),
   admin: integer("admin", { mode: "boolean" }).notNull().default(false),
+  /** vínculo com a conta de login (tabela `user` do Better Auth) */
+  authUserId: text("auth_user_id").unique(),
   criadoEm: integer("criado_em", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),
@@ -103,3 +113,9 @@ export const usuarios = sqliteTable("usuarios", {
 
 export type Usuario = typeof usuarios.$inferSelect;
 export type NovoUsuario = typeof usuarios.$inferInsert;
+
+/* ------------------------------------------------------------------ */
+/* AUTENTICAÇÃO (Better Auth)                                          */
+/* ------------------------------------------------------------------ */
+
+export * from "./auth-schema";

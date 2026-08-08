@@ -5,6 +5,7 @@ import { pacotesRoutes } from "./routes/pacotes";
 import { contasRoutes } from "./routes/contas";
 import { usuariosRoutes } from "./routes/usuarios";
 import { seed } from "./routes/seed";
+import { auth } from "./auth";
 
 // API features are oRPC procedures, one file per feature in ./routes/,
 // composed into this router — typed end-to-end via the clients
@@ -25,5 +26,6 @@ export type AppRouterClient = RouterClient<AppRouter>;
 const app = createApp(router);
 // Rare plain-HTTP endpoints (webhooks, streaming, the Better Auth handler)
 // register here with full paths, e.g. app.post("/api/webhooks/example", ...)
+app.on(["GET", "POST"], "/api/auth/*", (c) => auth.handler(c.req.raw));
 
 export default app;

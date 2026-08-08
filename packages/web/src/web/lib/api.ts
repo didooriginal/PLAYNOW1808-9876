@@ -2,9 +2,15 @@ import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 import { createTanstackQueryUtils } from "@orpc/tanstack-query";
 import type { AppRouterClient } from "../../api";
+import { getToken } from "./auth";
 
 const link = new RPCLink({
   url: `${window.location.origin}/api/rpc`,
+  headers: () => {
+    const token = getToken();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  },
+  fetch: (request, init) => fetch(request, { ...init, credentials: "include" }),
 });
 
 /** Direct typed client: await client.ping() */

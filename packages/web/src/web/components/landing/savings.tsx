@@ -1,15 +1,17 @@
 import { ArrowRight, BadgeCheck, Flame, TrendingDown, Wallet } from "lucide-react";
 import { AppIcon } from "../app-icon";
 import { GlassCard, NeonButton, Pill, SectionTitle } from "../ui/kit";
-import { brl, plans, retailOf, savingsPct } from "@/lib/mock-data";
-
-const mega = plans.find((p) => p.id === "mega-promo") as (typeof plans)[number];
-const retail = retailOf(mega.items);
-const combo = mega.monthly;
-const pct = savingsPct(retail, combo);
-const yearSaving = (retail - combo) * 12;
+import { brl, retailOf, savingsPct } from "@/lib/mock-data";
+import { usePlanoDestaque } from "../../queries/planos";
 
 export function Savings() {
+  // mesmo pacote em destaque do banco, usado no comparativo caro vs. combo
+  const mega = usePlanoDestaque();
+  const retail = retailOf(mega.items);
+  const combo = mega.monthly;
+  const pct = savingsPct(retail, combo);
+  const yearSaving = (retail - combo) * 12;
+
   return (
     <section id="economia" className="relative px-4 py-20 sm:px-6 sm:py-28">
       <div className="mx-auto max-w-7xl">

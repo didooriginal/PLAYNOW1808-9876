@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { asc, eq, sql } from "drizzle-orm";
 import { ORPCError } from "@orpc/server";
-import { base } from "../__core/app";
+import { adminOnly } from "../middleware/auth";
 import { db } from "../database";
 import { contasMatrizes } from "../database/schema";
 
@@ -21,22 +21,22 @@ const contaInput = z.object({
 
 export const contasRoutes = {
   /** estoque completo de contas matrizes */
-  listar: base.handler(() =>
+  listar: adminOnly.handler(() =>
     db.select().from(contasMatrizes).orderBy(asc(contasMatrizes.servico), asc(contasMatrizes.rotulo)),
   ),
 
-  obter: base.input(z.object({ id: z.number().int() })).handler(async ({ input }) => {
+  obter: adminOnly.input(z.object({ id: z.number().int() })).handler(async ({ input }) => {
     const [row] = await db.select().from(contasMatrizes).where(eq(contasMatrizes.id, input.id));
     if (!row) throw new ORPCError("NOT_FOUND", { message: "Conta matriz não encontrada" });
     return row;
   }),
 
-  criar: base.input(contaInput).handler(async ({ input }) => {
+  criar: adminOnly.input(contaInput).handler(async ({ input }) => {
     const [row] = await db.insert(contasMatrizes).values(input).returning();
     return row;
   }),
 
-  atualizar: base
+  atualizar: adminOnly
     .input(contaInput.partial().extend({ id: z.number().int() }))
     .handler(async ({ input }) => {
       const { id, ...patch } = input;
@@ -50,7 +50,7 @@ export const contasRoutes = {
     }),
 
   /** ocupa (+1) ou libera (-1) uma vaga, respeitando o total */
-  ajustarVagas: base
+  ajustarVagas: adminOnly
     .input(z.object({ id: z.number().int(), delta: z.number().int() }))
     .handler(async ({ input }) => {
       const [conta] = await db.select().from(contasMatrizes).where(eq(contasMatrizes.id, input.id));
@@ -70,7 +70,7 @@ export const contasRoutes = {
     }),
 
   /** reposição: zera a lotação e volta a conta para ativo */
-  repor: base.input(z.object({ id: z.number().int() })).handler(async ({ input }) => {
+  repor: adminOnly.input(z.object({ id: z.number().int() })).handler(async ({ input }) => {
     const [row] = await db
       .update(contasMatrizes)
       .set({ vagasOcupadas: 0, status: "ativo" })
@@ -80,13 +80,13 @@ export const contasRoutes = {
     return row;
   }),
 
-  remover: base.input(z.object({ id: z.number().int() })).handler(async ({ input }) => {
+  remover: adminOnly.input(z.object({ id: z.number().int() })).handler(async ({ input }) => {
     await db.delete(contasMatrizes).where(eq(contasMatrizes.id, input.id));
     return { ok: true };
   }),
 
   /** resumo de lotação usado nos KPIs do admin */
-  resumo: base.handler(async () => {
+  resumo: adminOnly.handler(async () => {
     const [row] = await db
       .select({
         contas: sql<number>`count(*)`,

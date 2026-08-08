@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { sql } from "drizzle-orm";
-import { base } from "../__core/app";
+import { adminOnly } from "../middleware/auth";
 import { db } from "../database";
 import { contasMatrizes, pacotes, usuarios } from "../database/schema";
 
@@ -16,6 +16,7 @@ const PACOTES = [
     preco: 34.9,
     precoAnual: 27.9,
     servicos: ["netflix", "prime", "spotify"],
+    perks: ["3 apps liberados", "1 tela por app", "Suporte no WhatsApp", "Troca de app em 24h"],
     accent: "cyan",
     badge: null as string | null,
     destaque: false,
@@ -27,6 +28,13 @@ const PACOTES = [
     preco: 59.9,
     precoAnual: 47.9,
     servicos: ["netflix", "disney", "hbomax", "prime", "spotify", "youtube", "crunchyroll"],
+    perks: [
+      "7 apps liberados",
+      "Netflix em 4K",
+      "Suporte prioritário 24/7",
+      "Reposição automática de conta",
+      "Garantia de 7 dias",
+    ],
     accent: "red",
     badge: "Mais vendido",
     destaque: true,
@@ -52,6 +60,13 @@ const PACOTES = [
       "deezer",
       "canva",
       "iptv",
+    ],
+    perks: [
+      "Todos os apps do catálogo",
+      "IPTV com canais ao vivo",
+      "2 telas nos principais apps",
+      "Gerente de conta dedicado",
+      "Upgrades gratuitos vitalícios",
     ],
     accent: "purple",
     badge: "Completo",
@@ -97,9 +112,9 @@ async function contar() {
 }
 
 export const seed = {
-  status: base.handler(() => contar()),
+  status: adminOnly.handler(() => contar()),
 
-  run: base
+  run: adminOnly
     .input(z.object({ force: z.boolean().default(false) }).optional())
     .handler(async ({ input }) => {
       const force = input?.force ?? false;

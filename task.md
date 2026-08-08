@@ -41,3 +41,41 @@
 - Stores web: src/web/queries/{pacotes,contas,usuarios,seed}.ts.
 - /dashboard e /admin consomem 100% do banco (mocks só para faturas, novidades, upgrades, série de MRR).
 - Verificado: typecheck OK, build OK, screenshots OK, mutations (ajustarVagas/repor/criar) OK.
+
+## Fase 3 — Retomada após a interrupção (07/08/2026)
+
+### Diagnóstico
+- Nenhum arquivo estava truncado: `bun run typecheck` (3/3) e `bun run build` passaram
+  no código clonado como estava. Não havia `}` faltando nem componente quebrado.
+- O que realmente faltava era **infraestrutura**: o repositório não traz `.env`
+  (gitignored), então `DATABASE_URL`/`DATABASE_AUTH_TOKEN` estavam ausentes e todas as
+  chamadas ao banco quebravam em runtime.
+- E a **landing ainda lia pacotes do mock** (`lib/mock-data.ts`), última parte da
+  integração que o dev anterior não terminou.
+
+### Feito agora
+- [x] `.env` provisionado (Turso gerenciado) e `db:push` aplicado → tabelas `pacotes`,
+      `contas_matrizes`, `usuarios` criadas no banco real.
+- [x] Nova coluna `pacotes.perks` (JSON de benefícios) — antes os perks só existiam no mock.
+      Aplicada via `ALTER TABLE` (o `db:push` do drizzle-kit exige TTY para coluna NOT NULL).
+- [x] `routes/pacotes.ts`: `perks` no schema de input (criar/atualizar).
+- [x] `routes/seed.ts`: perks dos 3 pacotes; seed executado (3 pacotes, 15 contas, 8 usuários).
+- [x] Novo `src/web/queries/planos.ts` — ponte banco → landing: converte `pacotes` para o
+      tipo `Plan` usado pelos componentes (`usePlanos`, `usePlanoDestaque`), com fallback
+      no catálogo estático enquanto carrega ou se a tabela estiver vazia.
+- [x] `landing/plans.tsx`, `landing/hero.tsx`, `landing/savings.tsx` agora renderizam os
+      pacotes do banco (antes eram constantes de módulo do mock).
+- [x] Admin › Pacotes: formulário ganhou tagline, preço anual, vagas, benefícios e
+      "pacote em destaque"; card lista os perks; rodapé do card com `flex-wrap`.
+
+### Verificações (07/08/2026)
+- `bun run typecheck` → 3/3 OK
+- `bun run build` → OK (web + desktop)
+- `/`, `/dashboard`, `/admin` sem erro de console/pageerror, `overflowX = 0` em 1440
+- Mutations testadas via API: pacotes criar/remover (com perks), contas ajustarVagas/repor/atualizar,
+  resumos de contas e usuários
+- dev server: tmux `dev`, porta 4200
+
+### Nota
+- Mocks que continuam propositalmente sem tabela: faturas, novidades/upgrades, depoimentos,
+  stats sociais, série histórica de MRR e catálogo de serviços (ícones/preço avulso).

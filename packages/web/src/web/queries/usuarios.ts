@@ -12,13 +12,16 @@ export function useResumoClientes() {
 }
 
 /**
- * Painel do cliente: usuário + pacote contratado + credenciais das contas matrizes.
- * Sem e-mail, devolve o primeiro cliente cadastrado (modo demo).
+ * Painel do cliente LOGADO: usuário + pacote contratado + credenciais das contas
+ * matrizes. Resolvido no servidor pela sessão (Better Auth) — exige login.
  */
-export function usePainelCliente(email?: string) {
-  return useQuery(
-    orpc.usuarios.painel.queryOptions({ input: email ? { email } : {}, staleTime: 10_000 }),
-  );
+export function usePainelCliente() {
+  return useQuery(orpc.usuarios.painel.queryOptions({ staleTime: 10_000 }));
+}
+
+/** Perfil da sessão atual (nome, e-mail, flag admin). */
+export function useEu() {
+  return useQuery(orpc.usuarios.eu.queryOptions({ staleTime: 30_000 }));
 }
 
 function useInvalidarUsuarios() {

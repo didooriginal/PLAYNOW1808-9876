@@ -2,6 +2,7 @@ import { z } from "zod";
 import { asc, eq, inArray, sql } from "drizzle-orm";
 import { ORPCError } from "@orpc/server";
 import { base } from "../__core/app";
+import { adminOnly, authed } from "../middleware/auth";
 import { db } from "../database";
 import { contasMatrizes, pacotes, usuarios } from "../database/schema";
 
@@ -42,20 +43,20 @@ const listarComPacote = () =>
 
 export const usuariosRoutes = {
   /** base de clientes com o pacote contratado resolvido */
-  listar: base.handler(() => listarComPacote()),
+  listar: adminOnly.handler(() => listarComPacote()),
 
-  obter: base.input(z.object({ id: z.number().int() })).handler(async ({ input }) => {
+  obter: adminOnly.input(z.object({ id: z.number().int() })).handler(async ({ input }) => {
     const [row] = await db.select().from(usuarios).where(eq(usuarios.id, input.id));
     if (!row) throw new ORPCError("NOT_FOUND", { message: "Usuário não encontrado" });
     return row;
   }),
 
-  criar: base.input(usuarioInput).handler(async ({ input }) => {
+  criar: adminOnly.input(usuarioInput).handler(async ({ input }) => {
     const [row] = await db.insert(usuarios).values(input).returning();
     return row;
   }),
 
-  atualizar: base
+  atualizar: adminOnly
     .input(usuarioInput.partial().extend({ id: z.number().int() }))
     .handler(async ({ input }) => {
       const { id, ...patch } = input;
@@ -64,26 +65,39 @@ export const usuariosRoutes = {
       return row;
     }),
 
-  remover: base.input(z.object({ id: z.number().int() })).handler(async ({ input }) => {
+  remover: adminOnly.input(z.object({ id: z.number().int() })).handler(async ({ input }) => {
     await db.delete(usuarios).where(eq(usuarios.id, input.id));
     return { ok: true };
   }),
 
   /**
-   * PAINEL DO CLIENTE — devolve o usuário, o pacote contratado e as credenciais
-   * (contas matrizes) de cada serviço incluído no pacote.
-   * Sem `email`/`id` retorna o primeiro cliente cadastrado (modo demo).
+   * PAINEL DO CLIENTE — exige sessão. Resolve o cliente pelo vínculo
+   * `usuarios.auth_user_id` (fallback: e-mail da conta de login) e devolve o
+   * pacote contratado + as credenciais (contas matrizes) de cada serviço.
    */
-  painel: base
-    .input(z.object({ email: z.string().optional(), id: z.number().int().optional() }).optional())
-    .handler(async ({ input }) => {
-      const [cliente] = input?.id
-        ? await db.select().from(usuarios).where(eq(usuarios.id, input.id))
-        : input?.email
-          ? await db.select().from(usuarios).where(eq(usuarios.email, input.email))
-          : await db.select().from(usuarios).where(eq(usuarios.admin, false)).limit(1);
+  painel: authed.handler(async ({ context }) => {
+    const [porVinculo] = await db
+      .select()
+      .from(usuarios)
+      .where(eq(usuarios.authUserId, context.user.id));
 
-      if (!cliente) return null;
+    let cliente = porVinculo;
+
+    if (!cliente) {
+      const [porEmail] = await db
+        .select()
+        .from(usuarios)
+        .where(eq(usuarios.email, context.user.email.toLowerCase()));
+      if (porEmail) {
+        await db
+          .update(usuarios)
+          .set({ authUserId: context.user.id })
+          .where(eq(usuarios.id, porEmail.id));
+        cliente = { ...porEmail, authUserId: context.user.id };
+      }
+    }
+
+    if (!cliente) return null;
 
       const [pacote] = cliente.pacoteId
         ? await db.select().from(pacotes).where(eq(pacotes.id, cliente.pacoteId))
@@ -122,10 +136,67 @@ export const usuariosRoutes = {
         .filter((a): a is NonNullable<typeof a> => a !== null);
 
       return { cliente, pacote: pacote ?? null, acessos };
+  }),
+
+  /**
+   * Registra a intenção de compra do cliente logado (vindo do fluxo de cadastro):
+   * grava o pacote escolhido, o ciclo e o valor. O pagamento segue no WhatsApp,
+   * então o status fica como `vencendo` até o admin confirmar.
+   */
+  escolherPacote: authed
+    .input(
+      z.object({
+        pacoteId: z.number().int().nullable(),
+        ciclo: z.enum(["mensal", "anual"]).default("mensal"),
+        valor: z.number().nonnegative().default(0),
+        telefone: z.string().optional(),
+      }),
+    )
+    .handler(async ({ input, context }) => {
+      const [cliente] = await db
+        .select()
+        .from(usuarios)
+        .where(eq(usuarios.authUserId, context.user.id));
+      if (!cliente) throw new ORPCError("NOT_FOUND", { message: "Cliente não encontrado" });
+
+      const [row] = await db
+        .update(usuarios)
+        .set({
+          pacoteId: input.pacoteId,
+          ciclo: input.ciclo,
+          valor: input.valor,
+          ...(input.telefone ? { telefone: input.telefone } : {}),
+          statusPagamento: cliente.statusPagamento === "ativo" ? "ativo" : "vencendo",
+        })
+        .where(eq(usuarios.id, cliente.id))
+        .returning();
+      return row;
     }),
 
+  /** Perfil da sessão atual + flag de admin, para proteger rotas no front. */
+  eu: authed.handler(async ({ context }) => {
+    const [cliente] = await db
+      .select()
+      .from(usuarios)
+      .where(eq(usuarios.authUserId, context.user.id));
+    const [porEmail] = cliente
+      ? []
+      : await db
+          .select()
+          .from(usuarios)
+          .where(eq(usuarios.email, context.user.email.toLowerCase()));
+    const registro = cliente ?? porEmail ?? null;
+    return {
+      authId: context.user.id,
+      nome: registro?.nome ?? context.user.name,
+      email: context.user.email,
+      admin: registro?.admin ?? false,
+      clienteId: registro?.id ?? null,
+    };
+  }),
+
   /** KPIs de clientes/receita para o painel admin */
-  resumo: base.handler(async () => {
+  resumo: adminOnly.handler(async () => {
     const [row] = await db
       .select({
         total: sql<number>`count(*)`,

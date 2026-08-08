@@ -599,7 +599,28 @@ function PackagesView() {
   const { data: pacotes, isPending, isError, error } = usePacotes();
   const criar = useCriarPacote();
   const remover = useRemoverPacote();
-  const [form, setForm] = useState({ nome: "", preco: 0, servicos: [] as string[] });
+  const [form, setForm] = useState({
+    nome: "",
+    tagline: "",
+    preco: 0,
+    precoAnual: 0,
+    vagasRestantes: 10,
+    perks: "",
+    destaque: false,
+    servicos: [] as string[],
+  });
+
+  const limparForm = () =>
+    setForm({
+      nome: "",
+      tagline: "",
+      preco: 0,
+      precoAnual: 0,
+      vagasRestantes: 10,
+      perks: "",
+      destaque: false,
+      servicos: [],
+    });
 
   const toggle = (id: string) =>
     setForm((f) => ({
@@ -631,6 +652,49 @@ function PackagesView() {
             className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 font-sans text-sm text-white placeholder:text-white/25 focus:border-neon-purple/50 focus:outline-none"
           />
         </div>
+
+        <div className="mt-3 grid gap-3 sm:grid-cols-[1.4fr_0.6fr]">
+          <input
+            value={form.tagline}
+            onChange={(e) => setForm((f) => ({ ...f, tagline: e.target.value }))}
+            placeholder="Tagline (aparece no card da landing)"
+            className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 font-sans text-sm text-white placeholder:text-white/25 focus:border-neon-purple/50 focus:outline-none"
+          />
+          <input
+            type="number"
+            step="0.01"
+            value={form.precoAnual}
+            onChange={(e) => setForm((f) => ({ ...f, precoAnual: Number(e.target.value) }))}
+            placeholder="Preço anual /mês"
+            className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 font-sans text-sm text-white placeholder:text-white/25 focus:border-neon-purple/50 focus:outline-none"
+          />
+        </div>
+
+        <div className="mt-3 grid gap-3 sm:grid-cols-[1.4fr_0.6fr]">
+          <input
+            value={form.perks}
+            onChange={(e) => setForm((f) => ({ ...f, perks: e.target.value }))}
+            placeholder="Benefícios separados por vírgula"
+            className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 font-sans text-sm text-white placeholder:text-white/25 focus:border-neon-purple/50 focus:outline-none"
+          />
+          <input
+            type="number"
+            value={form.vagasRestantes}
+            onChange={(e) => setForm((f) => ({ ...f, vagasRestantes: Number(e.target.value) }))}
+            placeholder="Vagas restantes"
+            className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 font-sans text-sm text-white placeholder:text-white/25 focus:border-neon-purple/50 focus:outline-none"
+          />
+        </div>
+
+        <label className="mt-3 flex w-fit cursor-pointer items-center gap-2 font-sans text-xs text-white/50">
+          <input
+            type="checkbox"
+            checked={form.destaque}
+            onChange={(e) => setForm((f) => ({ ...f, destaque: e.target.checked }))}
+            className="size-4 accent-[#ff1f3d]"
+          />
+          Pacote em destaque (usado no hero e no comparativo da landing)
+        </label>
 
         <div className="mt-4 flex flex-wrap gap-2">
           {services.map((s) => {
@@ -667,15 +731,20 @@ function PackagesView() {
             criar.mutate(
               {
                 nome: form.nome,
-                tagline: "",
+                tagline: form.tagline,
                 preco: form.preco,
+                precoAnual: form.precoAnual > 0 ? form.precoAnual : null,
                 servicos: form.servicos,
-                accent: "cyan",
-                destaque: false,
-                vagasRestantes: 10,
+                perks: form.perks
+                  .split(",")
+                  .map((x) => x.trim())
+                  .filter(Boolean),
+                accent: form.destaque ? "red" : "cyan",
+                destaque: form.destaque,
+                vagasRestantes: form.vagasRestantes,
                 ativo: true,
               },
-              { onSuccess: () => setForm({ nome: "", preco: 0, servicos: [] }) },
+              { onSuccess: () => limparForm() },
             )
           }
         >
@@ -711,7 +780,17 @@ function PackagesView() {
                 ))}
               </div>
 
-              <div className="mt-4 flex items-center gap-2 border-t border-white/8 pt-4">
+              {p.perks?.length ? (
+                <ul className="mt-3 space-y-1">
+                  {p.perks.slice(0, 3).map((perk) => (
+                    <li key={perk} className="truncate font-sans text-[11px] text-white/40">
+                      · {perk}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+
+              <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-white/8 pt-4">
                 <Pill accent="cyan">{p.servicos.length} apps</Pill>
                 {p.precoAnual ? <Pill accent="purple">anual {brl(p.precoAnual)}</Pill> : null}
                 {p.destaque ? <Pill accent="red">destaque</Pill> : null}

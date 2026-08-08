@@ -2,6 +2,7 @@ import { z } from "zod";
 import { asc, eq } from "drizzle-orm";
 import { ORPCError } from "@orpc/server";
 import { base } from "../__core/app";
+import { adminOnly } from "../middleware/auth";
 import { db } from "../database";
 import { pacotes } from "../database/schema";
 
@@ -11,6 +12,7 @@ const pacoteInput = z.object({
   preco: z.number().nonnegative(),
   precoAnual: z.number().nonnegative().nullable().optional(),
   servicos: z.array(z.string()).default([]),
+  perks: z.array(z.string()).default([]),
   accent: z.enum(["red", "cyan", "purple"]).default("cyan"),
   badge: z.string().nullable().optional(),
   destaque: z.boolean().default(false),
@@ -28,12 +30,12 @@ export const pacotesRoutes = {
     return row;
   }),
 
-  criar: base.input(pacoteInput).handler(async ({ input }) => {
+  criar: adminOnly.input(pacoteInput).handler(async ({ input }) => {
     const [row] = await db.insert(pacotes).values(input).returning();
     return row;
   }),
 
-  atualizar: base
+  atualizar: adminOnly
     .input(pacoteInput.partial().extend({ id: z.number().int() }))
     .handler(async ({ input }) => {
       const { id, ...patch } = input;
@@ -42,7 +44,7 @@ export const pacotesRoutes = {
       return row;
     }),
 
-  remover: base.input(z.object({ id: z.number().int() })).handler(async ({ input }) => {
+  remover: adminOnly.input(z.object({ id: z.number().int() })).handler(async ({ input }) => {
     await db.delete(pacotes).where(eq(pacotes.id, input.id));
     return { ok: true };
   }),

@@ -2,7 +2,8 @@ import { ArrowRight, PlayCircle, ShieldCheck, Sparkles, Star, Zap } from "lucide
 import { AppIcon } from "../app-icon";
 import { Logo } from "../logo";
 import { GlassCard, NeonButton, Pill } from "../ui/kit";
-import { brl, plans, retailOf, savingsPct, services, socialStats } from "@/lib/mock-data";
+import { brl, retailOf, savingsPct, services, socialStats } from "@/lib/mock-data";
+import { usePlanoDestaque } from "../../queries/planos";
 
 function IconMarquee() {
   const row = [...services, ...services];
@@ -22,11 +23,12 @@ function IconMarquee() {
   );
 }
 
-const mega = plans.find((p) => p.id === "mega-promo") as (typeof plans)[number];
-const megaRetail = retailOf(mega.items);
-const megaSavings = savingsPct(megaRetail, mega.monthly);
-
 export function Hero() {
+  // pacote em destaque no banco — alimenta o card comparativo do hero
+  const mega = usePlanoDestaque();
+  const megaRetail = retailOf(mega.items);
+  const megaSavings = savingsPct(megaRetail, mega.monthly);
+
   return (
     <section className="relative overflow-hidden px-4 pb-16 pt-32 sm:px-6 sm:pt-40">
       <div className="mx-auto max-w-7xl">

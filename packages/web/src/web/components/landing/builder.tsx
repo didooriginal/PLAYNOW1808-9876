@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
+import { Link } from "wouter";
 import {
   Calculator,
   Check,
   ChevronDown,
-  MessageCircle,
+  UserPlus,
   Plus,
   RotateCcw,
   Sparkles,
@@ -21,7 +22,6 @@ import {
   serviceById,
   services,
   type ServiceId,
-  whatsappLink,
 } from "@/lib/mock-data";
 
 const categories = ["Todos", "Vídeo", "Música", "Extra"] as const;
@@ -49,12 +49,6 @@ export function Builder() {
   function toggle(id: ServiceId) {
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
-
-  const message = selected.length
-    ? `Olá! Quero montar meu combo PLAPLUSNOW com: ${selected
-        .map((id) => serviceById(id).name)
-        .join(", ")}. Total calculado no site: ${brl(total)}/mês${tier ? ` (com ${Math.round(tier.off * 100)}% de desconto)` : ""}.`
-    : "Olá! Quero montar meu combo personalizado na PLAPLUSNOW.";
 
   /* ---------------- calculadora (conteúdo compartilhado) ---------------- */
   const calculator = (
@@ -180,12 +174,16 @@ export function Builder() {
         )}
       </div>
 
-      <a href={whatsappLink(message)} target="_blank" rel="noreferrer" className="mt-4 block">
+      {/* cadastro primeiro: /signup registra a conta e depois abre o WhatsApp */}
+      <Link
+        to={`/signup?combo=${selected.join(",")}&preco=${total.toFixed(2)}`}
+        className="mt-4 block"
+      >
         <NeonButton accent="red" size="lg" className="w-full" disabled={selected.length === 0}>
-          <MessageCircle className="size-4" />
-          Finalizar via WhatsApp
+          <UserPlus className="size-4" />
+          Criar conta e finalizar
         </NeonButton>
-      </a>
+      </Link>
       <p className="mt-2.5 text-center font-sans text-[10px] leading-relaxed text-white/25">
         Sem cartão agora. Um atendente confirma os acessos antes do pagamento.
       </p>

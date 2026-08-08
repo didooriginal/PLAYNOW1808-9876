@@ -67,12 +67,12 @@ export function SiteHeader() {
               Área do Cliente
             </NeonButton>
           </Link>
-          <a href="#pacotes">
+          <Link to="/signup">
             <NeonButton accent="red" size="sm">
               <Zap className="size-4" />
               Assine Agora
             </NeonButton>
-          </a>
+          </Link>
           <button
             type="button"
             onClick={() => setOpen((v) => !v)}
@@ -108,6 +108,13 @@ export function SiteHeader() {
               className="rounded-xl px-4 py-3 font-sans text-sm text-neon-purple hover:bg-white/5"
             >
               Painel Admin
+            </Link>
+            <Link
+              to="/signup"
+              onClick={() => setOpen(false)}
+              className="rounded-xl px-4 py-3 font-sans text-sm font-semibold text-neon-red hover:bg-white/5"
+            >
+              Assinar Agora
             </Link>
           </div>
         </div>

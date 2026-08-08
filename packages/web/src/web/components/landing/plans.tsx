@@ -1,9 +1,11 @@
 import { useState } from "react";
-import { Check, Crown, Flame, MessageCircle, Users, Zap } from "lucide-react";
+import { Link } from "wouter";
+import { Check, Crown, Flame, UserPlus, Users, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AppIcon } from "../app-icon";
 import { GlassCard, NeonButton, Pill, SectionTitle, accentHex } from "../ui/kit";
-import { brl, plans, retailOf, savingsPct, whatsappLink } from "@/lib/mock-data";
+import { brl, retailOf, savingsPct } from "@/lib/mock-data";
+import { usePlanos } from "../../queries/planos";
 
 export type Cycle = "monthly" | "yearly";
 
@@ -51,6 +53,8 @@ function CycleToggle({ cycle, onChange }: { cycle: Cycle; onChange: (c: Cycle) =
 export function Plans() {
   const [cycle, setCycle] = useState<Cycle>("monthly");
   const yearly = cycle === "yearly";
+  // pacotes vindos da tabela `pacotes` (Turso/Drizzle)
+  const { planos } = usePlanos();
 
   return (
     <section id="pacotes" className="relative px-4 py-20 sm:px-6 sm:py-28">
@@ -75,7 +79,7 @@ export function Plans() {
         </div>
 
         <div className="mt-14 grid gap-6 lg:grid-cols-3">
-          {plans.map((plan, index) => {
+          {planos.map((plan, index) => {
             const monthly = yearly ? plan.yearlyMonthly : plan.monthly;
             const retail = retailOf(plan.items);
             const pct = savingsPct(retail, monthly);
@@ -196,12 +200,9 @@ export function Plans() {
 
                 <div className="mt-6 flex-1" />
 
-                <a
-                  href={whatsappLink(
-                    `Olá! Quero garantir minha vaga no pacote ${plan.name} da PLAPLUSNOW (${yearly ? "plano anual" : "plano mensal"} — ${brl(monthly)}/mês).`,
-                  )}
-                  target="_blank"
-                  rel="noreferrer"
+                {/* cadastro primeiro: /signup cria a conta e leva ao WhatsApp para fechar */}
+                <Link
+                  to={`/signup?plano=${plan.id}&ciclo=${yearly ? "anual" : "mensal"}`}
                   className="block"
                 >
                   <NeonButton
@@ -210,12 +211,12 @@ export function Plans() {
                     size="lg"
                     className="w-full"
                   >
-                    <MessageCircle className="size-4" />
+                    <UserPlus className="size-4" />
                     Garantir Vaga
                   </NeonButton>
-                </a>
+                </Link>
                 <p className="mt-3 text-center font-sans text-[11px] text-white/25">
-                  Ativação em até 10 minutos após o pagamento
+                  Crie sua conta e finalize no WhatsApp — ativação em até 10 minutos
                 </p>
               </GlassCard>
             );

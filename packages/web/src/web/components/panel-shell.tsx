@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { ArrowLeft, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "./logo";
 import type { Accent } from "@/lib/mock-data";
 import { accentHex } from "./ui/kit";
+import { authClient, clearToken } from "../lib/auth";
 
 export type NavItem = {
   id: string;
@@ -31,6 +32,13 @@ export function PanelShell({
   children: ReactNode;
 }) {
   const hex = accentHex[accent];
+  const [, navigate] = useLocation();
+
+  async function sair() {
+    await authClient.signOut();
+    clearToken();
+    navigate("/login");
+  }
 
   return (
     <div className="relative flex min-h-screen">
@@ -111,6 +119,7 @@ export function PanelShell({
           </Link>
           <button
             type="button"
+            onClick={() => void sair()}
             className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 font-sans text-sm text-white/40 transition-colors hover:bg-neon-red/10 hover:text-neon-red"
           >
             <LogOut className="size-4" />
@@ -127,12 +136,22 @@ export function PanelShell({
             <Link to="/">
               <Logo size="sm" withTagline={false} />
             </Link>
-            <span
-              className="flex size-9 items-center justify-center rounded-xl border font-display text-[11px] font-bold"
-              style={{ borderColor: `${hex}55`, background: `${hex}1f`, color: hex }}
-            >
-              {user.initials}
-            </span>
+            <div className="flex items-center gap-2">
+              <span
+                className="flex size-9 items-center justify-center rounded-xl border font-display text-[11px] font-bold"
+                style={{ borderColor: `${hex}55`, background: `${hex}1f`, color: hex }}
+              >
+                {user.initials}
+              </span>
+              <button
+                type="button"
+                onClick={() => void sair()}
+                aria-label="Sair da conta"
+                className="flex size-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] text-white/45 transition-colors hover:border-neon-red/50 hover:text-neon-red"
+              >
+                <LogOut className="size-4" />
+              </button>
+            </div>
           </div>
           <div className="-mx-4 mt-3 flex gap-1.5 overflow-x-auto px-4 pb-1">
             {nav.map((item) => {

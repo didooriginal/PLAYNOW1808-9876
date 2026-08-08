@@ -2,7 +2,7 @@
 
 SaaS brasileiro de venda e gestão de pacotes de streaming compartilhados. Ships on **web** (Vite + React + Tailwind 4). Visual: dark-mode futurista/tech, glassmorphism intenso, luzes neon (vermelho elétrico, ciano, roxo). Job: converter visitante em assinante de combo de streamings e dar a ele/ao admin um painel de gestão dos acessos.
 
-Escopo atual: **somente UI**, todos os dados vêm de mocks em `src/web/lib/mock-data.ts`. Sem backend real, sem banco, sem auth.
+Escopo atual: **backend real** em Turso/SQLite + Drizzle. `pacotes`, `contas_matrizes` e `usuarios` vêm do banco (landing, painel do cliente e admin). Seguem em mock (`src/web/lib/mock-data.ts`): catálogo de serviços/ícones, depoimentos, stats, faturas, novidades/upgrades e série de MRR. Sem auth ainda.
 
 ## Brand & Colors
 
