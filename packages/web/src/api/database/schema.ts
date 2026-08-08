@@ -111,6 +111,10 @@ export const usuarios = sqliteTable("usuarios", {
   proximaCobranca: text("proxima_cobranca").notNull().default(""),
   clienteDesde: text("cliente_desde").notNull().default(""),
   admin: integer("admin", { mode: "boolean" }).notNull().default(false),
+  /** codigo unico de indicacao - vira o link `site.com/signup?ref=CODIGO` */
+  referralCode: text("referral_code").unique(),
+  /** id do cliente que indicou este cadastro (preenchido no signup via ?ref=) */
+  indicadoPor: integer("indicado_por"),
   /** vínculo com a conta de login (tabela `user` do Better Auth) */
   authUserId: text("auth_user_id").unique(),
   criadoEm: integer("criado_em", { mode: "timestamp" })
@@ -208,6 +212,85 @@ export const chamados = sqliteTable("chamados", {
 
 export type Chamado = typeof chamados.$inferSelect;
 export type NovoChamado = typeof chamados.$inferInsert;
+
+/* ------------------------------------------------------------------ */
+/* GAMIFICACAO — progresso, XP, niveis e premios                       */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Uma linha por cliente. Todos os campos sao DERIVADOS automaticamente do
+ * historico (tempo de casa, status de pagamento, indicacoes convertidas) por
+ * `recalcularProgresso()` em routes/recompensas.ts — nunca editados na mao.
+ */
+export const recompensasProgresso = sqliteTable("recompensas_progresso", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  clienteId: integer("cliente_id")
+    .notNull()
+    .unique()
+    .references(() => usuarios.id, { onDelete: "cascade" }),
+  xp: integer("xp").notNull().default(0),
+  nivel: integer("nivel").notNull().default(1),
+  /** renovacoes pagas em dia */
+  renovacoes: integer("renovacoes").notNull().default(0),
+  /** total de pessoas cadastradas com o link do cliente */
+  indicacoes: integer("indicacoes").notNull().default(0),
+  /** indicacoes que viraram assinantes (pacote contratado) */
+  indicacoesAssinantes: integer("indicacoes_assinantes").notNull().default(0),
+  /** meses completos desde `clienteDesde` */
+  mesesAtivo: integer("meses_ativo").notNull().default(0),
+  /** ids das missoes concluidas — JSON ex.: ["m1","m2"] */
+  missoesConcluidas: text("missoes_concluidas", { mode: "json" })
+    .notNull()
+    .$type<string[]>()
+    .$defaultFn(() => []),
+  /** premios liberados — JSON ex.: ["cupom15","hbo_max","surpresa"] */
+  premiosLiberados: text("premios_liberados", { mode: "json" })
+    .notNull()
+    .$type<string[]>()
+    .$defaultFn(() => []),
+  /** premios ja entregues pelo admin — JSON */
+  premiosEntregues: text("premios_entregues", { mode: "json" })
+    .notNull()
+    .$type<string[]>()
+    .$defaultFn(() => []),
+  /** cupom ativo aplicado na proxima fatura (ex.: "PPN15OFF") */
+  cupomAtivo: text("cupom_ativo").notNull().default(""),
+  /** desconto percentual do cupom ativo */
+  cupomDesconto: integer("cupom_desconto").notNull().default(0),
+  atualizadoEm: integer("atualizado_em", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+export type RecompensaProgresso = typeof recompensasProgresso.$inferSelect;
+export type NovaRecompensaProgresso = typeof recompensasProgresso.$inferInsert;
+
+/**
+ * Livro-razao de XP e premios. `chave` e unica por cliente para deixar o
+ * calculo automatico idempotente (rodar de novo nao duplica pontos) e dar ao
+ * admin a trilha de auditoria de quando cada marco caiu.
+ */
+export const recompensasEventos = sqliteTable("recompensas_eventos", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  clienteId: integer("cliente_id")
+    .notNull()
+    .references(() => usuarios.id, { onDelete: "cascade" }),
+  /** renovacao | indicacao | missao | premio | bonus */
+  tipo: text("tipo").notNull(),
+  /** chave idempotente: "renovacao:3", "indicacao:12", "missao:m5" */
+  chave: text("chave").notNull(),
+  descricao: text("descricao").notNull().default(""),
+  xp: integer("xp").notNull().default(0),
+  /** avisa o admin (ex.: cliente bateu 12 meses = presente surpresa) */
+  notificarAdmin: integer("notificar_admin", { mode: "boolean" }).notNull().default(false),
+  lidoPeloAdmin: integer("lido_pelo_admin", { mode: "boolean" }).notNull().default(false),
+  criadoEm: integer("criado_em", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+export type RecompensaEvento = typeof recompensasEventos.$inferSelect;
+export type NovaRecompensaEvento = typeof recompensasEventos.$inferInsert;
 
 /* ------------------------------------------------------------------ */
 /* AUTENTICAÇÃO (Better Auth)                                          */

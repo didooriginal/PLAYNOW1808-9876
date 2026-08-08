@@ -8,6 +8,7 @@ import { seed } from "./routes/seed";
 import { aplicativosRoutes } from "./routes/aplicativos";
 import { alocacoesRoutes } from "./routes/alocacoes";
 import { suporteRoutes } from "./routes/suporte";
+import { recompensasRoutes } from "./routes/recompensas";
 import { auth } from "./auth";
 
 // API features are oRPC procedures, one file per feature in ./routes/,
@@ -22,6 +23,7 @@ export const router = {
   aplicativos: aplicativosRoutes,
   alocacoes: alocacoesRoutes,
   suporte: suporteRoutes,
+  recompensas: recompensasRoutes,
   seed,
 };
 

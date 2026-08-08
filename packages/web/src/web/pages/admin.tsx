@@ -18,6 +18,7 @@ import {
   ShieldCheck,
   Trash2,
   TrendingUp,
+  Trophy,
   UserPlus,
   Users,
 } from "lucide-react";
@@ -25,6 +26,7 @@ import { cn } from "@/lib/utils";
 import { AppIcon } from "../components/app-icon";
 import { ContaMatrizCard, diasParaVencer } from "../components/admin/conta-card";
 import { AppsView } from "../components/admin/apps-view";
+import { AfiliadosView } from "../components/admin/afiliados-view";
 import { SuporteView } from "../components/admin/suporte-view";
 import { PanelShell, type NavItem } from "../components/panel-shell";
 import {
@@ -48,6 +50,7 @@ import { useContas, useCriarConta, useResumoEstoque } from "../queries/contas";
 import { useMapaAlocacoes } from "../queries/alocacoes";
 import { useAplicativos } from "../queries/aplicativos";
 import { useResumoSuporte } from "../queries/suporte";
+import { useResumoRecompensas } from "../queries/recompensas";
 import { usePacotes, useCriarPacote, useRemoverPacote } from "../queries/pacotes";
 import {
   useCriarUsuario,
@@ -1129,10 +1132,12 @@ export default function AdminPage() {
   const pacotes = usePacotes();
   const aplicativos = useAplicativos();
   const suporte = useResumoSuporte();
+  const gamificacao = useResumoRecompensas();
 
   const esgotadas = (contas.data ?? []).filter((c) => c.vagasOcupadas >= c.totalVagas).length;
   const pendentesSuporte = (suporte.data?.abertos ?? 0) + (suporte.data?.emAndamento ?? 0);
   const aVencer = (clientes.data ?? []).filter((c) => c.statusPagamento !== "ativo").length;
+  const avisosGamificacao = gamificacao.data?.avisosPendentes ?? 0;
 
   const nav: NavItem[] = [
     { id: "visao", label: "Visão Geral", icon: LayoutDashboard },
@@ -1155,6 +1160,12 @@ export default function AdminPage() {
       badge: aplicativos.data ? String(aplicativos.data.length) : undefined,
     },
     { id: "clientes", label: "Clientes", icon: Users },
+    {
+      id: "afiliados",
+      label: "Afiliados/Gamificação",
+      icon: Trophy,
+      badge: avisosGamificacao ? String(avisosGamificacao) : undefined,
+    },
     {
       id: "suporte",
       label: "Suporte",
@@ -1180,6 +1191,10 @@ export default function AdminPage() {
       sub: "Problemas relatados pelos clientes — resolva e responda direto daqui.",
     },
     clientes: { title: "Clientes", sub: "Base completa de assinantes e seus pacotes." },
+    afiliados: {
+      title: "Afiliados / Gamificação",
+      sub: "Quem indicou quem, XP acumulado, níveis e prêmios liberados — tudo calculado automaticamente.",
+    },
     faturas: { title: "Faturas", sub: "Cobranças a vencer, recebimentos e inadimplência." },
   };
 
@@ -1230,6 +1245,7 @@ export default function AdminPage() {
             </>
           )}
           {active === "aplicativos" && <AppsView />}
+          {active === "afiliados" && <AfiliadosView />}
           {active === "suporte" && <SuporteView />}
           {active === "faturas" && <InvoicesAdminView />}
         </div>

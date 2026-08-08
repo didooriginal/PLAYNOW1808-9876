@@ -11,6 +11,7 @@ import {
   Gift,
   LifeBuoy,
   Loader2,
+  Trophy,
   LayoutGrid,
   MessageCircle,
   Receipt,
@@ -23,6 +24,7 @@ import { cn } from "@/lib/utils";
 import { AppIcon } from "../components/app-icon";
 import { RelatarProblema } from "../components/cliente/relatar-problema";
 import { SuporteClienteView } from "../components/cliente/suporte-view";
+import { JornadaCliente } from "../components/cliente/jornada";
 import { PanelShell, type NavItem } from "../components/panel-shell";
 import { GlassCard, NeonButton, Pill, ProgressBar, accentHex, NeonBackdrop } from "../components/ui/kit";
 import {
@@ -443,6 +445,7 @@ export default function DashboardPage() {
         icon: LayoutGrid,
         badge: data ? String(data.acessos.length) : undefined,
       },
+      { id: "jornada", label: "Jornada / Recompensas", icon: Trophy },
       { id: "novidades", label: "Novidades/Upgrades", icon: Sparkles, badge: String(upgrades.length) },
       { id: "faturas", label: "Faturas", icon: Receipt },
       {
@@ -508,6 +511,7 @@ export default function DashboardPage() {
           <div>
             <h1 className="font-display text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
               {active === "acessos" && "Meus Acessos"}
+              {active === "jornada" && "Jornada do Cliente"}
               {active === "novidades" && "Novidades e Upgrades"}
               {active === "faturas" && "Minhas Faturas"}
               {active === "suporte" && "Suporte"}
@@ -515,6 +519,8 @@ export default function DashboardPage() {
             <p className="mt-1.5 font-sans text-sm text-white/40">
               {active === "acessos" &&
                 "Login e senha de cada app do seu pacote. Nunca troque a senha da conta matriz."}
+              {active === "jornada" &&
+                "Suba de nível, cumpra missões e desbloqueie prêmios indicando amigos."}
               {active === "novidades" && "Novos apps, telas extras e formas de pagar menos."}
               {active === "faturas" && "Acompanhe pagamentos, vencimentos e recibos."}
               {active === "suporte" && "Relate um problema e acompanhe o andamento do chamado."}
@@ -541,6 +547,7 @@ export default function DashboardPage() {
             </>
           )}
 
+          {active === "jornada" && <JornadaCliente />}
           {active === "novidades" && <UpgradesView />}
           {active === "faturas" && <InvoicesView cliente={cliente} />}
           {active === "suporte" && <SuporteClienteView />}

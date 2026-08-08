@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation, useSearch } from "wouter";
 import { Check, Eye, EyeOff, MessageCircle, TriangleAlert, UserPlus } from "lucide-react";
 import { AuthField, AuthShell, inputClass } from "../components/auth-shell";
@@ -53,6 +54,14 @@ export default function SignupPage() {
       }) as ServiceId[];
   }, [params]);
   const comboPreco = Number(params.get("preco") ?? 0);
+  /** codigo de indicacao vindo do link `?ref=CODIGO` */
+  const ref = (params.get("ref") ?? "").trim().toUpperCase();
+  const { data: indicacao } = useQuery({
+    queryKey: ["indicacao", ref],
+    enabled: Boolean(ref),
+    staleTime: 60_000,
+    queryFn: () => client.recompensas.validarCodigo({ codigo: ref }),
+  });
 
   const { data: pacotes } = usePacotes();
   const pacote = useMemo(() => {
@@ -99,6 +108,15 @@ export default function SignupPage() {
       return;
     }
 
+    // vincula a indicacao (?ref=CODIGO) ao cadastro recem-criado
+    if (ref) {
+      try {
+        await client.recompensas.registrarIndicacao({ codigo: ref });
+      } catch {
+        /* codigo invalido nao bloqueia o cadastro */
+      }
+    }
+
     // grava o pacote escolhido no cadastro do cliente (pagamento segue no WhatsApp)
     try {
       await client.usuarios.escolherPacote({
@@ -139,6 +157,22 @@ export default function SignupPage() {
       }
       subtitle="Leva 30 segundos. Depois de cadastrar, você é levado ao WhatsApp para confirmar o pagamento e os acessos são liberados na sua área do cliente."
     >
+      {ref && indicacao?.valido && (
+        <div className="mb-6 flex items-center gap-3 rounded-2xl border border-neon-purple/40 bg-neon-purple/[0.08] p-4">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-neon-purple/45 bg-neon-purple/12">
+            <UserPlus className="size-4 text-neon-purple" />
+          </span>
+          <div>
+            <div className="font-display text-sm font-bold text-white">
+              Você foi indicado por {indicacao.nome}
+            </div>
+            <div className="font-sans text-[11px] text-white/45">
+              Código {ref} aplicado — sua conta já entra vinculada à indicação.
+            </div>
+          </div>
+        </div>
+      )}
+
       {plano && (
         <div
           className="mb-6 rounded-2xl border p-4"
