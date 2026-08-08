@@ -38,28 +38,29 @@ export type Service = {
   mono: string;
   /** cor da marca (usada em glow/ícone) */
   color: string;
-  /** preço avulso "de mercado" — usado no comparativo */
+  /** preço avulso PLAPLUSNOW (tabela oficial) — base do comparativo */
   retail: number;
-  /** preço dentro do combo PLAPLUSNOW (mensal) */
+  /** preço unitário dentro de um combo (mensal) */
   price: number;
-  category: "Vídeo" | "Música" | "Extra";
+  /** categoria do catálogo: Streaming | Esportes | Música | Produtividade | IPTV | Asiático */
+  category: string;
 };
 
 export const services: Service[] = [
-  { id: "netflix", name: "Netflix", mono: "N", color: "#e50914", retail: 59.9, price: 14.9, category: "Vídeo" },
-  { id: "disney", name: "Disney+", mono: "D+", color: "#4f8ef7", retail: 43.9, price: 12.9, category: "Vídeo" },
-  { id: "prime", name: "Prime Video", mono: "PV", color: "#00a8e1", retail: 19.9, price: 8.9, category: "Vídeo" },
-  { id: "hbomax", name: "HBO Max", mono: "MAX", color: "#8b5cf6", retail: 55.9, price: 13.9, category: "Vídeo" },
-  { id: "paramount", name: "Paramount+", mono: "P+", color: "#0064ff", retail: 19.9, price: 8.9, category: "Vídeo" },
-  { id: "appletv", name: "Apple TV+", mono: "TV+", color: "#d4d4d8", retail: 21.9, price: 9.9, category: "Vídeo" },
-  { id: "spotify", name: "Spotify", mono: "S", color: "#1db954", retail: 21.9, price: 9.9, category: "Música" },
-  { id: "youtube", name: "YouTube Premium", mono: "YT", color: "#ff0033", retail: 24.9, price: 10.9, category: "Vídeo" },
-  { id: "crunchyroll", name: "Crunchyroll", mono: "CR", color: "#f47521", retail: 16.9, price: 7.9, category: "Vídeo" },
-  { id: "globoplay", name: "Globoplay", mono: "G", color: "#ff5722", retail: 49.9, price: 12.9, category: "Vídeo" },
-  { id: "star", name: "Star+", mono: "★+", color: "#e0b04a", retail: 39.9, price: 11.9, category: "Vídeo" },
-  { id: "deezer", name: "Deezer", mono: "DZ", color: "#a238ff", retail: 19.9, price: 8.9, category: "Música" },
-  { id: "canva", name: "Canva Pro", mono: "C", color: "#00c4cc", retail: 34.9, price: 9.9, category: "Extra" },
-  { id: "iptv", name: "IPTV + Canais ao vivo", mono: "IP", color: "#22d3ee", retail: 89.9, price: 19.9, category: "Extra" },
+  { id: "netflix", name: "Netflix", mono: "N", color: "#e50914", retail: 20, price: 20, category: "Streaming" },
+  { id: "disney", name: "Disney+", mono: "D+", color: "#4f8ef7", retail: 18.9, price: 18.9, category: "Streaming" },
+  { id: "prime", name: "Amazon Prime Video", mono: "PV", color: "#00a8e1", retail: 15, price: 15, category: "Streaming" },
+  { id: "hbomax", name: "HBO Max", mono: "MAX", color: "#8b5cf6", retail: 15, price: 15, category: "Streaming" },
+  { id: "paramount", name: "Paramount+", mono: "P+", color: "#0064ff", retail: 15, price: 15, category: "Streaming" },
+  { id: "appletv", name: "Apple TV+", mono: "TV+", color: "#d4d4d8", retail: 15, price: 15, category: "Streaming" },
+  { id: "spotify", name: "Spotify", mono: "S", color: "#1db954", retail: 15, price: 15, category: "Música" },
+  { id: "youtube", name: "YouTube Premium", mono: "YT", color: "#ff0033", retail: 15, price: 15, category: "Streaming" },
+  { id: "crunchyroll", name: "Crunchyroll", mono: "CR", color: "#f47521", retail: 15, price: 15, category: "Asiático" },
+  { id: "globoplay", name: "Globoplay", mono: "G", color: "#ff5722", retail: 20, price: 20, category: "Streaming" },
+  { id: "star", name: "Star+", mono: "★+", color: "#e0b04a", retail: 15, price: 15, category: "Streaming" },
+  { id: "deezer", name: "Deezer", mono: "DZ", color: "#a238ff", retail: 15, price: 15, category: "Música" },
+  { id: "canva", name: "Canva Pro", mono: "C", color: "#00c4cc", retail: 15, price: 15, category: "Produtividade" },
+  { id: "iptv", name: "IPTV + Canais ao vivo", mono: "IP", color: "#22d3ee", retail: 35, price: 35, category: "IPTV" },
 ];
 
 /**
@@ -69,20 +70,48 @@ export const services: Service[] = [
  */
 const dynamicServices = new Map<string, Service>();
 
-export function registerServices(
-  apps: { slug: string; nome: string; mono: string; cor: string; tipo: string; precoAvulso: number }[],
-) {
+/** rotulo exibido para cada categoria do catalogo */
+export const CATEGORIAS: Record<string, string> = {
+  streaming: "Streaming",
+  esportes: "Esportes",
+  musica: "Música",
+  produtividade: "Produtividade",
+  iptv: "IPTV",
+  asiatico: "Asiático",
+};
+
+export type AppDoCatalogo = {
+  slug: string;
+  nome: string;
+  mono: string;
+  cor: string;
+  tipo: string;
+  categoria?: string;
+  precoAvulso: number;
+  preco: number;
+  ativo?: boolean;
+};
+
+/**
+ * Registra o catalogo vindo do banco. O banco e a FONTE DE VERDADE de preco e
+ * categoria, entao sobrescreve tambem os apps da lista estatica (que serve
+ * apenas de fallback enquanto o fetch nao chega).
+ */
+export function registerServices(apps: AppDoCatalogo[]) {
   for (const app of apps) {
-    if (services.some((s) => s.id === app.slug)) continue;
-    dynamicServices.set(app.slug, {
+    const avulso = app.precoAvulso || app.preco || 0;
+    const estatico = services.find((s) => s.id === app.slug);
+    const registro: Service = {
       id: app.slug as ServiceId,
       name: app.nome,
-      mono: app.mono || app.nome.slice(0, 2).toUpperCase(),
-      color: app.cor || "#22d3ee",
-      retail: app.precoAvulso || 0,
-      price: 0,
-      category: app.tipo === "musica" ? "Música" : app.tipo === "extra" ? "Extra" : "Vídeo",
-    });
+      mono: app.mono || estatico?.mono || app.nome.slice(0, 2).toUpperCase(),
+      color: app.cor || estatico?.color || "#22d3ee",
+      retail: avulso,
+      price: app.preco || avulso,
+      category: CATEGORIAS[app.categoria ?? ""] ?? CATEGORIAS.streaming,
+    };
+    dynamicServices.set(app.slug, registro);
+    if (estatico) Object.assign(estatico, registro);
   }
 }
 

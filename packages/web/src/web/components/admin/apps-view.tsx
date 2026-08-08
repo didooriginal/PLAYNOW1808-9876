@@ -11,6 +11,7 @@ import {
 } from "../../queries/aplicativos";
 import { ComboBuilder } from "./combo-builder";
 
+
 const TIPOS = [
   { id: "video", label: "Vídeo" },
   { id: "musica", label: "Música" },
@@ -115,26 +116,19 @@ function NovoAppForm({ onClose }: { onClose: () => void }) {
             </option>
           ))}
         </select>
-        <div className="grid grid-cols-2 gap-3">
-          <input
-            className={inputCls}
-            type="number"
-            step="0.01"
-            aria-label="Preço PLAPLUSNOW"
-            placeholder="Preço PPN"
-            value={form.preco}
-            onChange={(e) => set("preco", Number(e.target.value))}
-          />
-          <input
-            className={inputCls}
-            type="number"
-            step="0.01"
-            aria-label="Preço avulso de mercado"
-            placeholder="Avulso mercado"
-            value={form.precoAvulso}
-            onChange={(e) => set("precoAvulso", Number(e.target.value))}
-          />
-        </div>
+        <input
+          className={inputCls}
+          type="number"
+          step="0.01"
+          aria-label="Preço avulso"
+          placeholder="Preço avulso (R$/mês)"
+          value={form.preco}
+          onChange={(e) => {
+            const v = Number(e.target.value);
+            set("preco", v);
+            set("precoAvulso", v);
+          }}
+        />
       </div>
 
       {criar.isError && (
@@ -152,6 +146,39 @@ function NovoAppForm({ onClose }: { onClose: () => void }) {
         Cadastrar aplicativo
       </NeonButton>
     </GlassCard>
+  );
+}
+
+/** edicao rapida do preco avulso direto no card (salva no Enter ou ao sair) */
+function PrecoInline({ app }: { app: { id: number; nome: string; preco: number } }) {
+  const atualizar = useAtualizarAplicativo();
+  const [valor, setValor] = useState(String(app.preco));
+
+  const salvar = () => {
+    const preco = Number(valor);
+    if (!Number.isFinite(preco) || preco < 0 || preco === app.preco) {
+      setValor(String(app.preco));
+      return;
+    }
+    atualizar.mutate({ id: app.id, preco, precoAvulso: preco });
+  };
+
+  return (
+    <span className="flex items-center gap-1 text-white/45">
+      R$
+      <input
+        type="number"
+        step="0.01"
+        min="0"
+        aria-label={`Preço avulso de ${app.nome}`}
+        value={valor}
+        onChange={(e) => setValor(e.target.value)}
+        onBlur={salvar}
+        onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+        className="w-14 rounded border border-white/10 bg-white/[0.04] px-1 py-0.5 text-right font-mono text-[10px] text-white outline-none transition-colors focus:border-neon-cyan/50"
+      />
+      <span className="text-white/20">/mês</span>
+    </span>
   );
 }
 
@@ -289,11 +316,10 @@ export function AppsView() {
                     <div className="truncate font-display text-sm font-bold text-white">
                       {app.nome}
                     </div>
-                    <div className="truncate font-mono text-[10px] text-white/30">
-                      {app.slug} · {brl(app.preco)}
-                      {app.precoAvulso > app.preco && (
-                        <span className="text-white/20"> · avulso {brl(app.precoAvulso)}</span>
-                      )}
+                    <div className="flex items-center gap-1.5 font-mono text-[10px] text-white/30">
+                      <span className="truncate">{app.slug}</span>
+                      <span className="text-white/15">·</span>
+                      <PrecoInline app={app} />
                     </div>
                   </div>
                   <button

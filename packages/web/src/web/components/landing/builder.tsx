@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { AppIcon } from "../app-icon";
 import { GlassCard, NeonButton, Pill, SectionTitle } from "../ui/kit";
 import {
+  CATEGORIAS,
   brl,
   builderDiscount,
   builderTiers,
@@ -23,17 +24,48 @@ import {
   services,
   type ServiceId,
 } from "@/lib/mock-data";
+import { useAplicativos } from "@/queries/aplicativos";
 
-const categories = ["Todos", "Vídeo", "Música", "Extra"] as const;
+/** ordem em que as categorias do catalogo aparecem nos filtros */
+const ORDEM_CATEGORIAS = ["streaming", "esportes", "musica", "produtividade", "iptv", "asiatico"];
 
 export function Builder() {
   const [selected, setSelected] = useState<ServiceId[]>(["netflix", "spotify"]);
-  const [category, setCategory] = useState<(typeof categories)[number]>("Todos");
+  const [category, setCategory] = useState("Todos");
   const [openMobile, setOpenMobile] = useState(false);
 
+  // catalogo real do banco (tabela oficial de precos avulsos)
+  const { data: catalogo } = useAplicativos();
+
+  /** apps ativos do catalogo, na ordem das categorias, com fallback estatico */
+  const disponiveis = useMemo(() => {
+    if (!catalogo?.length) return services;
+    return catalogo
+      .filter((a) => a.ativo)
+      .map((a) => serviceById(a.slug))
+      .sort(
+        (a, b) =>
+          ORDEM_CATEGORIAS.indexOf(
+            Object.keys(CATEGORIAS).find((k) => CATEGORIAS[k] === a.category) ?? "",
+          ) -
+            ORDEM_CATEGORIAS.indexOf(
+              Object.keys(CATEGORIAS).find((k) => CATEGORIAS[k] === b.category) ?? "",
+            ) ||
+          a.retail - b.retail ||
+          a.name.localeCompare(b.name),
+      );
+  }, [catalogo]);
+
+  const categories = useMemo(() => {
+    const presentes = ORDEM_CATEGORIAS.map((k) => CATEGORIAS[k]).filter((rotulo) =>
+      disponiveis.some((s) => s.category === rotulo),
+    );
+    return ["Todos", ...presentes];
+  }, [disponiveis]);
+
   const visible = useMemo(
-    () => (category === "Todos" ? services : services.filter((s) => s.category === category)),
-    [category],
+    () => (category === "Todos" ? disponiveis : disponiveis.filter((s) => s.category === category)),
+    [category, disponiveis],
   );
 
   const subtotal = useMemo(
@@ -131,10 +163,12 @@ export function Builder() {
             {tier ? `- ${brl(discount)} (${Math.round(tier.off * 100)}%)` : "—"}
           </span>
         </div>
-        <div className="flex items-center justify-between text-white/40">
-          <span>Preço avulso desses apps</span>
-          <span className="line-through decoration-neon-red/60">{brl(retail)}</span>
-        </div>
+        {retail > total && (
+          <div className="flex items-center justify-between text-white/40">
+            <span>Somando avulso</span>
+            <span className="line-through decoration-neon-red/60">{brl(retail)}</span>
+          </div>
+        )}
       </div>
 
       {/* próximo tier */}
@@ -277,9 +311,7 @@ export function Builder() {
                       <div className="font-display text-lg font-extrabold text-white">
                         {brl(s.price)}
                       </div>
-                      <div className="font-sans text-[10px] text-white/30 line-through decoration-neon-red/50">
-                        {brl(s.retail)}
-                      </div>
+                      <div className="font-sans text-[10px] text-white/30">avulso / mês</div>
                     </div>
                   </button>
                 );
