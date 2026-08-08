@@ -50,7 +50,7 @@ import { useContas, useCriarConta, useResumoEstoque } from "../queries/contas";
 import { useMapaAlocacoes } from "../queries/alocacoes";
 import { useAplicativos } from "../queries/aplicativos";
 import { useResumoSuporte } from "../queries/suporte";
-import { useResumoRecompensas } from "../queries/recompensas";
+import { useResumoRecompensas, useAfiliados } from "../queries/recompensas";
 import { usePacotes, useCriarPacote, useRemoverPacote } from "../queries/pacotes";
 import {
   useCriarUsuario,
@@ -1038,6 +1038,17 @@ function NovoClienteForm() {
 function InvoicesAdminView() {
   const { data, isPending, isError, error } = useUsuarios();
   const resumo = useResumoClientes();
+  const afiliados = useAfiliados();
+
+  const cupons = useMemo(() => {
+    const mapa = new Map<number, { cupom: string; desconto: number }>();
+    for (const linha of afiliados.data ?? []) {
+      if (linha.cupomAtivo && linha.cupomDesconto > 0) {
+        mapa.set(linha.clienteId, { cupom: linha.cupomAtivo, desconto: linha.cupomDesconto });
+      }
+    }
+    return mapa;
+  }, [afiliados.data]);
 
   if (isPending) return <Loading label="Carregando faturas..." />;
   if (isError) return <ErrorBox message={error?.message} />;
@@ -1084,7 +1095,10 @@ function InvoicesAdminView() {
           <div className="font-display text-sm font-bold text-white">Cobranças pendentes</div>
         </div>
         <div className="mt-4 space-y-2.5">
-          {pending.map((c) => (
+          {pending.map((c) => {
+            const cupom = cupons.get(c.id);
+            const valorFinal = cupom ? c.valor * (1 - cupom.desconto / 100) : c.valor;
+            return (
             <div
               key={c.id}
               className="flex flex-wrap items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.03] p-3.5"
@@ -1093,15 +1107,31 @@ function InvoicesAdminView() {
                 <Receipt className="size-4 text-neon-red" />
               </span>
               <div className="min-w-0 flex-1">
-                <div className="font-display text-xs font-bold text-white">{c.nome}</div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="font-display text-xs font-bold text-white">{c.nome}</div>
+                  {cupom && (
+                    <span className="rounded-full border border-neon-cyan/30 bg-neon-cyan/10 px-2 py-0.5 font-sans text-[10px] font-semibold text-neon-cyan">
+                      {cupom.cupom} · {cupom.desconto}% OFF
+                    </span>
+                  )}
+                </div>
                 <div className="font-sans text-[11px] text-white/35">
                   {c.pacoteNome ?? "sem pacote"} · vencimento {c.proximaCobranca || "—"}
                 </div>
               </div>
-              <span className="font-display text-sm font-bold text-white">{brl(c.valor)}</span>
+              <span className="font-display text-sm font-bold text-white">
+                {cupom && (
+                  <span className="mr-2 font-sans text-[11px] font-medium text-white/30 line-through">
+                    {brl(c.valor)}
+                  </span>
+                )}
+                {brl(valorFinal)}
+              </span>
               <a
                 href={whatsappLink(
-                  `Olá ${c.nome}! Passando para lembrar da sua fatura de ${brl(c.valor)} na PLAPLUSNOW.`,
+                  cupom
+                    ? `Olá ${c.nome}! Sua fatura da PLAPLUSNOW está em aberto. Com o cupom ${cupom.cupom} (${cupom.desconto}% OFF) da sua Jornada, o valor fica ${brl(valorFinal)} em vez de ${brl(c.valor)}.`
+                    : `Olá ${c.nome}! Passando para lembrar da sua fatura de ${brl(c.valor)} na PLAPLUSNOW.`,
                 )}
                 target="_blank"
                 rel="noreferrer"
@@ -1111,7 +1141,8 @@ function InvoicesAdminView() {
                 </NeonButton>
               </a>
             </div>
-          ))}
+            );
+          })}
           {pending.length === 0 && (
             <p className="font-sans text-sm text-white/35">Nenhuma cobrança pendente.</p>
           )}

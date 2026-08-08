@@ -39,6 +39,7 @@ import {
 } from "@/lib/mock-data";
 import { usePainelCliente } from "../queries/usuarios";
 import { useMeusChamados } from "../queries/suporte";
+import { useMinhaJornada } from "../queries/recompensas";
 
 /** dados vindos do banco (usuarios.painel) */
 type PainelCliente = NonNullable<ReturnType<typeof usePainelCliente>["data"]>;
@@ -280,6 +281,13 @@ function ActivePlanCard({
 /* ------------------------------------------------------------------ */
 
 function InvoicesView({ cliente }: { cliente: Cliente }) {
+  // cupom conquistado na Jornada (3 renovações em dia = 15% OFF)
+  const jornada = useMinhaJornada();
+  const cupom = jornada.data?.progresso.cupomAtivo ?? "";
+  const desconto = jornada.data?.progresso.cupomDesconto ?? 0;
+  const valorCheio = cliente.valor;
+  const valorComDesconto = cupom ? valorCheio * (1 - desconto / 100) : valorCheio;
+
   const statusStyle = {
     pago: "border-emerald-400/35 bg-emerald-400/10 text-emerald-300",
     aberto: "border-amber-400/40 bg-amber-400/10 text-amber-300",
@@ -294,8 +302,10 @@ function InvoicesView({ cliente }: { cliente: Cliente }) {
         {[
           {
             label: "Fatura em aberto",
-            value: brl(cliente.valor),
-            sub: `vence em ${cliente.proximaCobranca || "—"}`,
+            value: brl(valorComDesconto),
+            sub: cupom
+              ? `${brl(valorCheio)} - ${desconto}% de desconto`
+              : `vence em ${cliente.proximaCobranca || "—"}`,
             accent: "red" as const,
           },
           { label: "Total pago em 2026", value: brl(total), sub: `${myInvoices.length - 1} faturas quitadas`, accent: "cyan" as const },
@@ -312,6 +322,32 @@ function InvoicesView({ cliente }: { cliente: Cliente }) {
           </GlassCard>
         ))}
       </div>
+
+      {cupom && (
+        <GlassCard accent="red" className="flex flex-wrap items-center gap-4 p-5">
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl border border-neon-red/40 bg-neon-red/10">
+            <Gift className="size-5 text-neon-red" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="font-display text-sm font-bold text-white">
+              Cupom da Jornada aplicado na próxima fatura
+            </div>
+            <div className="mt-0.5 font-sans text-[11px] text-white/45">
+              Você conquistou {desconto}% OFF com suas renovações em dia. O desconto entra
+              automaticamente na cobrança de {cliente.proximaCobranca || "—"}.
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="font-mono text-sm font-bold tracking-widest text-neon-red">{cupom}</div>
+            <div className="font-sans text-[11px] text-white/35 line-through">
+              {brl(valorCheio)}
+            </div>
+            <div className="font-display text-lg font-extrabold text-white">
+              {brl(valorComDesconto)}
+            </div>
+          </div>
+        </GlassCard>
+      )}
 
       <GlassCard className="overflow-hidden">
         <div className="flex items-center justify-between gap-3 border-b border-white/8 px-5 py-4">
