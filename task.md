@@ -79,3 +79,42 @@
 ### Nota
 - Mocks que continuam propositalmente sem tabela: faturas, novidades/upgrades, depoimentos,
   stats sociais, série histórica de MRR e catálogo de serviços (ícones/preço avulso).
+
+---
+
+## Fase — Gamificação, Indicações e Afiliados (08/08/2026)
+
+### Banco
+- `usuarios.referral_code` (unique) e `usuarios.indicado_por` (FK lógica p/ quem indicou).
+- `recompensas_progresso`: XP, nível, renovações, indicações, meses ativo, missões,
+  prêmios liberados/entregues, cupom ativo + desconto.
+- `recompensas_eventos`: livro-razão idempotente (`chave` única por cliente), trilha de
+  auditoria e origem das notificações do admin.
+
+### Regras
+- Nada é pontuado à mão: `recalcularProgresso(clienteId)` deriva tudo do histórico real
+  (renovações a partir de `clienteDesde`, indicações convertidas = indicado com pacote e
+  não inadimplente) e roda a cada carga de painel.
+- +50 XP por renovação em dia · +150 XP por indicação que vira assinante · 250 XP por nível.
+- Níveis: Iniciante → Bronze → Prata → Ouro → Platina → Diamante → Lenda PPN.
+- 7 missões: m1 1 renovação · m2 3 renovações (cupom `PPN15OFF`, 15% OFF) · m3 5 renovações ·
+  m4 1 indicação assinante · m5 3 indicações (HBO Max grátis) · m6 10 renovações ·
+  m7 12 meses ativo (presente surpresa). m5/m6/m7 notificam o admin.
+
+### Telas
+- `/dashboard` › **Jornada / Recompensas**: barra de nível, trilha de missões 1–7,
+  painel de prêmios e link de indicação (`/signup?ref=CODIGO`) com copiar + WhatsApp.
+- `/signup?ref=`: valida o código, mostra "Você foi indicado por X" e grava `indicadoPor`.
+- `/admin` › **Afiliados/Gamificação**: KPIs, avisos de marcos, quem indicou quem, XP,
+  prêmios liberados (clique = marcar entregue).
+- **Faturas**: cupom de 15% aplicado na fatura em aberto do cliente (banner + valor com
+  desconto) e nas cobranças pendentes do admin (badge, valor riscado, texto do WhatsApp).
+
+### Verificações
+- `bun run typecheck` OK · `bun run build` OK
+- E2E Playwright: cliente (Jornada, Faturas) e admin (Afiliados, Faturas) com `errors: []`
+- `/signup?ref=DIEGOK26K` → banner + cadastro gravando `indicadoPor`
+
+### Dados de demonstração
+- Camila Ribeiro, Lucas Ferraz e Juliana Prado foram vinculados como indicados do
+  Diego (id 9) só para a aba Afiliados não nascer vazia — pode ser removido a pedido.
