@@ -16,6 +16,7 @@ function useInvalidarContas() {
   return () => {
     qc.invalidateQueries({ queryKey: orpc.contas.key() });
     qc.invalidateQueries({ queryKey: orpc.usuarios.key() });
+    qc.invalidateQueries({ queryKey: orpc.alocacoes.key() });
   };
 }
 
@@ -35,7 +36,13 @@ export function useAjustarVagas() {
   return useMutation(orpc.contas.ajustarVagas.mutationOptions({ onSuccess: invalidar }));
 }
 
-/** reposição: zera a lotação e reativa a conta */
+/** altera o total de vagas da conta matriz */
+export function useEditarVagas() {
+  const invalidar = useInvalidarContas();
+  return useMutation(orpc.contas.editarVagas.mutationOptions({ onSuccess: invalidar }));
+}
+
+/** reposição: libera todas as vagas para realocação (sem apagar histórico) */
 export function useReporConta() {
   const invalidar = useInvalidarContas();
   return useMutation(orpc.contas.repor.mutationOptions({ onSuccess: invalidar }));

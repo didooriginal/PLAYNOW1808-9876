@@ -43,13 +43,13 @@ export function AppIcon({
   className,
   active = false,
 }: {
-  id: ServiceId;
+  id: string;
   size?: keyof typeof boxSizes;
   className?: string;
   active?: boolean;
 }) {
   const service = serviceById(id);
-  const Brand = brandIcons[id];
+  const Brand = brandIcons[id as ServiceId];
 
   return (
     <span

@@ -9,10 +9,11 @@ import {
   Database,
   Layers,
   LayoutDashboard,
+  Smartphone,
   Loader2,
   Plus,
+  LifeBuoy,
   Receipt,
-  RefreshCw,
   Search,
   ShieldCheck,
   Trash2,
@@ -22,6 +23,9 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AppIcon } from "../components/app-icon";
+import { ContaMatrizCard, diasParaVencer } from "../components/admin/conta-card";
+import { AppsView } from "../components/admin/apps-view";
+import { SuporteView } from "../components/admin/suporte-view";
 import { PanelShell, type NavItem } from "../components/panel-shell";
 import {
   GlassCard,
@@ -40,14 +44,10 @@ import {
   type Accent,
   type ServiceId,
 } from "@/lib/mock-data";
-import {
-  useAjustarVagas,
-  useContas,
-  useCriarConta,
-  useRemoverConta,
-  useReporConta,
-  useResumoEstoque,
-} from "../queries/contas";
+import { useContas, useCriarConta, useResumoEstoque } from "../queries/contas";
+import { useMapaAlocacoes } from "../queries/alocacoes";
+import { useAplicativos } from "../queries/aplicativos";
+import { useResumoSuporte } from "../queries/suporte";
 import { usePacotes, useCriarPacote, useRemoverPacote } from "../queries/pacotes";
 import {
   useCriarUsuario,
@@ -197,167 +197,10 @@ function StatCards() {
 
 /* ------------------------------------------------------------------ */
 
-function MasterAccountCard({ acc }: { acc: Conta }) {
-  const service = serviceById(acc.servico as ServiceId);
-  const pct = Math.round((acc.vagasOcupadas / acc.totalVagas) * 100);
-  const full = acc.vagasOcupadas >= acc.totalVagas;
-  const nearly = !full && pct >= 75;
-
-  const alocar = useAjustarVagas();
-  const repor = useReporConta();
-  const remover = useRemoverConta();
-  const busy = alocar.isPending || repor.isPending || remover.isPending;
-
-  return (
-    <GlassCard
-      hover
-      className="relative flex flex-col overflow-hidden p-5"
-      style={
-        full
-          ? {
-              borderColor: "rgba(255,31,61,0.45)",
-              boxShadow:
-                "inset 0 1px 0 0 rgba(255,255,255,0.07), 0 0 0 1px rgba(255,31,61,0.15), 0 0 34px -8px rgba(255,31,61,0.5)",
-            }
-          : undefined
-      }
-    >
-      <div
-        className="pointer-events-none absolute -right-14 -top-14 size-36 rounded-full blur-3xl"
-        style={{
-          background: `radial-gradient(circle, ${full ? "rgba(255,31,61,0.3)" : `${service.color}2b`} 0%, transparent 70%)`,
-        }}
-      />
-
-      <div className="relative flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <AppIcon id={acc.servico as ServiceId} size="sm" active={!full} />
-          <div className="min-w-0">
-            <div className="truncate font-display text-sm font-bold text-white">{acc.rotulo}</div>
-            <div className="truncate font-mono text-[10px] text-white/30">{acc.email}</div>
-          </div>
-        </div>
-        {full ? (
-          <span
-            className="shrink-0 rounded-full border border-neon-red/50 bg-neon-red/15 px-2.5 py-1 font-display text-[10px] font-bold uppercase tracking-widest text-neon-red"
-            style={{ boxShadow: "0 0 20px -6px #ff1f3d" }}
-          >
-            Esgotado
-          </span>
-        ) : nearly ? (
-          <span className="shrink-0 rounded-full border border-amber-400/45 bg-amber-400/12 px-2.5 py-1 font-display text-[10px] font-bold uppercase tracking-widest text-amber-300">
-            Quase cheio
-          </span>
-        ) : (
-          <span className="shrink-0 rounded-full border border-emerald-400/40 bg-emerald-400/10 px-2.5 py-1 font-display text-[10px] font-bold uppercase tracking-widest text-emerald-300">
-            Disponível
-          </span>
-        )}
-      </div>
-
-      {/* lotação */}
-      <div className="relative mt-5">
-        <div className="flex items-end justify-between">
-          <span className="font-sans text-[11px] uppercase tracking-[0.18em] text-white/35">
-            Lotação
-          </span>
-          <span
-            className="font-display text-lg font-extrabold"
-            style={{ color: full ? "#ff1f3d" : nearly ? "#f59e0b" : "#22d3ee" }}
-          >
-            {acc.vagasOcupadas}/{acc.totalVagas}
-            <span className="ml-1.5 font-sans text-[11px] font-medium text-white/35">
-              vagas ocupadas
-            </span>
-          </span>
-        </div>
-        <ProgressBar value={acc.vagasOcupadas} max={acc.totalVagas} className="mt-2.5" />
-        <div className="mt-2 flex items-center justify-between font-sans text-[11px] text-white/30">
-          <span>{pct}% de ocupação</span>
-          <span>
-            {full ? "0 vagas livres" : `${acc.totalVagas - acc.vagasOcupadas} vaga(s) livre(s)`}
-          </span>
-        </div>
-      </div>
-
-      {/* meta */}
-      <div className="relative mt-5 grid grid-cols-3 gap-3 border-t border-white/8 pt-4">
-        {[
-          { label: "Renovação", value: acc.renovacao || "—" },
-          { label: "Custo", value: brl(acc.custo) },
-          { label: "Região", value: acc.regiao },
-        ].map((m) => (
-          <div key={m.label}>
-            <div className="font-sans text-[9px] uppercase tracking-[0.16em] text-white/25">
-              {m.label}
-            </div>
-            <div className="mt-0.5 truncate font-display text-xs font-bold text-white/80">
-              {m.value}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="relative mt-4 flex gap-2">
-        {full ? (
-          <NeonButton
-            accent="red"
-            variant="outline"
-            size="sm"
-            className="flex-1"
-            disabled={busy}
-            onClick={() => repor.mutate({ id: acc.id })}
-          >
-            {repor.isPending ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : (
-              <RefreshCw className="size-3.5" />
-            )}
-            Repor conta
-          </NeonButton>
-        ) : (
-          <NeonButton
-            accent="cyan"
-            variant="outline"
-            size="sm"
-            className="flex-1"
-            disabled={busy}
-            onClick={() => alocar.mutate({ id: acc.id, delta: 1 })}
-          >
-            {alocar.isPending ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : (
-              <UserPlus className="size-3.5" />
-            )}
-            Alocar cliente
-          </NeonButton>
-        )}
-        <button
-          type="button"
-          className="flex size-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/40 transition-colors hover:border-white/25 hover:text-white"
-          aria-label="Copiar login"
-          onClick={() => navigator.clipboard?.writeText(`${acc.email} · ${acc.senha}`).catch(() => {})}
-        >
-          <Copy className="size-3.5" />
-        </button>
-        <button
-          type="button"
-          className="flex size-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/40 transition-colors hover:border-neon-red/50 hover:text-neon-red"
-          aria-label="Excluir conta matriz"
-          disabled={busy}
-          onClick={() => remover.mutate({ id: acc.id })}
-        >
-          <Trash2 className="size-3.5" />
-        </button>
-      </div>
-    </GlassCard>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-
 function NovaContaForm({ onClose }: { onClose: () => void }) {
   const criar = useCriarConta();
+  const catalogo = useAplicativos();
+  const apps = (catalogo.data ?? []).filter((a) => a.ativo);
   const [form, setForm] = useState({
     servico: "netflix",
     rotulo: "",
@@ -367,6 +210,8 @@ function NovaContaForm({ onClose }: { onClose: () => void }) {
     renovacao: "",
     custo: 0,
     regiao: "BR",
+    dataVencimento: "",
+    cartaoUtilizado: "",
   });
 
   const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) =>
@@ -394,9 +239,9 @@ function NovaContaForm({ onClose }: { onClose: () => void }) {
           onChange={(e) => set("servico", e.target.value)}
           className={input}
         >
-          {services.map((s) => (
-            <option key={s.id} value={s.id} className="bg-[#09090b]">
-              {s.name}
+          {(apps.length ? apps : services.map((s) => ({ slug: s.id, nome: s.name }))).map((a) => (
+            <option key={a.slug} value={a.slug} className="bg-[#09090b]">
+              {a.nome}
             </option>
           ))}
         </select>
@@ -446,6 +291,23 @@ function NovaContaForm({ onClose }: { onClose: () => void }) {
           value={form.regiao}
           onChange={(e) => set("regiao", e.target.value)}
         />
+        <label className="flex flex-col gap-1">
+          <span className="font-sans text-[10px] uppercase tracking-[0.16em] text-white/30">
+            Data de vencimento
+          </span>
+          <input
+            className={input}
+            type="date"
+            value={form.dataVencimento}
+            onChange={(e) => set("dataVencimento", e.target.value)}
+          />
+        </label>
+        <input
+          className={input}
+          placeholder="Cartão utilizado (ex.: Nubank final 4412)"
+          value={form.cartaoUtilizado}
+          onChange={(e) => set("cartaoUtilizado", e.target.value)}
+        />
       </div>
 
       {criar.isError && (
@@ -461,7 +323,7 @@ function NovaContaForm({ onClose }: { onClose: () => void }) {
           criar.mutate(
             {
               ...form,
-              rotulo: form.rotulo || `${serviceById(form.servico as ServiceId).name} — Matriz`,
+              rotulo: form.rotulo || `${serviceById(form.servico).name} — Matriz`,
               vagasOcupadas: 0,
               status: "ativo",
             },
@@ -481,8 +343,9 @@ function NovaContaForm({ onClose }: { onClose: () => void }) {
 function StockView() {
   const { data: contas, isPending, isError, error } = useContas();
   const resumo = useResumoEstoque();
+  const mapa = useMapaAlocacoes();
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<"todas" | "esgotadas" | "livres">("todas");
+  const [filter, setFilter] = useState<"todas" | "esgotadas" | "livres" | "vencendo">("todas");
   const [criando, setCriando] = useState(false);
 
   const filtered = useMemo(() => {
@@ -491,7 +354,15 @@ function StockView() {
       const matchesQuery =
         a.rotulo.toLowerCase().includes(q) || a.email.toLowerCase().includes(q);
       const full = a.vagasOcupadas >= a.totalVagas;
-      const matchesFilter = filter === "todas" ? true : filter === "esgotadas" ? full : !full;
+      const dias = diasParaVencer(a.dataVencimento);
+      const matchesFilter =
+        filter === "todas"
+          ? true
+          : filter === "esgotadas"
+            ? full
+            : filter === "vencendo"
+              ? dias !== null && dias <= 5
+              : !full;
       return matchesQuery && matchesFilter;
     });
   }, [contas, query, filter]);
@@ -503,7 +374,7 @@ function StockView() {
 
   return (
     <div className="space-y-5">
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[
           {
             label: "Contas matrizes",
@@ -521,6 +392,12 @@ function StockView() {
             label: "Contas esgotadas",
             value: String(resumo.data?.esgotadas ?? 0),
             sub: "reposição recomendada",
+            accent: "red" as const,
+          },
+          {
+            label: "Vencendo em 5 dias",
+            value: String((resumo.data?.vencendo ?? 0) + (resumo.data?.vencidas ?? 0)),
+            sub: `${resumo.data?.vencidas ?? 0} já vencida(s)`,
             accent: "red" as const,
           },
         ].map((s) => (
@@ -547,7 +424,7 @@ function StockView() {
           />
         </div>
         <div className="flex gap-1.5">
-          {(["todas", "esgotadas", "livres"] as const).map((f) => (
+          {(["todas", "esgotadas", "livres", "vencendo"] as const).map((f) => (
             <button
               key={f}
               type="button"
@@ -577,7 +454,11 @@ function StockView() {
         <>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {filtered.map((acc) => (
-              <MasterAccountCard key={acc.id} acc={acc} />
+              <ContaMatrizCard
+                key={acc.id}
+                acc={acc}
+                vinculos={mapa.data?.[acc.id] ?? []}
+              />
             ))}
           </div>
 
@@ -1246,8 +1127,11 @@ export default function AdminPage() {
   const contas = useContas();
   const clientes = useUsuarios();
   const pacotes = usePacotes();
+  const aplicativos = useAplicativos();
+  const suporte = useResumoSuporte();
 
   const esgotadas = (contas.data ?? []).filter((c) => c.vagasOcupadas >= c.totalVagas).length;
+  const pendentesSuporte = (suporte.data?.abertos ?? 0) + (suporte.data?.emAndamento ?? 0);
   const aVencer = (clientes.data ?? []).filter((c) => c.statusPagamento !== "ativo").length;
 
   const nav: NavItem[] = [
@@ -1264,7 +1148,19 @@ export default function AdminPage() {
       icon: Layers,
       badge: pacotes.data ? String(pacotes.data.length) : undefined,
     },
+    {
+      id: "aplicativos",
+      label: "Aplicativos",
+      icon: Smartphone,
+      badge: aplicativos.data ? String(aplicativos.data.length) : undefined,
+    },
     { id: "clientes", label: "Clientes", icon: Users },
+    {
+      id: "suporte",
+      label: "Suporte",
+      icon: LifeBuoy,
+      badge: pendentesSuporte ? String(pendentesSuporte) : undefined,
+    },
     { id: "faturas", label: "Faturas", icon: Receipt, badge: aVencer ? String(aVencer) : undefined },
   ];
 
@@ -1272,9 +1168,17 @@ export default function AdminPage() {
     visao: { title: "Visão Geral", sub: "Saúde da operação, direto do banco de dados." },
     estoque: {
       title: "Gestão de Estoque / Contas Matrizes",
-      sub: "Lotação real de cada conta compartilhada. Alocar e repor grava no banco.",
+      sub: "Lotação real, clientes vinculados e alertas de vencimento de cada matriz.",
     },
     pacotes: { title: "Pacotes", sub: "Combos vendidos: nome, preço e serviços incluídos." },
+    aplicativos: {
+      title: "Catálogo de Aplicativos",
+      sub: "Cadastre os apps disponíveis. Eles alimentam os pacotes e as contas matrizes.",
+    },
+    suporte: {
+      title: "Suporte",
+      sub: "Problemas relatados pelos clientes — resolva e responda direto daqui.",
+    },
     clientes: { title: "Clientes", sub: "Base completa de assinantes e seus pacotes." },
     faturas: { title: "Faturas", sub: "Cobranças a vencer, recebimentos e inadimplência." },
   };
@@ -1325,6 +1229,8 @@ export default function AdminPage() {
               <ClientsTable />
             </>
           )}
+          {active === "aplicativos" && <AppsView />}
+          {active === "suporte" && <SuporteView />}
           {active === "faturas" && <InvoicesAdminView />}
         </div>
       </PanelShell>

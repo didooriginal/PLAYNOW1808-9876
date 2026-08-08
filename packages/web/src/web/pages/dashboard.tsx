@@ -9,7 +9,7 @@ import {
   Eye,
   EyeOff,
   Gift,
-  KeyRound,
+  LifeBuoy,
   Loader2,
   LayoutGrid,
   MessageCircle,
@@ -21,6 +21,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AppIcon } from "../components/app-icon";
+import { RelatarProblema } from "../components/cliente/relatar-problema";
+import { SuporteClienteView } from "../components/cliente/suporte-view";
 import { PanelShell, type NavItem } from "../components/panel-shell";
 import { GlassCard, NeonButton, Pill, ProgressBar, accentHex, NeonBackdrop } from "../components/ui/kit";
 import {
@@ -34,6 +36,7 @@ import {
   type ServiceId,
 } from "@/lib/mock-data";
 import { usePainelCliente } from "../queries/usuarios";
+import { useMeusChamados } from "../queries/suporte";
 
 /** dados vindos do banco (usuarios.painel) */
 type PainelCliente = NonNullable<ReturnType<typeof usePainelCliente>["data"]>;
@@ -44,7 +47,7 @@ type PacoteContratado = PainelCliente["pacote"];
 /* ------------------------------------------------------------------ */
 
 function AccessCard({ cred }: { cred: Acesso }) {
-  const service = serviceById(cred.servico as ServiceId);
+  const service = serviceById(cred.servico);
   const [revealed, setRevealed] = useState(false);
   const [copied, setCopied] = useState<"email" | "password" | null>(null);
 
@@ -55,7 +58,7 @@ function AccessCard({ cred }: { cred: Acesso }) {
   }
 
   const down = cred.status === "manutencao";
-  const vagasLivres = cred.totalVagas - cred.vagasOcupadas;
+  const aguardando = cred.aguardando;
 
   return (
     <GlassCard
@@ -70,28 +73,42 @@ function AccessCard({ cred }: { cred: Acesso }) {
 
       <div className="relative flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
-          <AppIcon id={cred.servico as ServiceId} size="md" active />
+          <AppIcon id={cred.servico} size="md" active={!aguardando} />
           <div>
             <div className="font-display text-base font-bold text-white">{service.name}</div>
             <div className="mt-0.5 font-sans text-[11px] text-white/35">
-              {cred.vagasOcupadas}/{cred.totalVagas} vagas · {cred.regiao}
+              Acesso individual · {cred.regiao}
             </div>
           </div>
         </div>
         <span
           className={cn(
             "inline-flex items-center gap-1 rounded-full border px-2 py-1 font-sans text-[10px] uppercase tracking-widest",
-            down
+            down || aguardando
               ? "border-amber-400/40 bg-amber-400/10 text-amber-300"
               : "border-emerald-400/35 bg-emerald-400/10 text-emerald-300",
           )}
         >
-          {down ? <TriangleAlert className="size-3" /> : <BadgeCheck className="size-3" />}
-          {down ? "manutenção" : "ativo"}
+          {down || aguardando ? (
+            <TriangleAlert className="size-3" />
+          ) : (
+            <BadgeCheck className="size-3" />
+          )}
+          {aguardando ? "liberando" : down ? "manutenção" : "ativo"}
         </span>
       </div>
 
       {/* credenciais */}
+      {aguardando ? (
+        <div className="relative mt-5 rounded-xl border border-amber-400/35 bg-amber-400/10 p-4 text-center">
+          <p className="font-display text-xs font-bold text-amber-200">
+            Estamos preparando o seu acesso
+          </p>
+          <p className="mt-1 font-sans text-[11px] text-white/50">
+            Em instantes o login deste app aparece aqui.
+          </p>
+        </div>
+      ) : (
       <div className="relative mt-5 space-y-2">
         <div className="rounded-xl border border-white/8 bg-white/[0.03] p-3">
           <div className="font-sans text-[10px] uppercase tracking-[0.2em] text-white/30">
@@ -150,15 +167,10 @@ function AccessCard({ cred }: { cred: Acesso }) {
           </div>
         </div>
       </div>
+      )}
 
-      <div className="relative mt-4 flex flex-wrap items-center gap-2 border-t border-white/8 pt-4">
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 font-sans text-[11px] text-white/45">
-          <KeyRound className="size-3" />
-          {cred.rotulo}
-        </span>
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-neon-purple/30 bg-neon-purple/10 px-2.5 py-1 font-sans text-[11px] text-neon-purple">
-          {vagasLivres > 0 ? `${vagasLivres} vaga(s) livre(s)` : "conta cheia"}
-        </span>
+      <div className="relative mt-4 border-t border-white/8 pt-4">
+        <RelatarProblema servico={cred.servico} contaId={cred.contaId} />
       </div>
     </GlassCard>
   );
@@ -420,6 +432,8 @@ function UpgradesView() {
 export default function DashboardPage() {
   const [active, setActive] = useState("acessos");
   const { data, isPending, isError, error } = usePainelCliente();
+  const chamados = useMeusChamados();
+  const abertos = (chamados.data ?? []).filter((c) => c.status !== "resolvido").length;
 
   const nav: NavItem[] = useMemo(
     () => [
@@ -431,8 +445,14 @@ export default function DashboardPage() {
       },
       { id: "novidades", label: "Novidades/Upgrades", icon: Sparkles, badge: String(upgrades.length) },
       { id: "faturas", label: "Faturas", icon: Receipt },
+      {
+        id: "suporte",
+        label: "Suporte",
+        icon: LifeBuoy,
+        badge: abertos ? String(abertos) : undefined,
+      },
     ],
-    [data],
+    [data, abertos],
   );
 
   if (isPending || isError || !data) {
@@ -490,12 +510,14 @@ export default function DashboardPage() {
               {active === "acessos" && "Meus Acessos"}
               {active === "novidades" && "Novidades e Upgrades"}
               {active === "faturas" && "Minhas Faturas"}
+              {active === "suporte" && "Suporte"}
             </h1>
             <p className="mt-1.5 font-sans text-sm text-white/40">
               {active === "acessos" &&
                 "Login e senha de cada app do seu pacote. Nunca troque a senha da conta matriz."}
               {active === "novidades" && "Novos apps, telas extras e formas de pagar menos."}
               {active === "faturas" && "Acompanhe pagamentos, vencimentos e recibos."}
+              {active === "suporte" && "Relate um problema e acompanhe o andamento do chamado."}
             </p>
           </div>
 
@@ -521,6 +543,7 @@ export default function DashboardPage() {
 
           {active === "novidades" && <UpgradesView />}
           {active === "faturas" && <InvoicesView cliente={cliente} />}
+          {active === "suporte" && <SuporteClienteView />}
         </div>
       </PanelShell>
     </div>

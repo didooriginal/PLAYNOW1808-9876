@@ -60,14 +60,48 @@ export const services: Service[] = [
   { id: "iptv", name: "IPTV + Canais ao vivo", mono: "IP", color: "#22d3ee", retail: 89.9, price: 19.9, category: "Extra" },
 ];
 
-export const serviceById = (id: ServiceId) =>
-  services.find((s) => s.id === id) as Service;
+/**
+ * Apps cadastrados no banco (catálogo dinâmico do admin) são registrados aqui
+ * em runtime, para que ícones e comparativos funcionem com qualquer slug novo
+ * sem precisar tocar neste arquivo.
+ */
+const dynamicServices = new Map<string, Service>();
+
+export function registerServices(
+  apps: { slug: string; nome: string; mono: string; cor: string; tipo: string; precoAvulso: number }[],
+) {
+  for (const app of apps) {
+    if (services.some((s) => s.id === app.slug)) continue;
+    dynamicServices.set(app.slug, {
+      id: app.slug as ServiceId,
+      name: app.nome,
+      mono: app.mono || app.nome.slice(0, 2).toUpperCase(),
+      color: app.cor || "#22d3ee",
+      retail: app.precoAvulso || 0,
+      price: 0,
+      category: app.tipo === "musica" ? "Música" : app.tipo === "extra" ? "Extra" : "Vídeo",
+    });
+  }
+}
+
+/** nunca lança: slug desconhecido vira um serviço genérico com monograma */
+export const serviceById = (id: string): Service =>
+  services.find((s) => s.id === id) ??
+  dynamicServices.get(id) ?? {
+    id: id as ServiceId,
+    name: id.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+    mono: id.slice(0, 2).toUpperCase(),
+    color: "#22d3ee",
+    retail: 0,
+    price: 0,
+    category: "Extra",
+  };
 
 /** soma de todos os apps comprados separadamente */
 export const retailTotal = services.reduce((sum, s) => sum + s.retail, 0);
 
 /** soma o preço avulso de uma lista de apps */
-export function retailOf(items: ServiceId[]) {
+export function retailOf(items: string[]) {
   return items.reduce((sum, id) => sum + serviceById(id).retail, 0);
 }
 

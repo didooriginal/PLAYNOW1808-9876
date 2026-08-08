@@ -1,10 +1,11 @@
 import { z } from "zod";
-import { asc, eq, inArray, sql } from "drizzle-orm";
+import { asc, eq, sql } from "drizzle-orm";
 import { ORPCError } from "@orpc/server";
 import { base } from "../__core/app";
 import { adminOnly, authed } from "../middleware/auth";
 import { db } from "../database";
 import { contasMatrizes, pacotes, usuarios } from "../database/schema";
+import { garantirAlocacao } from "./alocacoes";
 
 const usuarioInput = z.object({
   nome: z.string().min(1),
@@ -104,36 +105,56 @@ export const usuariosRoutes = {
         : [];
 
       const servicos = pacote?.servicos ?? [];
-      const contas = servicos.length
-        ? await db
-            .select()
-            .from(contasMatrizes)
-            .where(inArray(contasMatrizes.servico, servicos))
-        : [];
 
-      /** uma credencial por serviço do pacote — a matriz com mais vagas livres */
-      const acessos = servicos
-        .map((servico) => {
-          const candidatas = contas
-            .filter((c) => c.servico === servico)
-            .sort(
-              (a, b) => b.totalVagas - b.vagasOcupadas - (a.totalVagas - a.vagasOcupadas),
-            );
-          const conta = candidatas[0];
-          if (!conta) return null;
-          return {
+      /**
+       * Um acesso por serviço do pacote. A credencial vem da ALOCAÇÃO do
+       * cliente — se ele ainda não tem vaga naquele app, alocamos uma agora
+       * (idempotente). Isso garante que a mesma conta apareça sempre, em vez
+       * de mudar a cada reload. Sem vaga livre → acesso fica "aguardando".
+       *
+       * O cliente nunca vê quantas vagas existem nem quem mais usa a conta.
+       */
+      const acessos = [] as {
+        servico: string;
+        contaId: number | null;
+        email: string;
+        senha: string;
+        status: string;
+        regiao: string;
+        aguardando: boolean;
+      }[];
+
+      for (const servico of servicos) {
+        const alocacao = await garantirAlocacao(cliente.id, servico);
+        if (!alocacao) {
+          acessos.push({
             servico,
-            contaId: conta.id,
-            email: conta.email,
-            senha: conta.senha,
-            status: conta.status,
-            rotulo: conta.rotulo,
-            regiao: conta.regiao,
-            vagasOcupadas: conta.vagasOcupadas,
-            totalVagas: conta.totalVagas,
-          };
-        })
-        .filter((a): a is NonNullable<typeof a> => a !== null);
+            contaId: null,
+            email: "",
+            senha: "",
+            status: "aguardando",
+            regiao: "BR",
+            aguardando: true,
+          });
+          continue;
+        }
+
+        const [conta] = await db
+          .select()
+          .from(contasMatrizes)
+          .where(eq(contasMatrizes.id, alocacao.contaId));
+        if (!conta) continue;
+
+        acessos.push({
+          servico,
+          contaId: conta.id,
+          email: conta.email,
+          senha: conta.senha,
+          status: conta.status,
+          regiao: conta.regiao,
+          aguardando: false,
+        });
+      }
 
       return { cliente, pacote: pacote ?? null, acessos };
   }),
