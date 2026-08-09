@@ -14,6 +14,7 @@ import { combosRoutes } from "./routes/combos";
 import { codigosRoutes, registrarEmail } from "./routes/codigos";
 import { auth } from "./auth";
 import { criarAssistente } from "./agent";
+import { criarCopiloto } from "./agent/admin";
 import { createAgentUIStreamResponse } from "ai";
 import { eq } from "drizzle-orm";
 import { db } from "./database";
@@ -125,6 +126,45 @@ app.post("/api/agent/messages", async (c) => {
   }
 
   const agent = criarAssistente({ clienteId: cliente.id, nome: cliente.nome });
+  return createAgentUIStreamResponse({
+    agent,
+    uiMessages: messages as Parameters<typeof createAgentUIStreamResponse>[0]["uiMessages"],
+  });
+});
+
+/**
+ * COPILOTO ADMIN — streaming de chat exclusivo do painel administrativo.
+ * Exige sessão E `usuarios.admin = true`; qualquer outro caso recebe 401/403/404
+ * antes de o agente ser montado.
+ */
+app.post("/api/agent/admin-messages", async (c) => {
+  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+  if (!session) return c.json({ erro: "sessão obrigatória" }, 401);
+
+  const [porVinculo] = await db
+    .select()
+    .from(usuarios)
+    .where(eq(usuarios.authUserId, session.user.id));
+  const eu =
+    porVinculo ??
+    (
+      await db
+        .select()
+        .from(usuarios)
+        .where(eq(usuarios.email, session.user.email.toLowerCase()))
+    )[0];
+
+  if (!eu) return c.json({ erro: "usuário não encontrado" }, 404);
+  if (!eu.admin) return c.json({ erro: "acesso restrito a administradores" }, 403);
+
+  let messages: unknown = [];
+  try {
+    ({ messages } = (await c.req.json()) as { messages: unknown });
+  } catch {
+    return c.json({ erro: "corpo inválido" }, 400);
+  }
+
+  const agent = criarCopiloto({ nome: eu.nome });
   return createAgentUIStreamResponse({
     agent,
     uiMessages: messages as Parameters<typeof createAgentUIStreamResponse>[0]["uiMessages"],

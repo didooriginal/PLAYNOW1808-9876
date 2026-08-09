@@ -32,6 +32,7 @@ import { AfiliadosView } from "../components/admin/afiliados-view";
 import { CodigosView } from "../components/admin/codigos-view";
 import { SuporteView } from "../components/admin/suporte-view";
 import { ManualView } from "../components/admin/manual-view";
+import { CopilotoAdmin } from "../components/admin/copiloto";
 import { PanelShell, type NavItem } from "../components/panel-shell";
 import {
   GlassCard,
@@ -65,6 +66,7 @@ import {
 import { usePacotes, useCriarPacote, useRemoverPacote } from "../queries/pacotes";
 import {
   useCriarUsuario,
+  useEu,
   useRemoverUsuario,
   useResumoClientes,
   useUsuarios,
@@ -1233,6 +1235,7 @@ function InvoicesAdminView() {
 
 export default function AdminPage() {
   const [active, setActive] = useState("visao");
+  const eu = useEu();
   const contas = useContas();
   const clientes = useUsuarios();
   const pacotes = usePacotes();
@@ -1374,6 +1377,9 @@ export default function AdminPage() {
           {active === "manual" && <ManualView />}
         </div>
       </PanelShell>
+
+      {/* Copiloto Admin — assistente de IA exclusivo desta area */}
+      <CopilotoAdmin nome={eu.data?.nome} />
     </div>
   );
 }
