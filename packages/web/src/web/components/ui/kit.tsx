@@ -90,7 +90,9 @@ export function NeonButton({
       }
       {...rest}
     >
-      <span className="relative z-10 inline-flex items-center gap-2">{children}</span>
+      <span className="relative z-10 inline-flex min-w-0 max-w-full items-center gap-2">
+        {children}
+      </span>
       {variant === "solid" && (
         <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/35 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
       )}

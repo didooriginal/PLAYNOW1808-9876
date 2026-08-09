@@ -187,7 +187,7 @@ function AccessCard({ cred }: { cred: Acesso }) {
       )}
 
       {/* acesso direto + guia */}
-      <div className="relative mt-4 grid grid-cols-2 gap-2">
+      <div className="relative mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
         <a
           href={info.url}
           target="_blank"
@@ -200,7 +200,9 @@ function AccessCard({ cred }: { cred: Acesso }) {
           data-testid="abrir-servico"
         >
           <NeonButton accent="red" size="sm" className="w-full !px-3">
-            <span className="truncate">{info.rotulo}</span>
+            <span className="min-w-0 truncate">
+              {info.rotulo.length > 15 ? "Abrir" : info.rotulo}
+            </span>
             <ExternalLink className="size-3.5 shrink-0" />
           </NeonButton>
         </a>
@@ -213,7 +215,7 @@ function AccessCard({ cred }: { cred: Acesso }) {
           data-testid="como-acessar"
         >
           <HelpCircle className="size-3.5 shrink-0" />
-          <span className="truncate">Como acessar</span>
+          <span className="min-w-0 truncate">Como acessar</span>
         </NeonButton>
       </div>
 
