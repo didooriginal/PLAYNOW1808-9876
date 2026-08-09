@@ -4,6 +4,8 @@ import { ORPCError } from "@orpc/server";
 import { adminOnly, authed } from "../middleware/auth";
 import { db } from "../database";
 import { chamados, contasMatrizes, usuarios } from "../database/schema";
+import { MSG_BLOQUEIO, estaBloqueado } from "../lib/cobranca";
+import { notificar } from "./notificacoes";
 
 /**
  * SUPORTE — o cliente relata um problema no acesso ("senha incorreta",
@@ -46,6 +48,11 @@ export const suporteRoutes = {
       const cliente = await clienteDaSessao(context.user.id, context.user.email);
       if (!cliente) throw new ORPCError("NOT_FOUND", { message: "Cliente não encontrado" });
 
+      // BLOQUEIO POR INADIMPLENCIA — atendimento humano pausado ate regularizar
+      if (estaBloqueado(cliente.statusPagamento)) {
+        throw new ORPCError("FORBIDDEN", { message: MSG_BLOQUEIO });
+      }
+
       const [row] = await db
         .insert(chamados)
         .values({
@@ -56,6 +63,18 @@ export const suporteRoutes = {
           descricao: input.descricao,
         })
         .returning();
+
+      await notificar({
+        escopo: "admin",
+        clienteId: cliente.id,
+        tipo: "sistema",
+        severidade: "alerta",
+        titulo: `Novo chamado de ${cliente.nome}`,
+        mensagem: `${input.tipo.replace("_", " ")}${input.servico ? ` · ${input.servico}` : ""}`,
+        destino: "suporte",
+        chave: `chamado:${row?.id ?? Date.now()}`,
+      });
+
       return row;
     }),
 

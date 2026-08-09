@@ -49,6 +49,10 @@ import { usePainelCliente } from "../queries/usuarios";
 import { useMeusChamados } from "../queries/suporte";
 import { useMinhasFaturas, rotuloCompetencia, dataBr } from "../queries/faturas";
 import { useMinhaTelaNetflix } from "../queries/netflix";
+import { ChecklistBoasVindas } from "../components/cliente/boas-vindas";
+import { ContadorVencimento } from "../components/cliente/contador";
+import { TelaBloqueio } from "../components/cliente/bloqueio";
+import { AvisosCliente } from "../components/cliente/avisos";
 
 /** dados vindos do banco (usuarios.painel) */
 type PainelCliente = NonNullable<ReturnType<typeof usePainelCliente>["data"]>;
@@ -652,26 +656,47 @@ export default function DashboardPage() {
     );
   }
 
-  const { cliente, pacote, acessos } = data;
+  const { cliente, pacote, acessos, situacao, bloqueado, motivoBloqueio, precisaAceitarTermos } =
+    data;
   const initials = cliente.nome
     .split(" ")
     .map((w) => w[0])
     .slice(0, 2)
     .join("");
 
+  // BLOQUEIO POR INADIMPLENCIA: nada de logins, suporte ou abas — so o pagamento.
+  if (bloqueado) {
+    return (
+      <div className="relative min-h-screen px-4 py-8 sm:px-6 lg:px-10">
+        <NeonBackdrop />
+        <div className="mx-auto max-w-5xl space-y-6">
+          <div className="flex items-center justify-between gap-3">
+            <div className="font-display text-lg font-extrabold tracking-tight text-white">
+              PLAPLUSNOW
+            </div>
+            <AvisosCliente />
+          </div>
+          <TelaBloqueio nome={cliente.nome} situacao={situacao} motivo={motivoBloqueio} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="relative min-h-screen">
+      {precisaAceitarTermos && <ChecklistBoasVindas nome={cliente.nome} />}
       <NeonBackdrop />
       <PanelShell
         nav={nav}
         active={active}
         onNavigate={setActive}
         accent="red"
-        role={`Cliente · ${cliente.statusPagamento}`}
+        role={`Cliente · ${situacao.rotulo}`}
         user={{ name: cliente.nome, email: cliente.email, initials }}
       >
         <div className="mx-auto max-w-6xl space-y-6">
-          <div>
+          <div className="flex items-start justify-between gap-4">
+            <div>
             <h1 className="font-display text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
               {active === "acessos" && "Meus Acessos"}
               {active === "netflix" && "Desbloquear Tela Netflix"}
@@ -691,10 +716,13 @@ export default function DashboardPage() {
               {active === "faturas" && "Acompanhe pagamentos, vencimentos e recibos."}
               {active === "suporte" && "Relate um problema e acompanhe o andamento do chamado."}
             </p>
+            </div>
+            <AvisosCliente />
           </div>
 
           {active === "acessos" && (
             <>
+              <ContadorVencimento situacao={situacao} />
               <ActivePlanCard cliente={cliente} pacote={pacote} apps={acessos.length} />
               <CodigoRecente />
               {acessos.length > 0 ? (

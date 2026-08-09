@@ -44,7 +44,7 @@ export const auth = betterAuth({
             nome: user.name || email.split("@")[0],
             email,
             authUserId: user.id,
-            statusPagamento: "vencendo",
+            statusPagamento: "pendente",
             clienteDesde: new Date().toISOString().slice(0, 10),
           });
         },

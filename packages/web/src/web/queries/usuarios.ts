@@ -43,3 +43,46 @@ export function useRemoverUsuario() {
   const invalidar = useInvalidarUsuarios();
   return useMutation(orpc.usuarios.remover.mutationOptions({ onSuccess: invalidar }));
 }
+
+/** Aceite do checklist de boas-vindas (regras de uso). */
+export function useAceitarTermos() {
+  const qc = useQueryClient();
+  return useMutation(
+    orpc.usuarios.aceitarTermos.mutationOptions({
+      onSuccess: () => qc.invalidateQueries({ queryKey: orpc.usuarios.key() }),
+    }),
+  );
+}
+
+/** Trava de vencimento: unica forma de mudar a data de cobranca. */
+export function useAlterarVencimento() {
+  const invalidar = useInvalidarUsuarios();
+  return useMutation(orpc.usuarios.alterarVencimento.mutationOptions({ onSuccess: invalidar }));
+}
+
+export function useHistoricoVencimento(clienteId: number | null) {
+  return useQuery(
+    orpc.usuarios.historicoVencimento.queryOptions({
+      input: { clienteId: clienteId ?? 0 },
+      enabled: clienteId !== null,
+      staleTime: 15_000,
+    }),
+  );
+}
+
+/** rotulos de negocio compartilhados pela UI */
+export const ROTULO_STATUS_CLIENTE: Record<string, string> = {
+  ativo: "Finalizado",
+  pendente: "Pendente",
+  atrasado: "Atrasado",
+  suspenso: "Suspenso",
+};
+
+export const FORMAS_PAGAMENTO = [
+  { valor: "pix", rotulo: "Pix" },
+  { valor: "cartao", rotulo: "Cartão" },
+  { valor: "dinheiro", rotulo: "Dinheiro" },
+  { valor: "boleto", rotulo: "Boleto" },
+  { valor: "transferencia", rotulo: "Transferência" },
+  { valor: "outro", rotulo: "Outro" },
+] as const;

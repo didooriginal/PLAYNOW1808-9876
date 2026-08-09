@@ -2,6 +2,8 @@ import { z } from "zod";
 import { and, desc, eq, inArray, lt, or } from "drizzle-orm";
 import { ORPCError } from "@orpc/server";
 import { adminOnly, authed } from "../middleware/auth";
+import { notificar } from "./notificacoes";
+import { estaBloqueado } from "../lib/cobranca";
 import { db } from "../database";
 import {
   alocacoes,
@@ -285,6 +287,18 @@ export async function registrarEmail(entrada: EmailBruto) {
     })
     .returning();
 
+  // GATILHO: todo OTP capturado vira alerta na central do admin.
+  await notificar({
+    escopo: "admin",
+    clienteId,
+    tipo: "otp",
+    severidade: servicoSlug.startsWith("netflix") ? "alerta" : "info",
+    titulo: `Código ${servico} recebido: ${achado.codigo}`,
+    mensagem: `${destinatario || "conta matriz"}${assunto ? ` · ${assunto}` : ""}`,
+    destino: "codigos",
+    chave: `otp:${row?.id ?? `${achado.codigo}-${Date.now()}`}`,
+  });
+
   return { ok: true as const, registro: row };
 }
 
@@ -365,6 +379,8 @@ export const codigosRoutes = {
       .from(usuarios)
       .where(eq(usuarios.authUserId, context.user.id));
     if (!cliente) return [];
+    // inadimplente nao ve codigos de acesso
+    if (estaBloqueado(cliente.statusPagamento)) return [];
 
     const minhasContas = await db
       .select({ email: contasMatrizes.email })

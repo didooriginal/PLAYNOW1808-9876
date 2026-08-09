@@ -24,6 +24,9 @@ import {
   Tv,
   UserPlus,
   Users,
+  BellRing,
+  CalendarClock,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AppIcon } from "../components/app-icon";
@@ -35,6 +38,7 @@ import { SuporteView } from "../components/admin/suporte-view";
 import { ManualView } from "../components/admin/manual-view";
 import { NetflixTvView } from "../components/admin/netflix-tv-view";
 import { CopilotoAdmin } from "../components/admin/copiloto";
+import { AlertasView } from "../components/admin/alertas-view";
 import { PanelShell, type NavItem } from "../components/panel-shell";
 import {
   GlassCard,
@@ -68,12 +72,18 @@ import {
 } from "../queries/faturas";
 import { usePacotes, useCriarPacote, useRemoverPacote } from "../queries/pacotes";
 import {
+  useAlterarVencimento,
+  useAtualizarUsuario,
   useCriarUsuario,
   useEu,
+  useHistoricoVencimento,
   useRemoverUsuario,
   useResumoClientes,
   useUsuarios,
+  FORMAS_PAGAMENTO,
+  ROTULO_STATUS_CLIENTE,
 } from "../queries/usuarios";
+import { useAlertasAdmin } from "../queries/notificacoes";
 import { useRodarSeed, useSeedStatus } from "../queries/seed";
 
 type Conta = NonNullable<ReturnType<typeof useContas>["data"]>[number];
@@ -806,15 +816,21 @@ function QueueCard() {
     }
 
     for (const u of clientes ?? []) {
-      if (u.statusPagamento === "inadimplente")
+      if (u.statusPagamento === "suspenso")
+        out.push({
+          title: `Suspenso · ${u.nome}`,
+          detail: `${brl(u.valor)} · vencido em ${u.proximaCobranca || "—"} · acesso bloqueado`,
+          accent: "red",
+        });
+      else if (u.statusPagamento === "atrasado")
         out.push({
           title: `Cobrar ${u.nome}`,
           detail: `${brl(u.valor)} · vencimento ${u.proximaCobranca || "—"}`,
           accent: "red",
         });
-      else if (u.statusPagamento === "vencendo")
+      else if (u.statusPagamento === "pendente")
         out.push({
-          title: `Fatura vencendo · ${u.nome}`,
+          title: `Fatura pendente · ${u.nome}`,
           detail: `${brl(u.valor)} · vence ${u.proximaCobranca || "—"}`,
           accent: "cyan",
         });
@@ -859,20 +875,140 @@ function QueueCard() {
 
 /* ------------------------------------------------------------------ */
 
+const ABAS_STATUS = [
+  { id: "todos", rotulo: "Todos" },
+  { id: "ativo", rotulo: "Finalizados" },
+  { id: "pendente", rotulo: "Pendentes" },
+  { id: "atrasado", rotulo: "Atrasados" },
+  { id: "suspenso", rotulo: "Suspensos" },
+] as const;
+
+const STATUS_STYLE: Record<string, string> = {
+  ativo: "border-emerald-400/35 bg-emerald-400/10 text-emerald-300",
+  pendente: "border-amber-400/40 bg-amber-400/10 text-amber-300",
+  atrasado: "border-neon-red/45 bg-neon-red/12 text-neon-red",
+  suspenso: "border-white/25 bg-white/10 text-white/70",
+};
+
+/** Modal da trava de vencimento: exige motivo e mostra o historico. */
+function ModalVencimento({ cliente, onClose }: { cliente: Cliente; onClose: () => void }) {
+  const alterar = useAlterarVencimento();
+  const historico = useHistoricoVencimento(cliente.id);
+  const [data, setData] = useState(cliente.proximaCobranca || "");
+  const [motivo, setMotivo] = useState("");
+
+  const input =
+    "w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 font-sans text-sm text-white placeholder:text-white/25 focus:border-neon-purple/50 focus:outline-none";
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
+      <div
+        className="max-h-[88vh] w-full max-w-lg overflow-y-auto rounded-3xl border border-white/12 bg-[#0b0b0f] p-6"
+        data-testid="modal-vencimento"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="font-sans text-[10px] uppercase tracking-[0.22em] text-white/35">
+              Trava de vencimento
+            </div>
+            <h3 className="mt-1 font-display text-xl font-extrabold text-white">
+              Alterar vencimento · {cliente.nome}
+            </h3>
+            <p className="mt-1 font-sans text-[12px] text-white/40">
+              Data atual {cliente.proximaCobranca || "—"}. Toda mudança fica registrada com autor,
+              data e motivo.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Fechar"
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg text-white/40 hover:text-white"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+
+        <div className="mt-5 space-y-3">
+          <input
+            className={input}
+            placeholder="Nova data (dd/mm/aaaa)"
+            data-testid="nova-data-vencimento"
+            value={data}
+            onChange={(e) => setData(e.target.value)}
+          />
+          <textarea
+            className={cn(input, "min-h-[90px] resize-y")}
+            placeholder="Motivo da alteração (mínimo 5 caracteres)"
+            data-testid="motivo-vencimento"
+            value={motivo}
+            onChange={(e) => setMotivo(e.target.value)}
+          />
+          {alterar.isError && (
+            <p className="font-sans text-xs text-neon-red">{alterar.error?.message}</p>
+          )}
+          <NeonButton
+            accent="purple"
+            size="sm"
+            data-testid="salvar-vencimento"
+            disabled={alterar.isPending || motivo.trim().length < 5 || !data.trim()}
+            onClick={() =>
+              alterar.mutate(
+                { id: cliente.id, proximaCobranca: data.trim(), motivo: motivo.trim() },
+                { onSuccess: onClose },
+              )
+            }
+          >
+            {alterar.isPending ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <CalendarClock className="size-4" />
+            )}
+            Salvar e registrar
+          </NeonButton>
+        </div>
+
+        <div className="mt-6 border-t border-white/8 pt-4">
+          <div className="font-display text-xs font-bold text-white/70">Histórico</div>
+          <div className="mt-3 space-y-2">
+            {(historico.data ?? []).length === 0 && (
+              <p className="font-sans text-[12px] text-white/35">Nenhuma alteração registrada.</p>
+            )}
+            {(historico.data ?? []).map((h) => (
+              <div
+                key={h.id}
+                className="rounded-xl border border-white/8 bg-white/[0.03] p-3 font-sans text-[11.5px] text-white/45"
+              >
+                <span className="text-white/70">
+                  {h.de || "—"} → {h.para}
+                </span>
+                <span className="block mt-0.5">{h.motivo}</span>
+                <span className="mt-0.5 block text-[10.5px] text-white/25">{h.autor}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ClientsTable({ compact = false }: { compact?: boolean }) {
   const { data, isPending, isError, error } = useUsuarios();
   const remover = useRemoverUsuario();
-
-  const statusStyle = {
-    ativo: "border-emerald-400/35 bg-emerald-400/10 text-emerald-300",
-    vencendo: "border-amber-400/40 bg-amber-400/10 text-amber-300",
-    inadimplente: "border-neon-red/45 bg-neon-red/12 text-neon-red",
-  } as const;
+  const atualizar = useAtualizarUsuario();
+  const [aba, setAba] = useState<string>("todos");
+  const [editandoVencimento, setEditandoVencimento] = useState<Cliente | null>(null);
 
   if (isPending) return <Loading label="Carregando clientes..." />;
   if (isError) return <ErrorBox message={error?.message} />;
 
-  const rows = compact ? (data ?? []).slice(0, 5) : (data ?? []);
+  const todos = (data ?? []) as Cliente[];
+  const contagem = (id: string) =>
+    id === "todos" ? todos.length : todos.filter((c) => c.statusPagamento === id).length;
+
+  const filtrados = aba === "todos" ? todos : todos.filter((c) => c.statusPagamento === aba);
+  const rows = compact ? filtrados.slice(0, 5) : filtrados;
 
   return (
     <GlassCard className="overflow-hidden">
@@ -886,14 +1022,38 @@ function ClientsTable({ compact = false }: { compact?: boolean }) {
         <span className="font-sans text-[11px] text-white/30">{rows.length} registros</span>
       </div>
 
+      {!compact && (
+        <div className="flex flex-wrap gap-2 border-b border-white/8 px-5 py-3" data-testid="abas-status">
+          {ABAS_STATUS.map((a) => (
+            <button
+              key={a.id}
+              type="button"
+              data-testid={`aba-${a.id}`}
+              onClick={() => setAba(a.id)}
+              className={cn(
+                "rounded-xl border px-3 py-1.5 font-sans text-[11.5px] transition-colors",
+                aba === a.id
+                  ? "border-neon-purple/55 bg-neon-purple/12 text-white"
+                  : "border-white/10 bg-white/[0.03] text-white/45 hover:border-white/25",
+              )}
+            >
+              {a.rotulo}
+              <span className="ml-1.5 font-display text-[10.5px] text-white/35">
+                {contagem(a.id)}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[760px]">
+        <table className="w-full min-w-[900px]">
           <thead>
             <tr className="border-b border-white/8 text-left font-sans text-[10px] uppercase tracking-[0.16em] text-white/30">
               <th className="px-5 py-3 font-medium">Cliente</th>
               <th className="px-3 py-3 font-medium">Pacote</th>
-              <th className="px-3 py-3 font-medium">Apps</th>
               <th className="px-3 py-3 font-medium">Valor</th>
+              <th className="px-3 py-3 font-medium">Forma de pagamento</th>
               <th className="px-3 py-3 font-medium">Próx. cobrança</th>
               <th className="px-3 py-3 font-medium">Status</th>
               <th className="px-5 py-3 font-medium" />
@@ -923,23 +1083,49 @@ function ClientsTable({ compact = false }: { compact?: boolean }) {
                   {c.pacoteNome ?? "—"}
                   {c.ciclo === "anual" ? " (anual)" : ""}
                 </td>
-                <td className="px-3 py-3.5 font-display text-xs font-bold text-neon-cyan">
-                  {c.pacoteServicos?.length ?? 0}
-                </td>
                 <td className="px-3 py-3.5 font-display text-xs font-bold text-white">
                   {brl(c.valor)}
                 </td>
-                <td className="px-3 py-3.5 font-sans text-xs text-white/45">
-                  {c.proximaCobranca || "—"}
+                <td className="px-3 py-3.5">
+                  <select
+                    data-testid={`forma-pagamento-${c.id}`}
+                    className="rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1.5 font-sans text-[11px] text-white/70 focus:border-neon-purple/50 focus:outline-none"
+                    value={c.formaPagamento ?? "pix"}
+                    onChange={(e) =>
+                      atualizar.mutate({ id: c.id, formaPagamento: e.target.value as "pix" })
+                    }
+                  >
+                    {FORMAS_PAGAMENTO.map((f) => (
+                      <option key={f.valor} value={f.valor} className="bg-[#09090b]">
+                        {f.rotulo}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+                <td className="px-3 py-3.5">
+                  <div className="flex items-center gap-2">
+                    <span className="font-sans text-xs text-white/45">
+                      {c.proximaCobranca || "—"}
+                    </span>
+                    <button
+                      type="button"
+                      data-testid={`alterar-vencimento-${c.id}`}
+                      onClick={() => setEditandoVencimento(c)}
+                      aria-label="Alterar vencimento"
+                      className="flex size-7 items-center justify-center rounded-lg border border-white/10 text-white/30 transition-colors hover:border-neon-purple/50 hover:text-neon-purple"
+                    >
+                      <CalendarClock className="size-3.5" />
+                    </button>
+                  </div>
                 </td>
                 <td className="px-3 py-3.5">
                   <span
                     className={cn(
                       "inline-block rounded-full border px-2.5 py-1 font-sans text-[10px] uppercase tracking-widest",
-                      statusStyle[c.statusPagamento as keyof typeof statusStyle],
+                      STATUS_STYLE[c.statusPagamento] ?? STATUS_STYLE.pendente,
                     )}
                   >
-                    {c.statusPagamento}
+                    {ROTULO_STATUS_CLIENTE[c.statusPagamento] ?? c.statusPagamento}
                   </span>
                 </td>
                 <td className="px-5 py-3.5 text-right">
@@ -955,9 +1141,23 @@ function ClientsTable({ compact = false }: { compact?: boolean }) {
                 </td>
               </tr>
             ))}
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={7} className="px-5 py-10 text-center font-sans text-sm text-white/35">
+                  Nenhum cliente nesta aba.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
+
+      {editandoVencimento && (
+        <ModalVencimento
+          cliente={editandoVencimento}
+          onClose={() => setEditandoVencimento(null)}
+        />
+      )}
     </GlassCard>
   );
 }
@@ -1247,6 +1447,7 @@ export default function AdminPage() {
   const gamificacao = useResumoRecompensas();
   const codigos = useCodigos();
   const filaTv = useFilaTvNetflix();
+  const alertas = useAlertasAdmin();
 
   const esgotadas = (contas.data ?? []).filter((c) => c.vagasOcupadas >= c.totalVagas).length;
   const pendentesSuporte = (suporte.data?.abertos ?? 0) + (suporte.data?.emAndamento ?? 0);
@@ -1299,6 +1500,12 @@ export default function AdminPage() {
       icon: Tv,
       badge: filaTv.data?.pendentes ? String(filaTv.data.pendentes) : undefined,
     },
+    {
+      id: "alertas",
+      label: "Central de Alertas",
+      icon: BellRing,
+      badge: alertas.data?.naoLidas ? String(alertas.data.naoLidas) : undefined,
+    },
     { id: "manual", label: "Manual do Admin", icon: BookOpen },
   ];
 
@@ -1330,6 +1537,10 @@ export default function AdminPage() {
     netflixtv: {
       title: "Solicitações de TV Netflix",
       sub: "Códigos do netflix.com/tv2 enviados pelos clientes. Aprove em 1 clique e a TV deles libera na hora.",
+    },
+    alertas: {
+      title: "Central de Alertas",
+      sub: "Fila automática de tudo que exige ação: códigos pedidos, desbloqueio de TV, vencimentos próximos e clientes atrasados.",
     },
     manual: {
       title: "Manual do Admin",
@@ -1389,6 +1600,7 @@ export default function AdminPage() {
           {active === "faturas" && <InvoicesAdminView />}
           {active === "codigos" && <CodigosView />}
           {active === "netflixtv" && <NetflixTvView />}
+          {active === "alertas" && <AlertasView onIr={setActive} />}
           {active === "manual" && <ManualView />}
         </div>
       </PanelShell>

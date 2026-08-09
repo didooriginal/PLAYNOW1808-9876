@@ -190,7 +190,7 @@ export function ferramentasDoAdmin() {
       inputSchema: z.object({
         busca: z.string().optional().describe("nome ou e-mail do cliente. Omita para o panorama."),
         status: z
-          .enum(["todos", "ativo", "vencendo", "inadimplente"])
+          .enum(["todos", "ativo", "pendente", "atrasado", "suspenso"])
           .optional()
           .describe("filtra por status de pagamento. Padrão: todos."),
       }),
@@ -221,12 +221,13 @@ export function ferramentasDoAdmin() {
           totalDaBase: todos.length,
           porStatus: {
             ativo: todos.filter((u) => u.statusPagamento === "ativo").length,
-            vencendo: todos.filter((u) => u.statusPagamento === "vencendo").length,
-            inadimplente: todos.filter((u) => u.statusPagamento === "inadimplente").length,
+            pendente: todos.filter((u) => u.statusPagamento === "pendente").length,
+            atrasado: todos.filter((u) => u.statusPagamento === "atrasado").length,
+            suspenso: todos.filter((u) => u.statusPagamento === "suspenso").length,
           },
           receitaMensalRecorrente: brl(
             todos
-              .filter((u) => u.statusPagamento !== "inadimplente")
+              .filter((u) => u.statusPagamento !== "atrasado" && u.statusPagamento !== "suspenso")
               .reduce((s, u) => s + (u.ciclo === "anual" ? u.valor : u.valor), 0),
           ),
           encontrados: filtrados.length,

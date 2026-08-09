@@ -272,7 +272,9 @@ export async function recalcularProgresso(clienteId: number) {
   // renovacao = cada mes de casa que ja foi cobrado. Cliente inadimplente
   // perde a ultima (nao renovou em dia).
   const renovacoes =
-    cliente.statusPagamento === "inadimplente" ? Math.max(0, mesesAtivo - 1) : mesesAtivo;
+    cliente.statusPagamento === "atrasado" || cliente.statusPagamento === "suspenso"
+      ? Math.max(0, mesesAtivo - 1)
+      : mesesAtivo;
 
   const indicados = await db
     .select({
@@ -287,7 +289,7 @@ export async function recalcularProgresso(clienteId: number) {
     .where(eq(usuarios.indicadoPor, clienteId));
 
   const assinantes = indicados.filter(
-    (i) => i.pacoteId !== null && i.statusPagamento !== "inadimplente",
+    (i) => i.pacoteId !== null && i.statusPagamento !== "atrasado" && i.statusPagamento !== "suspenso",
   );
 
   /* --- eventos idempotentes (livro-razao de XP) ------------------- */
@@ -456,7 +458,8 @@ export const recompensasRoutes = {
       indicados: indicados.map((i) => ({
         nome: i.nome,
         email: i.email,
-        assinante: i.pacoteId !== null && i.statusPagamento !== "inadimplente",
+        assinante:
+          i.pacoteId !== null && i.statusPagamento !== "atrasado" && i.statusPagamento !== "suspenso",
         statusPagamento: i.statusPagamento,
         desde: i.clienteDesde,
       })),

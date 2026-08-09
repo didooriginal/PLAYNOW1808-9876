@@ -96,12 +96,12 @@ const CONTAS = [
 const CLIENTES = [
   { nome: "Diego Dias Silva", email: "diego.silva@email.com", pacote: "Mega Promo", statusPagamento: "ativo", ciclo: "mensal", valor: 59.9, proximaCobranca: "12/09/2026", clienteDesde: "12/03/2025" },
   { nome: "Camila Ribeiro", email: "camila.rib@email.com", pacote: "15 em 1", statusPagamento: "ativo", ciclo: "mensal", valor: 99.9, proximaCobranca: "20/09/2026", clienteDesde: "07/08/2025" },
-  { nome: "Lucas Ferraz", email: "lucas.ferraz@email.com", pacote: "Pacote 03", statusPagamento: "vencendo", ciclo: "mensal", valor: 34.9, proximaCobranca: "09/08/2026", clienteDesde: "09/12/2025" },
+  { nome: "Lucas Ferraz", email: "lucas.ferraz@email.com", pacote: "Pacote 03", statusPagamento: "pendente", ciclo: "mensal", valor: 34.9, proximaCobranca: "09/08/2026", clienteDesde: "09/12/2025" },
   { nome: "Juliana Prado", email: "ju.prado@email.com", pacote: "Pacote 03", statusPagamento: "ativo", ciclo: "mensal", valor: 41.5, proximaCobranca: "28/08/2026", clienteDesde: "28/02/2026" },
   { nome: "Rafael Monteiro", email: "rafa.monteiro@email.com", pacote: "Mega Promo", statusPagamento: "ativo", ciclo: "anual", valor: 574.8, proximaCobranca: "02/02/2027", clienteDesde: "02/02/2024" },
   { nome: "Beatriz Aguiar", email: "bia.aguiar@email.com", pacote: "15 em 1", statusPagamento: "ativo", ciclo: "anual", valor: 958.8, proximaCobranca: "17/11/2026", clienteDesde: "17/11/2025" },
-  { nome: "Marcos Tavares", email: "marcos.tv@email.com", pacote: "Pacote 03", statusPagamento: "inadimplente", ciclo: "mensal", valor: 34.9, proximaCobranca: "26/07/2026", clienteDesde: "26/01/2026" },
-  { nome: "Fernanda Lopes", email: "fer.lopes@email.com", pacote: "Mega Promo", statusPagamento: "vencendo", ciclo: "mensal", valor: 55.2, proximaCobranca: "10/08/2026", clienteDesde: "10/04/2026" },
+  { nome: "Marcos Tavares", email: "marcos.tv@email.com", pacote: "Pacote 03", statusPagamento: "atrasado", ciclo: "mensal", valor: 34.9, proximaCobranca: "26/07/2026", clienteDesde: "26/01/2026" },
+  { nome: "Fernanda Lopes", email: "fer.lopes@email.com", pacote: "Mega Promo", statusPagamento: "pendente", ciclo: "mensal", valor: 55.2, proximaCobranca: "10/08/2026", clienteDesde: "10/04/2026" },
 ];
 
 async function contar() {

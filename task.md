@@ -248,3 +248,11 @@
 - Assistente respondeu com dados reais do banco (7 apps do Mega Promo, fatura de 12/08/2026
   R$ 50,92 com PPN15OFF) e recusou pergunta fora de escopo ("receita de bolo").
 - Rodapés do modal e do chat com espaço extra no mobile para não colidir com o badge Runable.
+
+## Operação: status em 4 estados, fidelidade e alertas (concluído)
+- Status do cliente: ativo ("Finalizado") | pendente | atrasado | suspenso (>7 dias). Varredura automática a cada 60s ao abrir painéis.
+- Clientes (admin): abas por status com contadores, forma de pagamento editável na linha, botão "Alterar vencimento" com motivo obrigatório + histórico.
+- Trava de vencimento: usuarios.atualizar não altera proximaCobranca; só usuarios.alterarVencimento (grava histórico e notifica o cliente).
+- Central de Alertas (admin): OTP, TV, suporte, vencimento 3 dias/no dia, atraso diário. Webhook opcional via ALERTAS_WEBHOOK_URL.
+- Cliente: checklist obrigatório no 1º acesso, contador regressivo, sino de avisos, tela de bloqueio (Pix + WhatsApp) quando atrasado/suspenso.
+- Manual do Admin v1.1 com a seção "Central de Alertas e Regras de Fidelidade".

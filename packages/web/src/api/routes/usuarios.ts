@@ -1,17 +1,46 @@
 import { z } from "zod";
-import { asc, eq, sql } from "drizzle-orm";
+import { asc, desc, eq, sql } from "drizzle-orm";
 import { ORPCError } from "@orpc/server";
 import { base } from "../__core/app";
 import { adminOnly, authed } from "../middleware/auth";
 import { db } from "../database";
-import { contasMatrizes, pacotes, usuarios } from "../database/schema";
+import { contasMatrizes, historicoVencimento, pacotes, usuarios } from "../database/schema";
 import { garantirAlocacao } from "./alocacoes";
+import {
+  FORMAS_PAGAMENTO,
+  MSG_BLOQUEIO,
+  STATUS_CLIENTE,
+  estaBloqueado,
+  situacaoCobranca,
+  statusEsperado,
+} from "../lib/cobranca";
+import { notificar, varrerVencimentos } from "./notificacoes";
+
+/**
+ * Patch de edicao: TODOS os campos opcionais e SEM default, para que uma
+ * edicao parcial (ex.: so a forma de pagamento) nunca sobrescreva status,
+ * data de cobranca ou valor com o valor padrao do schema.
+ */
+const usuarioPatch = z.object({
+  nome: z.string().min(1).optional(),
+  email: z.string().email().optional(),
+  telefone: z.string().nullable().optional(),
+  statusPagamento: z.enum(STATUS_CLIENTE).optional(),
+  formaPagamento: z.enum(FORMAS_PAGAMENTO).optional(),
+  pacoteId: z.number().int().nullable().optional(),
+  ciclo: z.enum(["mensal", "anual"]).optional(),
+  valor: z.number().nonnegative().optional(),
+  proximaCobranca: z.string().optional(),
+  clienteDesde: z.string().optional(),
+  admin: z.boolean().optional(),
+});
 
 const usuarioInput = z.object({
   nome: z.string().min(1),
   email: z.string().email(),
   telefone: z.string().nullable().optional(),
-  statusPagamento: z.enum(["ativo", "vencendo", "inadimplente"]).default("ativo"),
+  statusPagamento: z.enum(STATUS_CLIENTE).default("ativo"),
+  formaPagamento: z.enum(FORMAS_PAGAMENTO).default("pix"),
   pacoteId: z.number().int().nullable().optional(),
   ciclo: z.enum(["mensal", "anual"]).default("mensal"),
   valor: z.number().nonnegative().default(0),
@@ -29,6 +58,9 @@ const listarComPacote = () =>
       email: usuarios.email,
       telefone: usuarios.telefone,
       statusPagamento: usuarios.statusPagamento,
+      formaPagamento: usuarios.formaPagamento,
+      termosAceitosEm: usuarios.termosAceitosEm,
+      vencimentoTravado: usuarios.vencimentoTravado,
       pacoteId: usuarios.pacoteId,
       ciclo: usuarios.ciclo,
       valor: usuarios.valor,
@@ -44,7 +76,11 @@ const listarComPacote = () =>
 
 export const usuariosRoutes = {
   /** base de clientes com o pacote contratado resolvido */
-  listar: adminOnly.handler(() => listarComPacote()),
+  listar: adminOnly.handler(async () => {
+    // mantem os status coerentes com a data de vencimento antes de listar
+    await varrerVencimentos();
+    return listarComPacote();
+  }),
 
   obter: adminOnly.input(z.object({ id: z.number().int() })).handler(async ({ input }) => {
     const [row] = await db.select().from(usuarios).where(eq(usuarios.id, input.id));
@@ -58,13 +94,109 @@ export const usuariosRoutes = {
   }),
 
   atualizar: adminOnly
-    .input(usuarioInput.partial().extend({ id: z.number().int() }))
+    .input(usuarioPatch.extend({ id: z.number().int() }))
     .handler(async ({ input }) => {
-      const { id, ...patch } = input;
+      const { id, ...bruto } = input;
+      // remove chaves ausentes para nao sobrescrever coluna com undefined
+      const patch = Object.fromEntries(
+        Object.entries(bruto).filter(([, v]) => v !== undefined),
+      ) as Partial<typeof bruto>;
+
+      // TRAVA DE VENCIMENTO: a data de cobranca nunca muda por edicao livre.
+      // Use `usuarios.alterarVencimento`, que exige motivo e grava historico.
+      // (zod preenche defaults, entao so bloqueia quando veio valor real e diferente)
+      if (patch.proximaCobranca) {
+        const [atual] = await db
+          .select({ atualData: usuarios.proximaCobranca, travado: usuarios.vencimentoTravado })
+          .from(usuarios)
+          .where(eq(usuarios.id, id));
+        if (atual?.travado && patch.proximaCobranca !== atual.atualData) {
+          throw new ORPCError("FORBIDDEN", {
+            message:
+              "Data de vencimento travada. Use \"Alterar vencimento\" e informe o motivo para registrar no histórico.",
+          });
+        }
+        delete patch.proximaCobranca;
+      }
+
       const [row] = await db.update(usuarios).set(patch).where(eq(usuarios.id, id)).returning();
       if (!row) throw new ORPCError("NOT_FOUND", { message: "Usuário não encontrado" });
       return row;
     }),
+
+  /**
+   * Unica porta para mexer na data de vencimento. Exige motivo, grava o
+   * historico (quem, quando, de/para) e reavalia o status do cliente.
+   */
+  alterarVencimento: adminOnly
+    .input(
+      z.object({
+        id: z.number().int(),
+        proximaCobranca: z
+          .string()
+          .regex(/^\d{2}\/\d{2}\/\d{4}$/, "Use o formato dd/mm/aaaa"),
+        motivo: z.string().min(5, "Descreva o motivo da alteração (mínimo 5 caracteres)"),
+      }),
+    )
+    .handler(async ({ input, context }) => {
+      const [cliente] = await db.select().from(usuarios).where(eq(usuarios.id, input.id));
+      if (!cliente) throw new ORPCError("NOT_FOUND", { message: "Cliente não encontrado" });
+
+      const novoStatus = statusEsperado(input.proximaCobranca, cliente.statusPagamento);
+
+      const [row] = await db
+        .update(usuarios)
+        .set({ proximaCobranca: input.proximaCobranca, statusPagamento: novoStatus })
+        .where(eq(usuarios.id, input.id))
+        .returning();
+
+      await db.insert(historicoVencimento).values({
+        clienteId: input.id,
+        de: cliente.proximaCobranca,
+        para: input.proximaCobranca,
+        motivo: input.motivo,
+        autor: context.user.email,
+      });
+
+      await notificar({
+        escopo: "cliente",
+        clienteId: input.id,
+        tipo: "vencimento",
+        severidade: "info",
+        titulo: "Data de vencimento atualizada",
+        mensagem: `Sua próxima cobrança passou de ${cliente.proximaCobranca || "—"} para ${input.proximaCobranca}.`,
+        destino: "faturas",
+        chave: `venc-alt:${input.id}:${Date.now()}`,
+      });
+
+      return row;
+    }),
+
+  /** historico de alteracoes de vencimento de um cliente */
+  historicoVencimento: adminOnly
+    .input(z.object({ clienteId: z.number().int() }))
+    .handler(({ input }) =>
+      db
+        .select()
+        .from(historicoVencimento)
+        .where(eq(historicoVencimento.clienteId, input.clienteId))
+        .orderBy(desc(historicoVencimento.criadoEm)),
+    ),
+
+  /** aceite do checklist de boas-vindas (regras de uso) */
+  aceitarTermos: authed.handler(async ({ context }) => {
+    const [cliente] = await db
+      .select()
+      .from(usuarios)
+      .where(eq(usuarios.authUserId, context.user.id));
+    if (!cliente) throw new ORPCError("NOT_FOUND", { message: "Cliente não encontrado" });
+    const [row] = await db
+      .update(usuarios)
+      .set({ termosAceitosEm: new Date() })
+      .where(eq(usuarios.id, cliente.id))
+      .returning();
+    return { ok: true, termosAceitosEm: row?.termosAceitosEm ?? null };
+  }),
 
   remover: adminOnly.input(z.object({ id: z.number().int() })).handler(async ({ input }) => {
     await db.delete(usuarios).where(eq(usuarios.id, input.id));
@@ -77,6 +209,9 @@ export const usuariosRoutes = {
    * pacote contratado + as credenciais (contas matrizes) de cada serviço.
    */
   painel: authed.handler(async ({ context }) => {
+    // reavalia vencimentos/bloqueios antes de montar o painel
+    await varrerVencimentos();
+
     const [porVinculo] = await db
       .select()
       .from(usuarios)
@@ -124,6 +259,10 @@ export const usuariosRoutes = {
         aguardando: boolean;
       }[];
 
+      // BLOQUEIO POR INADIMPLENCIA: cliente atrasado/suspenso nao ve senha
+      // nem e-mail das contas matrizes — so a tela de regularizacao.
+      const bloqueado = estaBloqueado(cliente.statusPagamento);
+
       for (const servico of servicos) {
         const alocacao = await garantirAlocacao(cliente.id, servico);
         if (!alocacao) {
@@ -148,21 +287,31 @@ export const usuariosRoutes = {
         acessos.push({
           servico,
           contaId: conta.id,
-          email: conta.email,
-          senha: conta.senha,
+          email: bloqueado ? "" : conta.email,
+          senha: bloqueado ? "" : conta.senha,
           status: conta.status,
           regiao: conta.regiao,
           aguardando: false,
         });
       }
 
-      return { cliente, pacote: pacote ?? null, acessos };
+      return {
+        cliente,
+        pacote: pacote ?? null,
+        acessos,
+        /** contador regressivo + estado da cobranca, prontos para a UI */
+        situacao: situacaoCobranca(cliente),
+        bloqueado,
+        motivoBloqueio: bloqueado ? MSG_BLOQUEIO : "",
+        /** checklist de boas-vindas ainda nao aceito */
+        precisaAceitarTermos: !cliente.termosAceitosEm,
+      };
   }),
 
   /**
    * Registra a intenção de compra do cliente logado (vindo do fluxo de cadastro):
    * grava o pacote escolhido, o ciclo e o valor. O pagamento segue no WhatsApp,
-   * então o status fica como `vencendo` até o admin confirmar.
+   * então o status fica como `pendente` até o admin confirmar.
    */
   escolherPacote: authed
     .input(
@@ -187,7 +336,7 @@ export const usuariosRoutes = {
           ciclo: input.ciclo,
           valor: input.valor,
           ...(input.telefone ? { telefone: input.telefone } : {}),
-          statusPagamento: cliente.statusPagamento === "ativo" ? "ativo" : "vencendo",
+          statusPagamento: cliente.statusPagamento === "ativo" ? "ativo" : "pendente",
         })
         .where(eq(usuarios.id, cliente.id))
         .returning();
@@ -222,10 +371,11 @@ export const usuariosRoutes = {
       .select({
         total: sql<number>`count(*)`,
         ativos: sql<number>`coalesce(sum(case when ${usuarios.statusPagamento} = 'ativo' then 1 else 0 end), 0)`,
-        vencendo: sql<number>`coalesce(sum(case when ${usuarios.statusPagamento} = 'vencendo' then 1 else 0 end), 0)`,
-        inadimplentes: sql<number>`coalesce(sum(case when ${usuarios.statusPagamento} = 'inadimplente' then 1 else 0 end), 0)`,
+        vencendo: sql<number>`coalesce(sum(case when ${usuarios.statusPagamento} = 'pendente' then 1 else 0 end), 0)`,
+        inadimplentes: sql<number>`coalesce(sum(case when ${usuarios.statusPagamento} in ('atrasado','suspenso') then 1 else 0 end), 0)`,
+        suspensos: sql<number>`coalesce(sum(case when ${usuarios.statusPagamento} = 'suspenso' then 1 else 0 end), 0)`,
         mrr: sql<number>`coalesce(sum(case when ${usuarios.ciclo} = 'anual' then ${usuarios.valor} / 12.0 else ${usuarios.valor} end), 0)`,
-        emAtraso: sql<number>`coalesce(sum(case when ${usuarios.statusPagamento} = 'inadimplente' then ${usuarios.valor} else 0 end), 0)`,
+        emAtraso: sql<number>`coalesce(sum(case when ${usuarios.statusPagamento} in ('atrasado','suspenso') then ${usuarios.valor} else 0 end), 0)`,
       })
       .from(usuarios)
       .where(eq(usuarios.admin, false));

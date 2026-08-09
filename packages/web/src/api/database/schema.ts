@@ -98,8 +98,16 @@ export const usuarios = sqliteTable("usuarios", {
   nome: text("nome").notNull(),
   email: text("email").notNull().unique(),
   telefone: text("telefone"),
-  /** ativo | vencendo | inadimplente */
+  /** ativo (finalizado/em dia) | pendente | atrasado | suspenso */
   statusPagamento: text("status_pagamento").notNull().default("ativo"),
+  /** pix | cartao | dinheiro | boleto | transferencia | outro */
+  formaPagamento: text("forma_pagamento").notNull().default("pix"),
+  /** aceite do checklist de boas-vindas (regras de uso) */
+  termosAceitosEm: integer("termos_aceitos_em", { mode: "timestamp" }),
+  /** trava de vencimento: data so muda por rota dedicada, com motivo e log */
+  vencimentoTravado: integer("vencimento_travado", { mode: "boolean" })
+    .notNull()
+    .default(true),
   /** pacote contratado */
   pacoteId: integer("pacote_id").references(() => pacotes.id, {
     onDelete: "set null",
@@ -405,6 +413,67 @@ export const solicitacoesTv = sqliteTable("solicitacoes_tv", {
 
 export type SolicitacaoTv = typeof solicitacoesTv.$inferSelect;
 export type NovaSolicitacaoTv = typeof solicitacoesTv.$inferInsert;
+
+/* ------------------------------------------------------------------ */
+/* NOTIFICACOES — central de alertas do admin e avisos do cliente      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Um alerta por evento relevante. `chave` deixa o disparo idempotente:
+ * o mesmo lembrete de vencimento nunca e criado duas vezes.
+ *
+ * escopo: admin (central de alertas do painel) | cliente (avisos no painel).
+ */
+export const notificacoes = sqliteTable(
+  "notificacoes",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    /** admin | cliente */
+    escopo: text("escopo").notNull().default("admin"),
+    /** destinatario quando escopo = cliente; contexto quando escopo = admin */
+    clienteId: integer("cliente_id").references(() => usuarios.id, { onDelete: "cascade" }),
+    /** otp | tv | vencimento | pagamento | sistema */
+    tipo: text("tipo").notNull().default("sistema"),
+    /** info | alerta | critico */
+    severidade: text("severidade").notNull().default("info"),
+    titulo: text("titulo").notNull(),
+    mensagem: text("mensagem").notNull().default(""),
+    /** aba de destino no painel, ex.: "codigos" | "netflixtv" | "faturas" */
+    destino: text("destino").notNull().default(""),
+    /** chave de deduplicacao do gatilho */
+    chave: text("chave").notNull(),
+    lida: integer("lida", { mode: "boolean" }).notNull().default(false),
+    criadoEm: integer("criado_em", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (t) => [uniqueIndex("notificacoes_chave_idx").on(t.chave)],
+);
+
+export type Notificacao = typeof notificacoes.$inferSelect;
+export type NovaNotificacao = typeof notificacoes.$inferInsert;
+
+/* ------------------------------------------------------------------ */
+/* HISTORICO DE VENCIMENTO — trava de alteracao da data de pagamento   */
+/* ------------------------------------------------------------------ */
+
+export const historicoVencimento = sqliteTable("historico_vencimento", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  clienteId: integer("cliente_id")
+    .notNull()
+    .references(() => usuarios.id, { onDelete: "cascade" }),
+  de: text("de").notNull().default(""),
+  para: text("para").notNull().default(""),
+  motivo: text("motivo").notNull().default(""),
+  /** e-mail do admin que autorizou */
+  autor: text("autor").notNull().default(""),
+  criadoEm: integer("criado_em", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+export type HistoricoVencimento = typeof historicoVencimento.$inferSelect;
+export type NovoHistoricoVencimento = typeof historicoVencimento.$inferInsert;
 
 /* ------------------------------------------------------------------ */
 /* ------------------------------------------------------------------ */

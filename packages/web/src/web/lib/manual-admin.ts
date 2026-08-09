@@ -26,6 +26,7 @@ export type SecaoManual = {
     | "suporte"
     | "faturas"
     | "inicio"
+    | "alertas"
     | "regras";
   accent: "red" | "cyan" | "purple";
   /** onde a funcionalidade vive no painel */
@@ -34,7 +35,7 @@ export type SecaoManual = {
   blocos: Bloco[];
 };
 
-export const MANUAL_VERSAO = "1.0 · agosto/2026";
+export const MANUAL_VERSAO = "1.1 · agosto/2026";
 
 export const MANUAL: SecaoManual[] = [
   /* ---------------------------------------------------------------- */
@@ -117,7 +118,7 @@ export const MANUAL: SecaoManual[] = [
       {
         tipo: "texto",
         texto:
-          "A tabela de clientes lista toda a base com pacote, valor, ciclo, data de início e status de pagamento. A busca filtra por nome, e-mail ou telefone. Cada linha é a ficha operacional do assinante: dela saem as faturas, a jornada de XP e os acessos liberados.",
+          "A tabela de clientes é dividida em abas por situação — Finalizados, Pendentes, Atrasados, Suspensos e Todos, cada uma com o contador ao lado — e lista pacote, valor, forma de pagamento (editável direto na linha), próxima cobrança e status. A busca filtra por nome, e-mail ou telefone. Cada linha é a ficha operacional do assinante: dela saem as faturas, a jornada de XP e os acessos liberados.",
       },
       {
         tipo: "passos",
@@ -137,15 +138,19 @@ export const MANUAL: SecaoManual[] = [
         itens: [
           {
             termo: "ativo",
-            desc: "Em dia. Acessos liberados e jornada contando renovações normalmente.",
+            desc: "Aparece como \"Finalizado\" na lista de clientes: pagamento em dia, acessos liberados e jornada contando renovações normalmente.",
           },
           {
-            termo: "a vencer",
-            desc: "Fatura aberta com vencimento próximo. O cliente vê o alerta de vencimento no painel dele.",
+            termo: "pendente",
+            desc: "Vencimento chegando (3 dias ou menos) ou pagamento aguardando confirmação. O cliente vê o contador regressivo em amarelo no painel dele.",
           },
           {
-            termo: "inadimplente",
-            desc: "Fatura vencida. A última competência entra como \"vencido\" nas faturas e o cliente aparece no contador de pendências do menu.",
+            termo: "atrasado",
+            desc: "Passou do vencimento. O painel do cliente entra em BLOQUEIO: logins e senhas somem, o suporte humano é pausado e só aparece a tela de pagamento.",
+          },
+          {
+            termo: "suspenso",
+            desc: "Mais de 7 dias em atraso. Continua bloqueado e entra na fila de corte — avalie liberar a vaga da conta matriz.",
           },
         ],
       },
@@ -506,7 +511,7 @@ export const MANUAL: SecaoManual[] = [
           { termo: "aberto", desc: "Competência corrente, ainda dentro do prazo." },
           {
             termo: "vencido",
-            desc: "Passou do vencimento com o cliente marcado como inadimplente. Entra no contador de pendências.",
+            desc: "Passou do vencimento com o cliente marcado como atrasado ou suspenso. Entra no contador de pendências.",
           },
         ],
       },
@@ -525,6 +530,85 @@ export const MANUAL: SecaoManual[] = [
         tom: "atencao",
         texto:
           "Mudar a data de início da assinatura reescreve o calendário de vencimentos daquele cliente. Só faça isso para corrigir um cadastro errado, nunca para \"empurrar\" um vencimento.",
+      },
+    ],
+  },
+
+  /* ---------------------------------------------------------------- */
+  {
+    id: "alertas",
+    titulo: "Central de Alertas e Regras de Fidelidade",
+    icone: "alertas",
+    accent: "purple",
+    onde: "Menu › Central de Alertas (e reflexos no painel do cliente)",
+    resumo:
+      "A operação avisa você sozinha: pedidos de código, desbloqueio de TV, vencimentos chegando e clientes atrasados. É também onde as regras de bloqueio e a trava de vencimento aparecem.",
+    blocos: [
+      {
+        tipo: "texto",
+        texto:
+          "Todo gatilho importante do sistema vira um alerta na fila do admin, sem duplicar: cliente pediu código por e-mail, cliente mandou código de TV da Netflix, chamado novo no suporte, cobrança vencendo em 3 dias, cliente atrasado. Cada alerta tem severidade (info, alerta, crítico) e um atalho \"abrir\" que leva direto para a aba onde a ação acontece.",
+      },
+      {
+        tipo: "campos",
+        titulo: "O que gera alerta automaticamente",
+        itens: [
+          { termo: "Código por e-mail", desc: "Sempre que um OTP novo é capturado ou registrado manualmente." },
+          { termo: "Desbloqueio de TV", desc: "Pedido de código netflix.com/tv2 do cliente — severidade crítica, resolva em 1 clique." },
+          { termo: "Suporte", desc: "Chamado novo aberto pelo cliente." },
+          { termo: "Vencimento", desc: "3 dias antes e no dia do vencimento de cada cliente." },
+          { termo: "Pagamento", desc: "Todo dia enquanto o cliente estiver atrasado; vira crítico depois de 7 dias (suspensão)." },
+        ],
+      },
+      {
+        tipo: "passos",
+        titulo: "Sua rotina na aba",
+        itens: [
+          "Abra a Central de Alertas e ligue o filtro \"Somente não lidos\".",
+          "Resolva de cima para baixo: crítico primeiro (TV e pagamento), depois códigos e vencimentos.",
+          "Use \"abrir\" para pular direto na aba certa e executar a ação.",
+          "Marque como lido o que já foi tratado — o badge do menu segue o número de não lidos.",
+          "Se precisar reavaliar tudo na hora (depois de dar baixa em pagamentos, por exemplo), clique em \"Reavaliar vencimentos\".",
+        ],
+      },
+      {
+        tipo: "texto",
+        texto:
+          "A varredura de vencimentos roda sozinha sempre que o painel é aberto (no máximo 1 vez por minuto). Ela recalcula o status de todos os clientes pela data de cobrança: até 3 dias do vencimento vira pendente, passou do vencimento vira atrasado, mais de 7 dias em atraso vira suspenso — e volta para finalizado quando a data é renovada.",
+      },
+      {
+        tipo: "campos",
+        titulo: "Regras de fidelidade aplicadas ao cliente",
+        itens: [
+          {
+            termo: "Checklist de boas-vindas",
+            desc: "No primeiro acesso o cliente é obrigado a marcar as 5 regras de uso (não repassar senha, 1 tela, só o próprio perfil, pagar em dia, tentar o autoatendimento antes). O aceite fica gravado com data e hora.",
+          },
+          {
+            termo: "Contador regressivo",
+            desc: "O painel do cliente mostra dias, horas, minutos e segundos até o vencimento, em ciano, amarelo (3 dias ou menos) ou vermelho (atrasado).",
+          },
+          {
+            termo: "Bloqueio por inadimplência",
+            desc: "Cliente atrasado ou suspenso perde tudo na hora: logins e senhas somem, códigos e desbloqueio de TV param de responder, o suporte humano é pausado e só resta a tela de pagamento com Pix e WhatsApp.",
+          },
+          {
+            termo: "Trava de vencimento",
+            desc: "A data de cobrança não pode ser editada em massa. Só muda pelo botão \"Alterar vencimento\" na lista de clientes, com motivo obrigatório — cada mudança grava quem fez, quando e de/para no histórico, e o cliente é notificado.",
+          },
+        ],
+      },
+      {
+        tipo: "aviso",
+        tom: "regra",
+        texto:
+          "Nunca adie um vencimento sem escrever o motivo real. O histórico existe para você conseguir auditar depois quem ganhou prazo e por quê.",
+      },
+      {
+        tipo: "aviso",
+        tom: "dica",
+        texto:
+          "Quer os alertas fora do painel (Slack, n8n, WhatsApp API)? Configure a variável de ambiente ALERTAS_WEBHOOK_URL e todo alerta do admin é enviado também por POST.",
       },
     ],
   },

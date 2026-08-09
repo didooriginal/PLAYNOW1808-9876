@@ -110,7 +110,7 @@ function ClientesVinculados({
                 "size-1.5 shrink-0 rounded-full",
                 v.clienteStatus === "ativo"
                   ? "bg-emerald-400"
-                  : v.clienteStatus === "vencendo"
+                  : v.clienteStatus === "pendente"
                     ? "bg-amber-400"
                     : "bg-neon-red",
               )}

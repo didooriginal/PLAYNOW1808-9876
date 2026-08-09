@@ -107,6 +107,8 @@ export async function gerarFaturas(cliente: ClienteFatura, cupom = "", desconto 
   }
 
   const rotulo = cliente.pacoteNome ? `Assinatura ${cliente.pacoteNome}` : "Assinatura PLAPLUSNOW";
+  const atrasadoOuSuspenso =
+    cliente.statusPagamento === "atrasado" || cliente.statusPagamento === "suspenso";
 
   serie.forEach((item, idx) => {
     if (jaTem.has(item.competencia)) return;
@@ -114,8 +116,8 @@ export async function gerarFaturas(cliente: ClienteFatura, cupom = "", desconto 
     const vencida = new Date(`${item.vencimento}T12:00:00`).getTime() < hoje.getTime();
     let status = "pago";
     if (ultima) {
-      status = cliente.statusPagamento === "inadimplente" && vencida ? "vencido" : "aberto";
-    } else if (cliente.statusPagamento === "inadimplente" && idx === serie.length - 2 && vencida) {
+      status = atrasadoOuSuspenso && vencida ? "vencido" : "aberto";
+    } else if (atrasadoOuSuspenso && idx === serie.length - 2 && vencida) {
       status = "vencido";
     }
     novas.push({
@@ -332,7 +334,7 @@ export const faturasRoutes = {
 
       await db
         .update(usuarios)
-        .set({ statusPagamento: pendentes.length ? "inadimplente" : "ativo" })
+        .set({ statusPagamento: pendentes.length ? "atrasado" : "ativo" })
         .where(eq(usuarios.id, fatura.clienteId));
 
       return { ok: true };

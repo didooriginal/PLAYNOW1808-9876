@@ -16,6 +16,7 @@ import {
   Trophy,
   Users,
   type LucideIcon,
+  BellRing,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { GlassCard, Pill, accentHex, accentText } from "../ui/kit";
@@ -38,6 +39,7 @@ const ICONES: Record<SecaoManual["icone"], LucideIcon> = {
   suporte: LifeBuoy,
   faturas: Receipt,
   regras: ShieldAlert,
+  alertas: BellRing,
 };
 
 const TOM = {

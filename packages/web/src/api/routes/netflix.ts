@@ -2,6 +2,8 @@ import { z } from "zod";
 import { and, desc, eq, gt, inArray, or } from "drizzle-orm";
 import { ORPCError } from "@orpc/server";
 import { adminOnly, authed } from "../middleware/auth";
+import { notificar } from "./notificacoes";
+import { MSG_BLOQUEIO, estaBloqueado } from "../lib/cobranca";
 import { db } from "../database";
 import {
   alocacoes,
@@ -89,6 +91,18 @@ export const netflixRoutes = {
    */
   minhaTela: authed.handler(async ({ context }) => {
     const cliente = await clienteDaSessao(context.user.id);
+    // inadimplente nao recebe codigo nem abre pedido de TV
+    if (estaBloqueado(cliente.statusPagamento)) {
+      return {
+        bloqueado: true as const,
+        motivo: MSG_BLOQUEIO,
+        temNetflix: false,
+        conta: null,
+        codigos: [],
+        solicitacoes: [],
+        pendente: null,
+      };
+    }
     const contas = await minhasContasNetflix(cliente.id);
     const conta = contas[0] ?? null;
 
@@ -158,6 +172,9 @@ export const netflixRoutes = {
     )
     .handler(async ({ context, input }) => {
       const cliente = await clienteDaSessao(context.user.id);
+      if (estaBloqueado(cliente.statusPagamento)) {
+        throw new ORPCError("FORBIDDEN", { message: MSG_BLOQUEIO });
+      }
       const codigo = normalizarCodigoTv(input.codigoTv);
       if (codigo.length < 4) {
         throw new ORPCError("BAD_REQUEST", {
@@ -192,6 +209,18 @@ export const netflixRoutes = {
           atualizadoEm: new Date(),
         })
         .returning();
+
+      // GATILHO DE PRIORIDADE: pedido de TV avisa o admin na hora.
+      await notificar({
+        escopo: "admin",
+        clienteId: cliente.id,
+        tipo: "tv",
+        severidade: "critico",
+        titulo: `${cliente.nome} pediu liberação de TV Netflix`,
+        mensagem: `Código ${codigo}${input.dispositivo ? ` · ${input.dispositivo.trim()}` : ""} — aprove em 1 clique.`,
+        destino: "netflixtv",
+        chave: `tv:${row?.id ?? Date.now()}`,
+      });
 
       return row;
     }),
@@ -282,6 +311,21 @@ export const netflixRoutes = {
         .returning();
 
       if (!row) throw new ORPCError("NOT_FOUND", { message: "Solicitação não encontrada" });
+
+      await notificar({
+        escopo: "cliente",
+        clienteId: row.clienteId,
+        tipo: "tv",
+        severidade: input.status === "aprovado" ? "info" : "alerta",
+        titulo:
+          input.status === "aprovado"
+            ? "TV liberada! Volte para a tela da Netflix"
+            : "Código da TV não autorizado",
+        mensagem: row.respostaAdmin,
+        destino: "netflix",
+        chave: `tv-resp:${row.id}:${input.status}`,
+      });
+
       return row;
     }),
 };
