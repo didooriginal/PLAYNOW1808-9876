@@ -279,3 +279,18 @@
 @utility animate-pulse-ring {
   animation: ppn-pulse-ring 2.4s ease-out infinite;
 }
+
+@keyframes ppn-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(28px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@utility animate-modal-in {
+  animation: ppn-modal-in 0.28s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}

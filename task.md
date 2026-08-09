@@ -192,3 +192,59 @@
 - Webhook testado: 200 com código extraído, 422 quando o e-mail não tem código
 - E2E `errors: []` e `http_errors: []` em landing, admin (Aplicativos, Central de Códigos)
   e cliente (Meus Acessos, Novidades) + suítes antigas (gamificação, faturas, visão geral)
+
+---
+
+## Fase — UX do painel do cliente: acesso direto, guia, PWA e assistente de IA
+
+### 1. Link de acesso direto por app
+- `web/lib/servicos-info.ts` — fonte única com site oficial, tipo de login (`web` / `app` /
+  `perfil`), dispositivos, passo a passo e dicas para os 35 slugs do catálogo, com fallback
+  seguro para qualquer slug novo cadastrado pelo admin.
+- Cada card em Meus Acessos ganhou o botão "Abrir <serviço>" (`target="_blank"`,
+  `rel="noopener noreferrer"`). Fica desabilitado enquanto o acesso está "liberando".
+
+### 2. Pop-up "Como acessar"
+- `components/cliente/como-acessar.tsx` — modal em portal, fecha por overlay/ESC/botão,
+  scroll interno e bottom sheet no celular.
+- Conteúdo: passo a passo numerado do primeiro login, dispositivos suportados, dicas do
+  serviço e bloco "Regras de ouro" (não trocar senha/e-mail/telefone, não convidar
+  ninguém, não cancelar, usar só o próprio perfil, onde pegar o código OTP, como pedir
+  reposição).
+- Abre pelo botão "Como acessar" ou clicando no nome do app.
+
+### 3. PWA "Instalar Aplicativo"
+- `public/manifest.webmanifest` (standalone, `start_url: /dashboard`, tema `#09090b`,
+  atalhos), ícones gerados 192/512 + maskable + apple-touch, `public/sw.js`
+  (network-first, ignora `/api/*` e arquivos do dev server) e as metas de PWA/iOS no
+  `index.html`.
+- `web/lib/pwa.ts` guarda o `beforeinstallprompt` num singleton (o evento dispara antes do
+  React montar) e expõe `estaInstalado()` / `ehIOS()`.
+- `components/cliente/instalar-app.tsx` — card com botão "Instalar App"; no iOS (sem o
+  evento) mostra o roteiro Compartilhar → Adicionar à Tela de Início. Some quando já
+  instalado ou dispensado (`localStorage`).
+
+### 4. Assistente de IA de suporte
+- `api/agent/gateway.ts` + `api/agent/index.ts` — `ToolLoopAgent` com
+  `anthropic/claude-haiku-4.5`, persona restrita ao painel: recusa qualquer assunto fora
+  de acessos, códigos, faturas, jornada e combos.
+- `api/agent/tools/painel.ts` — tools criadas por `ferramentasDoCliente(clienteId)`:
+  `meusAcessos`, `comoAcessar`, `codigoRecente`, `minhasFaturas`, `minhaJornada`,
+  `meusChamados`, `combosDisponiveis`. O id vem SEMPRE da sessão, nunca do modelo, então
+  o agente não alcança dados de outro cliente.
+- Segurança: nenhuma tool devolve senha de conta matriz — o agente manda copiar pelo card.
+- `POST /api/agent/messages` (rota HTTP pura, streaming) resolve o cliente com
+  `auth.api.getSession` e responde 401 sem sessão.
+- `components/cliente/assistente.tsx` — botão flutuante + chat (`useChat` +
+  `DefaultChatTransport`), sugestões rápidas, estado "consultando seu painel...",
+  renderizador de **negrito**/`código` e bottom sheet no celular.
+
+### Verificações
+- `bun run typecheck` OK · `bun run build` OK
+- E2E `/tmp/e2e_ux.py` (1500x1150) e `/tmp/e2e_ux2.py` (390x844): `errors: []` e nenhuma
+  resposta HTTP >= 400; 7 cards com link direto (`https://www.netflix.com/br/login`,
+  `_blank`, `noopener noreferrer`); manifest 200; `sw.js` 200; `<link rel=manifest>`
+  presente; modal com passos + regras abrindo e fechando por ESC.
+- Assistente respondeu com dados reais do banco (7 apps do Mega Promo, fatura de 12/08/2026
+  R$ 50,92 com PPN15OFF) e recusou pergunta fora de escopo ("receita de bolo").
+- Rodapés do modal e do chat com espaço extra no mobile para não colidir com o badge Runable.

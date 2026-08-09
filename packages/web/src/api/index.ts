@@ -13,6 +13,11 @@ import { faturasRoutes } from "./routes/faturas";
 import { combosRoutes } from "./routes/combos";
 import { codigosRoutes, registrarEmail } from "./routes/codigos";
 import { auth } from "./auth";
+import { criarAssistente } from "./agent";
+import { createAgentUIStreamResponse } from "ai";
+import { eq } from "drizzle-orm";
+import { db } from "./database";
+import { usuarios } from "./database/schema";
 
 // API features are oRPC procedures, one file per feature in ./routes/,
 // composed into this router — typed end-to-end via the clients
@@ -86,6 +91,44 @@ app.post("/api/webhooks/email", async (c) => {
   return resultado.ok
     ? c.json({ ok: true, codigo: resultado.registro.codigo }, 200)
     : c.json({ ok: false, erro: resultado.motivo }, 422);
+});
+
+/**
+ * ASSISTENTE DE IA DO PAINEL — resposta em streaming, por isso rota HTTP pura.
+ * O cliente e resolvido pela SESSAO (nunca pelo corpo da requisicao), e o
+ * agente e montado com tools restritas a esse cliente.
+ */
+app.post("/api/agent/messages", async (c) => {
+  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+  if (!session) return c.json({ erro: "sessão obrigatória" }, 401);
+
+  const [porVinculo] = await db
+    .select()
+    .from(usuarios)
+    .where(eq(usuarios.authUserId, session.user.id));
+  const cliente =
+    porVinculo ??
+    (
+      await db
+        .select()
+        .from(usuarios)
+        .where(eq(usuarios.email, session.user.email.toLowerCase()))
+    )[0];
+
+  if (!cliente) return c.json({ erro: "cliente não encontrado" }, 404);
+
+  let messages: unknown = [];
+  try {
+    ({ messages } = (await c.req.json()) as { messages: unknown });
+  } catch {
+    return c.json({ erro: "corpo inválido" }, 400);
+  }
+
+  const agent = criarAssistente({ clienteId: cliente.id, nome: cliente.nome });
+  return createAgentUIStreamResponse({
+    agent,
+    uiMessages: messages as Parameters<typeof createAgentUIStreamResponse>[0]["uiMessages"],
+  });
 });
 
 export default app;

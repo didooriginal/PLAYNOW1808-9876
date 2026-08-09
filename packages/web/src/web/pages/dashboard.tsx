@@ -5,9 +5,11 @@ import {
   CalendarClock,
   Check,
   Copy,
+  ExternalLink,
   Eye,
   EyeOff,
   Gift,
+  HelpCircle,
   LifeBuoy,
   Loader2,
   Trophy,
@@ -22,6 +24,9 @@ import {
 import { cn } from "@/lib/utils";
 import { AppIcon } from "../components/app-icon";
 import { RelatarProblema } from "../components/cliente/relatar-problema";
+import { ComoAcessarModal } from "../components/cliente/como-acessar";
+import { InstalarApp } from "../components/cliente/instalar-app";
+import { AssistenteIA } from "../components/cliente/assistente";
 import { SuporteClienteView } from "../components/cliente/suporte-view";
 import { JornadaCliente } from "../components/cliente/jornada";
 import { CodigoRecente } from "../components/cliente/codigo-recente";
@@ -37,6 +42,7 @@ import {
   whatsappLink,
   type ServiceId,
 } from "@/lib/mock-data";
+import { servicoInfo } from "@/lib/servicos-info";
 import { usePainelCliente } from "../queries/usuarios";
 import { useMeusChamados } from "../queries/suporte";
 import { useMinhasFaturas, rotuloCompetencia, dataBr } from "../queries/faturas";
@@ -51,7 +57,9 @@ type PacoteContratado = PainelCliente["pacote"];
 
 function AccessCard({ cred }: { cred: Acesso }) {
   const service = serviceById(cred.servico);
+  const info = servicoInfo(cred.servico, service.name);
   const [revealed, setRevealed] = useState(false);
+  const [guia, setGuia] = useState(false);
   const [copied, setCopied] = useState<"email" | "password" | null>(null);
 
   function copy(kind: "email" | "password", value: string) {
@@ -78,7 +86,13 @@ function AccessCard({ cred }: { cred: Acesso }) {
         <div className="flex items-center gap-3">
           <AppIcon id={cred.servico} size="md" active={!aguardando} />
           <div>
-            <div className="font-display text-base font-bold text-white">{service.name}</div>
+            <button
+              type="button"
+              onClick={() => setGuia(true)}
+              className="text-left font-display text-base font-bold text-white transition-colors hover:text-neon-cyan"
+            >
+              {service.name}
+            </button>
             <div className="mt-0.5 font-sans text-[11px] text-white/35">
               Acesso individual · {cred.regiao}
             </div>
@@ -172,9 +186,49 @@ function AccessCard({ cred }: { cred: Acesso }) {
       </div>
       )}
 
-      <div className="relative mt-4 border-t border-white/8 pt-4">
+      {/* acesso direto + guia */}
+      <div className="relative mt-4 grid grid-cols-2 gap-2">
+        <a
+          href={info.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-disabled={aguardando}
+          onClick={(e) => {
+            if (aguardando) e.preventDefault();
+          }}
+          className={cn("min-w-0", aguardando && "pointer-events-none opacity-40")}
+          data-testid="abrir-servico"
+        >
+          <NeonButton accent="red" size="sm" className="w-full !px-3">
+            <span className="truncate">{info.rotulo}</span>
+            <ExternalLink className="size-3.5 shrink-0" />
+          </NeonButton>
+        </a>
+        <NeonButton
+          accent="cyan"
+          variant="outline"
+          size="sm"
+          className="w-full !px-3"
+          onClick={() => setGuia(true)}
+          data-testid="como-acessar"
+        >
+          <HelpCircle className="size-3.5 shrink-0" />
+          <span className="truncate">Como acessar</span>
+        </NeonButton>
+      </div>
+
+      <div className="relative mt-3 border-t border-white/8 pt-3">
         <RelatarProblema servico={cred.servico} contaId={cred.contaId} />
       </div>
+
+      {guia && (
+        <ComoAcessarModal
+          slug={cred.servico}
+          nome={service.name}
+          cor={service.color}
+          onClose={() => setGuia(false)}
+        />
+      )}
     </GlassCard>
   );
 }
@@ -624,12 +678,15 @@ export default function DashboardPage() {
             </>
           )}
 
+          {active === "acessos" && <InstalarApp />}
+
           {active === "jornada" && <JornadaCliente />}
           {active === "novidades" && <UpgradesView />}
           {active === "faturas" && <InvoicesView cliente={cliente} />}
           {active === "suporte" && <SuporteClienteView />}
         </div>
       </PanelShell>
+      <AssistenteIA cliente={{ nome: cliente.nome, apps: acessos.length }} />
     </div>
   );
 }

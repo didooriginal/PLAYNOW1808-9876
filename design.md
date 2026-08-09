@@ -72,3 +72,19 @@ Regras de neon: brilho vem de `box-shadow` colorido de baixa opacidade + borda 1
 - Banco: Turso/SQLite via Drizzle (`api/database/schema.ts`); migracoes com `bun run db:push`.
 - Icones: `lucide-react` para UI; `react-icons/si` para as marcas dos streamings.
 - Kit visual reutilizavel em `components/ui/kit.tsx`: `GlassCard`, `NeonButton`, `Pill`, `ProgressBar`, `SectionTitle`, `NeonBackdrop`, `accentHex`.
+
+## Painel do cliente — acesso direto, guia, PWA e assistente
+
+- Cada card de app tem duas acoes lado a lado: "Abrir <servico>" (solido vermelho, abre o
+  site oficial em nova aba) e "Como acessar" (outline ciano, abre o guia). "Relatar
+  problema" continua abaixo, separado por divisoria.
+- Modal "Como acessar": glass forte, glow na cor da marca, header com o icone do app,
+  passos numerados em circulos da cor da marca, bloco ciano de dicas e bloco ambar de
+  regras de seguranca. No celular vira bottom sheet com scroll interno.
+- Card "Instalar Aplicativo" em roxo, dispensavel, com roteiro alternativo para iOS.
+- Assistente de IA: FAB ciano fixo (acima da nav mobile e do badge Runable) que abre um
+  painel de chat ancorado no canto no desktop e bottom sheet no celular. Bolha do cliente
+  em vermelho, do assistente em glass neutro. Sem emoji nas respostas: as fontes Sora/Outfit
+  nao tem glifos de emoji.
+- Icones do PWA: fundo `#09090b`, glow vermelho no topo e ciano na base, "P+" em Sora
+  ExtraBold com contorno `#ff1f3d`.
