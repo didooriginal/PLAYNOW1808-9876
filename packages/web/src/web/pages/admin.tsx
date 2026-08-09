@@ -20,6 +20,7 @@ import {
   TrendingUp,
   Trophy,
   KeyRound,
+  BookOpen,
   UserPlus,
   Users,
 } from "lucide-react";
@@ -30,6 +31,7 @@ import { AppsView } from "../components/admin/apps-view";
 import { AfiliadosView } from "../components/admin/afiliados-view";
 import { CodigosView } from "../components/admin/codigos-view";
 import { SuporteView } from "../components/admin/suporte-view";
+import { ManualView } from "../components/admin/manual-view";
 import { PanelShell, type NavItem } from "../components/panel-shell";
 import {
   GlassCard,
@@ -1284,6 +1286,7 @@ export default function AdminPage() {
       icon: KeyRound,
       badge: codigos.data?.length ? String(codigos.data.length) : undefined,
     },
+    { id: "manual", label: "Manual do Admin", icon: BookOpen },
   ];
 
   const titles: Record<string, { title: string; sub: string }> = {
@@ -1310,6 +1313,10 @@ export default function AdminPage() {
     codigos: {
       title: "Central de Códigos",
       sub: "Códigos de verificação dos streamings, extraídos do e-mail e entregues ao cliente. Expiram em 1 hora.",
+    },
+    manual: {
+      title: "Manual do Admin",
+      sub: "Guia operacional completo do painel — como cada módulo funciona e o que fazer em cada situação.",
     },
   };
 
@@ -1364,6 +1371,7 @@ export default function AdminPage() {
           {active === "suporte" && <SuporteView />}
           {active === "faturas" && <InvoicesAdminView />}
           {active === "codigos" && <CodigosView />}
+          {active === "manual" && <ManualView />}
         </div>
       </PanelShell>
     </div>
