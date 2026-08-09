@@ -12,6 +12,7 @@ import { recompensasRoutes } from "./routes/recompensas";
 import { faturasRoutes } from "./routes/faturas";
 import { combosRoutes } from "./routes/combos";
 import { codigosRoutes, registrarEmail } from "./routes/codigos";
+import { netflixRoutes } from "./routes/netflix";
 import { auth } from "./auth";
 import { criarAssistente } from "./agent";
 import { criarCopiloto } from "./agent/admin";
@@ -36,6 +37,7 @@ export const router = {
   faturas: faturasRoutes,
   combos: combosRoutes,
   codigos: codigosRoutes,
+  netflix: netflixRoutes,
   seed,
 };
 

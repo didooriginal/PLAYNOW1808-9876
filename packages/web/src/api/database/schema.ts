@@ -367,6 +367,47 @@ export type CodigoOtp = typeof codigosOtp.$inferSelect;
 export type NovoCodigoOtp = typeof codigosOtp.$inferInsert;
 
 /* ------------------------------------------------------------------ */
+/* SOLICITACOES DE TV (desbloqueio netflix.com/tv2)                    */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Quando a Netflix pede o codigo que aparece na tela da Smart TV
+ * (netflix.com/tv2), o cliente digita esse codigo no painel dele e a
+ * solicitacao cai aqui com prioridade para o admin aprovar em 1 clique.
+ *
+ * Fluxo: pendente -> aprovado | recusado | cancelado.
+ */
+export const solicitacoesTv = sqliteTable("solicitacoes_tv", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  clienteId: integer("cliente_id")
+    .notNull()
+    .references(() => usuarios.id, { onDelete: "cascade" }),
+  /** conta matriz do servico (quando o cliente tem vaga ativa) */
+  contaId: integer("conta_id").references(() => contasMatrizes.id, { onDelete: "set null" }),
+  /** slug do app — hoje sempre netflix, mas fica generico de proposito */
+  servicoSlug: text("servico_slug").notNull().default("netflix"),
+  /** codigo exibido na tela da TV (4 a 12 caracteres) */
+  codigoTv: text("codigo_tv").notNull(),
+  /** onde a tela apareceu: "Smart TV Samsung sala", "TV Box", ... */
+  dispositivo: text("dispositivo").notNull().default(""),
+  /** pendente | aprovado | recusado | cancelado */
+  status: text("status").notNull().default("pendente"),
+  /** recado do admin devolvido ao cliente */
+  respostaAdmin: text("resposta_admin").notNull().default(""),
+  criadoEm: integer("criado_em", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  atualizadoEm: integer("atualizado_em", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  resolvidoEm: integer("resolvido_em", { mode: "timestamp" }),
+});
+
+export type SolicitacaoTv = typeof solicitacoesTv.$inferSelect;
+export type NovaSolicitacaoTv = typeof solicitacoesTv.$inferInsert;
+
+/* ------------------------------------------------------------------ */
+/* ------------------------------------------------------------------ */
 /* FATURAS                                                             */
 /* ------------------------------------------------------------------ */
 

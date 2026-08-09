@@ -77,6 +77,18 @@ export function AssistenteIA({ cliente }: { cliente: { nome: string; apps: numbe
     sendMessage({ text: conteudo });
   }
 
+  // outras telas do painel pedem ajuda ao assistente por evento
+  // (ex.: botao "Perguntar ao assistente" da secao Desbloquear Tela Netflix)
+  useEffect(() => {
+    function onPedido(e: Event) {
+      const pergunta = (e as CustomEvent<{ pergunta?: string }>).detail?.pergunta ?? "";
+      setAberto(true);
+      if (pergunta && !ocupado) sendMessage({ text: pergunta });
+    }
+    window.addEventListener("ppn:assistente", onPedido);
+    return () => window.removeEventListener("ppn:assistente", onPedido);
+  }, [ocupado, sendMessage]);
+
   const primeiroNome = cliente.nome.split(" ")[0] ?? "";
 
   return (

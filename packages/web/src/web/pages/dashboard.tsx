@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowUpRight,
   BadgeCheck,
@@ -13,6 +13,7 @@ import {
   LifeBuoy,
   Loader2,
   Trophy,
+  Tv,
   LayoutGrid,
   MessageCircle,
   Receipt,
@@ -30,6 +31,7 @@ import { AssistenteIA } from "../components/cliente/assistente";
 import { SuporteClienteView } from "../components/cliente/suporte-view";
 import { JornadaCliente } from "../components/cliente/jornada";
 import { CodigoRecente } from "../components/cliente/codigo-recente";
+import { DesbloquearNetflix } from "../components/cliente/netflix-desbloqueio";
 import { CombosSugeridos } from "../components/cliente/combos-sugeridos";
 import { PanelShell, type NavItem } from "../components/panel-shell";
 import { GlassCard, NeonButton, Pill, ProgressBar, accentHex, NeonBackdrop } from "../components/ui/kit";
@@ -46,6 +48,7 @@ import { servicoInfo } from "@/lib/servicos-info";
 import { usePainelCliente } from "../queries/usuarios";
 import { useMeusChamados } from "../queries/suporte";
 import { useMinhasFaturas, rotuloCompetencia, dataBr } from "../queries/faturas";
+import { useMinhaTelaNetflix } from "../queries/netflix";
 
 /** dados vindos do banco (usuarios.painel) */
 type PainelCliente = NonNullable<ReturnType<typeof usePainelCliente>["data"]>;
@@ -218,6 +221,18 @@ function AccessCard({ cred }: { cred: Acesso }) {
           <span className="min-w-0 truncate">Como acessar</span>
         </NeonButton>
       </div>
+
+      {cred.servico.startsWith("netflix") && (
+        <button
+          type="button"
+          data-testid="atalho-netflix"
+          onClick={() => window.dispatchEvent(new CustomEvent("ppn:ir-netflix"))}
+          className="relative mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-[#e50914]/45 bg-[#e50914]/[0.09] px-3 py-2.5 font-sans text-[11.5px] font-semibold text-[#ff8f96] transition-colors hover:border-[#e50914]"
+        >
+          <Tv className="size-3.5 shrink-0" />
+          <span className="min-w-0 truncate">Tela bloqueada na TV? Desbloquear agora</span>
+        </button>
+      )}
 
       <div className="relative mt-3 border-t border-white/8 pt-3">
         <RelatarProblema servico={cred.servico} contaId={cred.contaId} />
@@ -567,7 +582,17 @@ export default function DashboardPage() {
   const [active, setActive] = useState("acessos");
   const { data, isPending, isError, error } = usePainelCliente();
   const chamados = useMeusChamados();
+  const netflix = useMinhaTelaNetflix();
   const abertos = (chamados.data ?? []).filter((c) => c.status !== "resolvido").length;
+
+  useEffect(() => {
+    function ir() {
+      setActive("netflix");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+    window.addEventListener("ppn:ir-netflix", ir);
+    return () => window.removeEventListener("ppn:ir-netflix", ir);
+  }, []);
 
   const nav: NavItem[] = useMemo(
     () => [
@@ -576,6 +601,12 @@ export default function DashboardPage() {
         label: "Meus Acessos",
         icon: LayoutGrid,
         badge: data ? String(data.acessos.length) : undefined,
+      },
+      {
+        id: "netflix",
+        label: "Desbloquear Netflix",
+        icon: Tv,
+        badge: netflix.data?.pendente ? "1" : undefined,
       },
       { id: "jornada", label: "Jornada / Recompensas", icon: Trophy },
       { id: "novidades", label: "Novidades/Upgrades", icon: Sparkles, badge: String(upgrades.length) },
@@ -587,7 +618,7 @@ export default function DashboardPage() {
         badge: abertos ? String(abertos) : undefined,
       },
     ],
-    [data, abertos],
+    [data, abertos, netflix.data?.pendente],
   );
 
   if (isPending || isError || !data) {
@@ -643,6 +674,7 @@ export default function DashboardPage() {
           <div>
             <h1 className="font-display text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
               {active === "acessos" && "Meus Acessos"}
+              {active === "netflix" && "Desbloquear Tela Netflix"}
               {active === "jornada" && "Jornada do Cliente"}
               {active === "novidades" && "Novidades e Upgrades"}
               {active === "faturas" && "Minhas Faturas"}
@@ -651,6 +683,8 @@ export default function DashboardPage() {
             <p className="mt-1.5 font-sans text-sm text-white/40">
               {active === "acessos" &&
                 "Login e senha de cada app do seu pacote. Nunca troque a senha da conta matriz."}
+              {active === "netflix" &&
+                "Tela bloqueada na TV? Escolha o cenário que você está vendo e resolva em menos de 1 minuto."}
               {active === "jornada" &&
                 "Suba de nível, cumpra missões e desbloqueie prêmios indicando amigos."}
               {active === "novidades" && "Novos apps, telas extras e formas de pagar menos."}
@@ -679,6 +713,8 @@ export default function DashboardPage() {
               )}
             </>
           )}
+
+          {active === "netflix" && <DesbloquearNetflix />}
 
           {active === "acessos" && <InstalarApp />}
 

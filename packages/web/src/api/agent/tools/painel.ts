@@ -6,7 +6,7 @@
 //
 // Regra de segurança: nenhuma tool devolve a SENHA das contas matrizes. O
 // assistente orienta o cliente a copiar do card no painel.
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { tool } from "ai";
 import z from "zod";
 import { db } from "../../database";
@@ -18,11 +18,13 @@ import {
   codigosOtp,
   combos,
   faturas,
+  solicitacoesTv,
   pacotes,
   usuarios,
 } from "../../database/schema";
 import { MISSOES, recalcularProgresso, tituloDoNivel } from "../../routes/recompensas";
 import { servicoInfo } from "../../../web/lib/servicos-info";
+import { SLUGS_NETFLIX } from "../../routes/netflix";
 
 const brl = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
@@ -122,6 +124,79 @@ export function ferramentasDoCliente(clienteId: number) {
     }),
 
     /* ---------------------------------------------------------------- */
+    desbloqueioNetflix: tool({
+      description:
+        "Estado da secao 'Desbloquear Tela Netflix' do cliente: se ele tem Netflix, o codigo por e-mail disponivel agora (Opcao A) e as solicitacoes de codigo de TV / netflix.com/tv2 (Opcao B). Use SEMPRE que a pergunta envolver tela bloqueada, 'estou viajando', codigo na TV, netflix.com/tv2 ou verificacao da Netflix.",
+      inputSchema: z.object({}),
+      async execute() {
+        const [cliente] = await db.select().from(usuarios).where(eq(usuarios.id, clienteId));
+        if (!cliente) return { temNetflix: false };
+
+        const contas = await db
+          .select({ email: contasMatrizes.email, status: contasMatrizes.status })
+          .from(alocacoes)
+          .innerJoin(contasMatrizes, eq(contasMatrizes.id, alocacoes.contaId))
+          .where(
+            and(
+              eq(alocacoes.clienteId, clienteId),
+              eq(alocacoes.status, "ativo"),
+              inArray(alocacoes.servico, SLUGS_NETFLIX),
+            ),
+          );
+
+        const emails = new Set([
+          cliente.email.toLowerCase(),
+          ...contas.map((c) => c.email.toLowerCase()),
+        ]);
+
+        const otps = await db
+          .select()
+          .from(codigosOtp)
+          .orderBy(desc(codigosOtp.recebidoEm))
+          .limit(40);
+
+        const codigosEmail = otps
+          .filter(
+            (r) =>
+              SLUGS_NETFLIX.includes(r.servicoSlug) &&
+              (r.clienteId === clienteId || emails.has((r.destinatario ?? "").toLowerCase())),
+          )
+          .slice(0, 3)
+          .map((r) => ({ codigo: r.codigo, recebidoEm: new Date(r.recebidoEm).toISOString() }));
+
+        const pedidos = await db
+          .select()
+          .from(solicitacoesTv)
+          .where(eq(solicitacoesTv.clienteId, clienteId))
+          .orderBy(desc(solicitacoesTv.criadoEm))
+          .limit(5);
+
+        return {
+          temNetflix: contas.length > 0,
+          contaEmManutencao: contas.some((c) => c.status !== "ativo"),
+          onde: 'aba "Desbloquear Netflix" no menu do painel',
+          opcaoA: {
+            quando: 'a TV diz que enviou um codigo para o e-mail da conta ou pede "Estou viajando"',
+            comoFazer:
+              'na TV escolher "Enviar e-mail", voltar ao painel, tocar no codigo para copiar e digitar na TV',
+            codigosDisponiveisAgora: codigosEmail,
+          },
+          opcaoB: {
+            quando: "a TV mostra o endereco netflix.com/tv2 com um codigo curto na tela",
+            comoFazer:
+              "digitar esse codigo no campo da Opcao B e enviar; a equipe autoriza e a TV libera sozinha",
+            minhasSolicitacoes: pedidos.map((p) => ({
+              codigoTv: p.codigoTv,
+              status: p.status,
+              resposta: p.respostaAdmin,
+              criadoEm: new Date(p.criadoEm).toISOString(),
+            })),
+          },
+        };
+      },
+    }),
+
+    /* ---------------------------------------------------------------- */
     codigoRecente: tool({
       description:
         "Últimos códigos de verificação (OTP) recebidos para as contas do cliente. Use quando o app pedir 'código enviado por e-mail' ou 'código de acesso temporário'.",
@@ -155,7 +230,7 @@ export function ferramentasDoCliente(clienteId: number) {
           .map((r) => ({
             codigo: r.codigo,
             servico: r.servico || r.servicoSlug,
-            recebidoEm: r.recebidoEm,
+            recebidoEm: new Date(r.recebidoEm).toISOString(),
           }));
 
         return {

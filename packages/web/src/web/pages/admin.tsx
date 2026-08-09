@@ -21,6 +21,7 @@ import {
   Trophy,
   KeyRound,
   BookOpen,
+  Tv,
   UserPlus,
   Users,
 } from "lucide-react";
@@ -32,6 +33,7 @@ import { AfiliadosView } from "../components/admin/afiliados-view";
 import { CodigosView } from "../components/admin/codigos-view";
 import { SuporteView } from "../components/admin/suporte-view";
 import { ManualView } from "../components/admin/manual-view";
+import { NetflixTvView } from "../components/admin/netflix-tv-view";
 import { CopilotoAdmin } from "../components/admin/copiloto";
 import { PanelShell, type NavItem } from "../components/panel-shell";
 import {
@@ -56,6 +58,7 @@ import { useAplicativos } from "../queries/aplicativos";
 import { useResumoSuporte } from "../queries/suporte";
 import { useResumoRecompensas } from "../queries/recompensas";
 import { useCodigos } from "../queries/codigos";
+import { useFilaTvNetflix } from "../queries/netflix";
 import {
   useFaturas,
   useResumoFaturas,
@@ -1243,6 +1246,7 @@ export default function AdminPage() {
   const suporte = useResumoSuporte();
   const gamificacao = useResumoRecompensas();
   const codigos = useCodigos();
+  const filaTv = useFilaTvNetflix();
 
   const esgotadas = (contas.data ?? []).filter((c) => c.vagasOcupadas >= c.totalVagas).length;
   const pendentesSuporte = (suporte.data?.abertos ?? 0) + (suporte.data?.emAndamento ?? 0);
@@ -1289,6 +1293,12 @@ export default function AdminPage() {
       icon: KeyRound,
       badge: codigos.data?.length ? String(codigos.data.length) : undefined,
     },
+    {
+      id: "netflixtv",
+      label: "Solicitações TV Netflix",
+      icon: Tv,
+      badge: filaTv.data?.pendentes ? String(filaTv.data.pendentes) : undefined,
+    },
     { id: "manual", label: "Manual do Admin", icon: BookOpen },
   ];
 
@@ -1316,6 +1326,10 @@ export default function AdminPage() {
     codigos: {
       title: "Central de Códigos",
       sub: "Códigos de verificação dos streamings, extraídos do e-mail e entregues ao cliente. Expiram em 1 hora.",
+    },
+    netflixtv: {
+      title: "Solicitações de TV Netflix",
+      sub: "Códigos do netflix.com/tv2 enviados pelos clientes. Aprove em 1 clique e a TV deles libera na hora.",
     },
     manual: {
       title: "Manual do Admin",
@@ -1374,6 +1388,7 @@ export default function AdminPage() {
           {active === "suporte" && <SuporteView />}
           {active === "faturas" && <InvoicesAdminView />}
           {active === "codigos" && <CodigosView />}
+          {active === "netflixtv" && <NetflixTvView />}
           {active === "manual" && <ManualView />}
         </div>
       </PanelShell>
