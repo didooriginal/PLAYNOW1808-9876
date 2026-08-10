@@ -20,6 +20,8 @@
     "db:generate": "turbo db:generate",
     "db:migrate": "turbo db:migrate",
     "db:push": "turbo db:push",
+    "db:backup": "bun --env-file=.env scripts/backup-banco.ts",
+    "db:restore": "bun --env-file=.env scripts/restaurar-banco.ts",
     "internal:check-conventions": "konsistent",
     "internal:kill-port": "lsof -t -i :${PORT:-4200} | xargs kill -9"
   },
