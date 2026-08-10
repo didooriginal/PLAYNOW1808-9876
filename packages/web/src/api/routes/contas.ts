@@ -33,7 +33,7 @@ const contaInput = z.object({
   cartaoUtilizado: z.string().default(""),
 });
 
-export const contasRoutes = {
+export const contas = {
   /** estoque completo de contas matrizes */
   listar: adminOnly.handler(() =>
     db.select().from(contasMatrizes).orderBy(asc(contasMatrizes.servico), asc(contasMatrizes.rotulo)),

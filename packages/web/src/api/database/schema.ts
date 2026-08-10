@@ -81,6 +81,34 @@ export const contasMatrizes = sqliteTable("contas_matrizes", {
   dataVencimento: text("data_vencimento").notNull().default(""),
   /** cartão/meio de pagamento usado para pagar esta matriz (ex.: "Nubank final 4412") */
   cartaoUtilizado: text("cartao_utilizado").notNull().default(""),
+
+  /* ---- GESTÃO DE CONTAS (saldo de gift card) ---- */
+  /** nome comercial da conta exibido na aba Gestão de Contas */
+  nomeConta: text("nome_conta").notNull().default(""),
+  /** saldo atual do gift card/créditos — atualizado à mão pelo admin */
+  saldoGiftCard: real("saldo_gift_card").notNull().default(0),
+  /** quanto essa conta consome por mês */
+  custoMensal: real("custo_mensal").notNull().default(0),
+  /**
+   * limite de saldo crítico. Quando 0, o sistema usa a regra automática:
+   * custoMensal * 1.2 (custo do mês + 20% de margem de segurança).
+   */
+  alertaSaldoCritico: real("alerta_saldo_critico").notNull().default(0),
+
+  /* ---- SAÚDE / DISPONIBILIDADE ---- */
+  /**
+   * quando false, o alocador para de colocar clientes novos nesta conta.
+   * Ligado automaticamente pelo monitor de saúde ao detectar falhas seguidas.
+   */
+  aceitaNovos: integer("aceita_novos", { mode: "boolean" }).notNull().default(true),
+  /** falhas contabilizadas na janela de 30 dias (chamados de acesso) */
+  falhasRecentes: integer("falhas_recentes").notNull().default(0),
+  /** conta de reserva: só recebe clientes remanejados de contas problemáticas */
+  reserva: integer("reserva", { mode: "boolean" }).notNull().default(false),
+
+  /* ---- SALA DE JOGOS ---- */
+  /** conta do pool exclusivo de dias de jogo (descartável//alta rotatividade) */
+  poolJogos: integer("pool_jogos", { mode: "boolean" }).notNull().default(false),
   criadoEm: integer("criado_em", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),
@@ -123,6 +151,14 @@ export const usuarios = sqliteTable("usuarios", {
   referralCode: text("referral_code").unique(),
   /** id do cliente que indicou este cadastro (preenchido no signup via ?ref=) */
   indicadoPor: integer("indicado_por"),
+  /** IP registrado no cadastro — base do anti-fraude de rede de afiliados */
+  ipCadastro: text("ip_cadastro").notNull().default(""),
+  /** impressão digital do dispositivo no cadastro — anti-fraude de rede */
+  dispositivoHash: text("dispositivo_hash").notNull().default(""),
+  /** adicional Sala de Jogos contratado */
+  salaJogos: integer("sala_jogos", { mode: "boolean" }).notNull().default(false),
+  /** ISO YYYY-MM-DD de quando o adicional Sala de Jogos foi ativado */
+  salaJogosDesde: text("sala_jogos_desde").notNull().default(""),
   /** vínculo com a conta de login (tabela `user` do Better Auth) */
   authUserId: text("auth_user_id").unique(),
   criadoEm: integer("criado_em", { mode: "timestamp" })
@@ -525,3 +561,300 @@ export type NovaFatura = typeof faturas.$inferInsert;
 /* ------------------------------------------------------------------ */
 
 export * from "./auth-schema";
+
+/* ------------------------------------------------------------------ */
+/* CONFIGURAÇÕES GLOBAIS — parâmetros editáveis do SaaS                */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Chave/valor com os parâmetros que o dono do negócio ajusta sem deploy:
+ * percentual de comissão, taxa de saque, bônus de crédito, preço da Sala de
+ * Jogos, margem de saldo crítico, dias de win-back etc.
+ * Defaults ficam em `api/lib/config.ts` — a tabela só guarda o que foi mudado.
+ */
+export const configuracoes = sqliteTable("configuracoes", {
+  chave: text("chave").primaryKey(),
+  valor: text("valor").notNull().default(""),
+  atualizadoEm: integer("atualizado_em", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+export type Configuracao = typeof configuracoes.$inferSelect;
+
+/* ------------------------------------------------------------------ */
+/* MOVIMENTAÇÕES DE GIFT CARD — extrato do saldo das contas matrizes   */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Toda alteração de saldo vira uma linha aqui. O admin nunca digita o saldo
+ * final: ele lança "+R$ 70" e o sistema soma, mantendo a trilha de auditoria
+ * de quanto foi colocado, quando e por quem.
+ */
+export const movimentacoesGift = sqliteTable("movimentacoes_gift", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  contaId: integer("conta_id")
+    .notNull()
+    .references(() => contasMatrizes.id, { onDelete: "cascade" }),
+  /** credito (gift card inserido) | debito (consumo/renovação) | ajuste */
+  tipo: text("tipo").notNull().default("credito"),
+  /** valor absoluto do lançamento — o sinal vem do `tipo` */
+  valor: real("valor").notNull().default(0),
+  /** saldo resultante depois do lançamento — congela o extrato */
+  saldoResultante: real("saldo_resultante").notNull().default(0),
+  observacao: text("observacao").notNull().default(""),
+  /** e-mail do admin que lançou */
+  autor: text("autor").notNull().default(""),
+  criadoEm: integer("criado_em", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+export type MovimentacaoGift = typeof movimentacoesGift.$inferSelect;
+export type NovaMovimentacaoGift = typeof movimentacoesGift.$inferInsert;
+
+/* ------------------------------------------------------------------ */
+/* AFILIADOS — carteira, comissões e saques                            */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Uma carteira por cliente. Saldos são sempre DERIVADOS das comissões e dos
+ * saques (`recalcularCarteira()` em routes/afiliados.ts) — nunca editados na
+ * mão, para o extrato nunca divergir do somatório.
+ */
+export const carteiras = sqliteTable("carteiras", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  clienteId: integer("cliente_id")
+    .notNull()
+    .unique()
+    .references(() => usuarios.id, { onDelete: "cascade" }),
+  /** comissões liberadas e ainda não sacadas/creditadas */
+  disponivel: real("disponivel").notNull().default(0),
+  /** comissões aguardando o pagamento da fatura do indicado */
+  pendente: real("pendente").notNull().default(0),
+  /** comissões travadas pelo anti-fraude */
+  bloqueado: real("bloqueado").notNull().default(0),
+  totalGanho: real("total_ganho").notNull().default(0),
+  totalSacado: real("total_sacado").notNull().default(0),
+  /** total já convertido em desconto na mensalidade (com bônus) */
+  totalCreditado: real("total_creditado").notNull().default(0),
+  /** crédito ainda não consumido pelas faturas */
+  creditoDisponivel: real("credito_disponivel").notNull().default(0),
+  /** % da rede em dia na última apuração — define o bônus de performance */
+  redeEmDia: integer("rede_em_dia").notNull().default(0),
+  atualizadoEm: integer("atualizado_em", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+export type Carteira = typeof carteiras.$inferSelect;
+
+/**
+ * Comissão de 5% sobre cada pagamento de um indicado. `chave` é única
+ * (afiliado + indicado + competência) para o apurador ser idempotente.
+ */
+export const comissoes = sqliteTable(
+  "comissoes",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    afiliadoId: integer("afiliado_id")
+      .notNull()
+      .references(() => usuarios.id, { onDelete: "cascade" }),
+    indicadoId: integer("indicado_id")
+      .notNull()
+      .references(() => usuarios.id, { onDelete: "cascade" }),
+    faturaId: integer("fatura_id").references(() => faturas.id, { onDelete: "set null" }),
+    /** "YYYY-MM" */
+    competencia: text("competencia").notNull().default(""),
+    /** valor pago pelo indicado que serviu de base */
+    valorBase: real("valor_base").notNull().default(0),
+    percentual: real("percentual").notNull().default(5),
+    valor: real("valor").notNull().default(0),
+    /** pendente | liberada | bloqueada | paga */
+    status: text("status").notNull().default("pendente"),
+    /** preenchido quando o anti-fraude bloqueia (IP/dispositivo duplicado) */
+    motivoBloqueio: text("motivo_bloqueio").notNull().default(""),
+    chave: text("chave").notNull(),
+    criadoEm: integer("criado_em", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (t) => [uniqueIndex("comissoes_chave_idx").on(t.chave)],
+);
+
+export type Comissao = typeof comissoes.$inferSelect;
+
+/**
+ * Pedido de resgate. Dois caminhos: `saque` (Pix, com taxa e mínimo) ou
+ * `credito` (abate na mensalidade, com +25% de bônus e possível +1% de
+ * performance quando a rede se mantém 90% em dia).
+ */
+export const saques = sqliteTable("saques", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  clienteId: integer("cliente_id")
+    .notNull()
+    .references(() => usuarios.id, { onDelete: "cascade" }),
+  /** saque | credito */
+  tipo: text("tipo").notNull().default("saque"),
+  valorBruto: real("valor_bruto").notNull().default(0),
+  /** custo do saque em Pix (0 no crédito) */
+  taxa: real("taxa").notNull().default(0),
+  /** bônus de reinvestimento (25%) já somado ao valor final do crédito */
+  bonus: real("bonus").notNull().default(0),
+  /** bônus de performance da rede (+1%) */
+  bonusPerformance: real("bonus_performance").notNull().default(0),
+  valorLiquido: real("valor_liquido").notNull().default(0),
+  /** chave Pix informada no saque */
+  chavePix: text("chave_pix").notNull().default(""),
+  /** pendente | pago | recusado */
+  status: text("status").notNull().default("pendente"),
+  observacao: text("observacao").notNull().default(""),
+  criadoEm: integer("criado_em", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  processadoEm: integer("processado_em", { mode: "timestamp" }),
+});
+
+export type Saque = typeof saques.$inferSelect;
+
+/* ------------------------------------------------------------------ */
+/* COBRANÇAS PIX — gateway plugável (modo simulado por padrão)         */
+/* ------------------------------------------------------------------ */
+
+export const cobrancasPix = sqliteTable("cobrancas_pix", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  clienteId: integer("cliente_id")
+    .notNull()
+    .references(() => usuarios.id, { onDelete: "cascade" }),
+  faturaId: integer("fatura_id").references(() => faturas.id, { onDelete: "set null" }),
+  /** simulado | mercadopago | efi | asaas | pagarme */
+  provedor: text("provedor").notNull().default("simulado"),
+  /** id da cobrança no provedor */
+  txid: text("txid").notNull().unique(),
+  valor: real("valor").notNull().default(0),
+  /** o que está sendo cobrado, em texto (aparece no checkout e no admin) */
+  descricao: text("descricao").notNull().default(""),
+  /**
+   * Pedido do checkout serializado em JSON. Quando o pagamento é confirmado,
+   * este pedido é APLICADO automaticamente (troca de pacote, apps liberados,
+   * adicional Sala de Jogos). Fica `null` em cobranças de fatura simples.
+   */
+  pedido: text("pedido", { mode: "json" }).$type<{
+    tipo: "assinatura" | "jogos";
+    titulo: string;
+    pacoteId: number | null;
+    comboId: number | null;
+    apps: string[];
+    ciclo: "mensal" | "anual";
+    valor: number;
+  } | null>(),
+  /** payload copia-e-cola do Pix */
+  copiaECola: text("copia_e_cola").notNull().default(""),
+  /** aguardando | pago | expirado | cancelado */
+  status: text("status").notNull().default("aguardando"),
+  expiraEm: integer("expira_em", { mode: "timestamp" }),
+  pagoEm: integer("pago_em", { mode: "timestamp" }),
+  criadoEm: integer("criado_em", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+export type CobrancaPix = typeof cobrancasPix.$inferSelect;
+
+/* ------------------------------------------------------------------ */
+/* SALA DE JOGOS — pool de acesso de alta disponibilidade              */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Liberação temporária de uma conta do pool de jogos para um cliente com o
+ * adicional ativo. É o que elimina o gargalo do suporte em dia de pico: o
+ * cliente pega o acesso sozinho no painel e a vaga volta ao pool ao expirar.
+ */
+export const liberacoesJogos = sqliteTable("liberacoes_jogos", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  clienteId: integer("cliente_id")
+    .notNull()
+    .references(() => usuarios.id, { onDelete: "cascade" }),
+  contaId: integer("conta_id")
+    .notNull()
+    .references(() => contasMatrizes.id, { onDelete: "cascade" }),
+  servico: text("servico").notNull().default(""),
+  /** ativa | expirada | revogada */
+  status: text("status").notNull().default("ativa"),
+  criadoEm: integer("criado_em", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  expiraEm: integer("expira_em", { mode: "timestamp" }).notNull(),
+});
+
+export type LiberacaoJogos = typeof liberacoesJogos.$inferSelect;
+
+/* ------------------------------------------------------------------ */
+/* WIN-BACK — régua de reativação de suspensos/cancelados              */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Um registro por etapa da régua e por cliente (`chave` única). Guarda o
+ * cupom oferecido e se a mensagem já foi despachada pelo webhook.
+ */
+export const winbackEnvios = sqliteTable(
+  "winback_envios",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    clienteId: integer("cliente_id")
+      .notNull()
+      .references(() => usuarios.id, { onDelete: "cascade" }),
+    /** 1 (15 dias) | 2 (30 dias) | 3 (60 dias) */
+    etapa: integer("etapa").notNull().default(1),
+    diasInativo: integer("dias_inativo").notNull().default(0),
+    cupom: text("cupom").notNull().default(""),
+    desconto: integer("desconto").notNull().default(0),
+    mensagem: text("mensagem").notNull().default(""),
+    /** pendente | enviado | recuperado | descartado */
+    status: text("status").notNull().default("pendente"),
+    chave: text("chave").notNull(),
+    criadoEm: integer("criado_em", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    enviadoEm: integer("enviado_em", { mode: "timestamp" }),
+  },
+  (t) => [uniqueIndex("winback_chave_idx").on(t.chave)],
+);
+
+export type WinbackEnvio = typeof winbackEnvios.$inferSelect;
+
+/* ------------------------------------------------------------------ */
+/* RECUPERAÇÃO DE SENHA — fila de "esqueci minha senha"                */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Cada pedido de redefinição de senha vira uma linha aqui. O link é gerado
+ * pelo Better Auth e disparado por e-mail automaticamente; guardamos o
+ * registro para o admin conseguir acompanhar (e reenviar o link pelo
+ * WhatsApp enquanto o domínio de e-mail próprio não estiver verificado).
+ */
+export const resetsSenha = sqliteTable("resets_senha", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  email: text("email").notNull(),
+  /** cliente correspondente em `usuarios`, quando existir */
+  clienteId: integer("cliente_id").references(() => usuarios.id, {
+    onDelete: "set null",
+  }),
+  /** link completo de redefinição (contém o token do Better Auth) */
+  link: text("link").notNull().default(""),
+  /** pendente | usado | expirado */
+  status: text("status").notNull().default("pendente"),
+  /** email | admin — de onde partiu o pedido */
+  origem: text("origem").notNull().default("email"),
+  /** entrega por e-mail: pendente | enviado | falhou | sem_provedor */
+  entrega: text("entrega").notNull().default("pendente"),
+  /** mensagem de erro do provedor de e-mail, quando houver */
+  erroEntrega: text("erro_entrega").notNull().default(""),
+  criadoEm: integer("criado_em", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  expiraEm: integer("expira_em", { mode: "timestamp" }).notNull(),
+  usadoEm: integer("usado_em", { mode: "timestamp" }),
+});
+
+export type ResetSenha = typeof resetsSenha.$inferSelect;

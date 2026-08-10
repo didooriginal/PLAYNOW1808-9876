@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { adminOnly } from "../middleware/auth";
 import { db } from "../database";
-import { contasMatrizes, pacotes, usuarios } from "../database/schema";
+import { aplicativos, contasMatrizes, pacotes, usuarios } from "../database/schema";
 
 /**
  * Popula o banco com o catálogo inicial da operação.
@@ -33,7 +33,7 @@ const PACOTES = [
       "Netflix em 4K",
       "Suporte prioritário 24/7",
       "Reposição automática de conta",
-      "Garantia de 7 dias",
+      "Sem fidelidade: cancele quando quiser",
     ],
     accent: "red",
     badge: "Mais vendido",
@@ -75,6 +75,55 @@ const PACOTES = [
   },
 ];
 
+/**
+ * CATÁLOGO OFICIAL DE APPS.
+ * `precoAvulso` é o preço de tabela cobrado pelo próprio serviço em agosto/2026 —
+ * é ele que alimenta o comparativo "Do jeito tradicional" da landing e o cálculo
+ * de economia do painel. `preco` é quanto a PLAYPLUSNOW cobra pelo app avulso.
+ */
+const APLICATIVOS = [
+  { slug: "netflix", nome: "Netflix", mono: "N", cor: "#e50914", tipo: "video", categoria: "streaming", precoAvulso: 59.9, preco: 24.9 },
+  { slug: "disney", nome: "Disney+", mono: "D+", cor: "#4f8ef7", tipo: "video", categoria: "streaming", precoAvulso: 43.9, preco: 19.9 },
+  { slug: "hbomax", nome: "HBO Max", mono: "MAX", cor: "#8b5cf6", tipo: "video", categoria: "streaming", precoAvulso: 55.9, preco: 22.9 },
+  { slug: "prime", nome: "Amazon Prime Video", mono: "PV", cor: "#00a8e1", tipo: "video", categoria: "streaming", precoAvulso: 20, preco: 12.9 },
+  { slug: "spotify", nome: "Spotify", mono: "S", cor: "#1db954", tipo: "musica", categoria: "musica", precoAvulso: 21.9, preco: 14.9 },
+  { slug: "youtube", nome: "YouTube Premium", mono: "YT", cor: "#ff0033", tipo: "video", categoria: "streaming", precoAvulso: 25.9, preco: 16.9 },
+  { slug: "crunchyroll", nome: "Crunchyroll", mono: "CR", cor: "#f47521", tipo: "video", categoria: "asiatico", precoAvulso: 24.9, preco: 14.9 },
+  { slug: "paramount", nome: "Paramount+", mono: "P+", cor: "#0064ff", tipo: "video", categoria: "streaming", precoAvulso: 19.9, preco: 12.9 },
+  { slug: "appletv", nome: "Apple TV+", mono: "TV+", cor: "#d4d4d8", tipo: "video", categoria: "streaming", precoAvulso: 21.9, preco: 13.9 },
+  { slug: "globoplay", nome: "Globoplay", mono: "G", cor: "#ff5722", tipo: "video", categoria: "streaming", precoAvulso: 24.9, preco: 16.9 },
+  { slug: "star", nome: "Star+", mono: "★+", cor: "#e0b04a", tipo: "video", categoria: "streaming", precoAvulso: 27.9, preco: 16.9 },
+  { slug: "deezer", nome: "Deezer", mono: "DZ", cor: "#a238ff", tipo: "musica", categoria: "musica", precoAvulso: 20.9, preco: 13.9 },
+  { slug: "canva", nome: "Canva Pro", mono: "C", cor: "#00c4cc", tipo: "extra", categoria: "produtividade", precoAvulso: 34.9, preco: 19.9 },
+  { slug: "iptv", nome: "IPTV + Canais ao vivo", mono: "IP", cor: "#22d3ee", tipo: "video", categoria: "iptv", precoAvulso: 45, preco: 29.9 },
+  { slug: "jogos", nome: "Sala de Jogos", mono: "GG", cor: "#ff1f3d", tipo: "extra", categoria: "streaming", precoAvulso: 39.9, preco: 9.9 },
+];
+
+/**
+ * Sincroniza o catálogo de apps. Roda SEMPRE (mesmo em banco já povoado):
+ * é o que mantém o preço de tabela do comparativo de economia atualizado.
+ */
+export async function semearAplicativos() {
+  for (const app of APLICATIVOS) {
+    await db
+      .insert(aplicativos)
+      .values(app)
+      .onConflictDoUpdate({
+        target: aplicativos.slug,
+        set: {
+          nome: app.nome,
+          mono: app.mono,
+          cor: app.cor,
+          tipo: app.tipo,
+          categoria: app.categoria,
+          precoAvulso: app.precoAvulso,
+          preco: app.preco,
+        },
+      });
+  }
+  return APLICATIVOS.length;
+}
+
 const CONTAS = [
   { servico: "netflix", rotulo: "Netflix — Conta Matriz 01", email: "matriz.ntf01@plaplusnow.com", senha: "Ppn#N1x2026", totalVagas: 5, vagasOcupadas: 5, renovacao: "18/08/2026", custo: 59.9, regiao: "BR", status: "ativo" },
   { servico: "netflix", rotulo: "Netflix — Conta Matriz 07", email: "matriz.ntf07@plaplusnow.com", senha: "Ppn#N7x2026", totalVagas: 5, vagasOcupadas: 4, renovacao: "24/08/2026", custo: 59.9, regiao: "BR", status: "ativo" },
@@ -92,6 +141,34 @@ const CONTAS = [
   { servico: "iptv", rotulo: "IPTV — Servidor Alpha 01", email: "srv-alpha01.ppn", senha: "AlphaPpn#01", totalVagas: 60, vagasOcupadas: 48, renovacao: "01/09/2026", custo: 320, regiao: "BR/US", status: "ativo" },
   { servico: "canva", rotulo: "Canva Pro — Equipe 01", email: "matriz.cnv01@plaplusnow.com", senha: "Cnv$Pro2026", totalVagas: 5, vagasOcupadas: 5, renovacao: "19/08/2026", custo: 34.9, regiao: "Global", status: "ativo" },
 ];
+
+/**
+ * Pool inicial da Sala de Jogos. Fica fora de `CONTAS` porque é sincronizado
+ * sempre (mesmo em banco já povoado): sem pool, o adicional não libera nada.
+ */
+const CONTAS_JOGOS = [
+  { servico: "jogos", rotulo: "Sala de Jogos — Conta 01", email: "jogos01@plaplusnow.com", senha: "Ppn#Play01", totalVagas: 4, vagasOcupadas: 0, renovacao: "05/09/2026", custo: 39.9, regiao: "BR", status: "ativo" },
+  { servico: "jogos", rotulo: "Sala de Jogos — Conta 02", email: "jogos02@plaplusnow.com", senha: "Ppn#Play02", totalVagas: 4, vagasOcupadas: 0, renovacao: "12/09/2026", custo: 39.9, regiao: "BR", status: "ativo" },
+];
+
+/** Garante o pool da Sala de Jogos sem duplicar (chave: e-mail da conta). */
+export async function semearPoolJogos() {
+  for (const c of CONTAS_JOGOS) {
+    const [existe] = await db
+      .select({ id: contasMatrizes.id })
+      .from(contasMatrizes)
+      .where(eq(contasMatrizes.email, c.email));
+    if (existe) continue;
+    await db.insert(contasMatrizes).values({
+      ...c,
+      nomeConta: c.rotulo,
+      custoMensal: c.custo,
+      saldoGiftCard: Math.round(c.custo * 2.4 * 100) / 100,
+      poolJogos: true,
+    });
+  }
+  return CONTAS_JOGOS.length;
+}
 
 const CLIENTES = [
   { nome: "Diego Dias Silva", email: "diego.silva@email.com", pacote: "Mega Promo", statusPagamento: "ativo", ciclo: "mensal", valor: 59.9, proximaCobranca: "12/09/2026", clienteDesde: "12/03/2025" },
@@ -111,41 +188,57 @@ async function contar() {
   return { pacotes: Number(p?.n ?? 0), contas: Number(c?.n ?? 0), usuarios: Number(u?.n ?? 0) };
 }
 
+/**
+ * Executa o seed. Compartilhado entre a procedure `seed.run` (admin) e o
+ * script `bun scripts/seed.ts`, usado no bootstrap de um banco novo.
+ */
+export async function executarSeed({ force = false }: { force?: boolean } = {}) {
+  const antes = await contar();
+  // catálogo de apps é sincronizado sempre — preço de tabela muda com o tempo
+  await semearAplicativos();
+  await semearPoolJogos();
+
+  if (!force && (antes.pacotes > 0 || antes.contas > 0 || antes.usuarios > 0)) {
+    return { seeded: false, ...antes };
+  }
+
+  if (force) {
+    await db.delete(usuarios);
+    await db.delete(contasMatrizes);
+    await db.delete(pacotes);
+  }
+
+  const criados = await db.insert(pacotes).values(PACOTES).returning();
+  await db.insert(contasMatrizes).values(
+    CONTAS.map((c) => ({
+      ...c,
+      // gestão de contas: nome comercial, custo mensal e saldo inicial do gift card
+      nomeConta: c.rotulo,
+      custoMensal: c.custo,
+      saldoGiftCard: Math.round(c.custo * 2.4 * 100) / 100,
+    })),
+  );
+  await db.insert(usuarios).values(
+    CLIENTES.map((c) => ({
+      nome: c.nome,
+      email: c.email,
+      statusPagamento: c.statusPagamento,
+      ciclo: c.ciclo,
+      valor: c.valor,
+      proximaCobranca: c.proximaCobranca,
+      clienteDesde: c.clienteDesde,
+      pacoteId: criados.find((p) => p.nome === c.pacote)?.id ?? null,
+    })),
+  );
+
+  const depois = await contar();
+  return { seeded: true, ...depois };
+}
+
 export const seed = {
   status: adminOnly.handler(() => contar()),
 
   run: adminOnly
     .input(z.object({ force: z.boolean().default(false) }).optional())
-    .handler(async ({ input }) => {
-      const force = input?.force ?? false;
-      const antes = await contar();
-
-      if (!force && (antes.pacotes > 0 || antes.contas > 0 || antes.usuarios > 0)) {
-        return { seeded: false, ...antes };
-      }
-
-      if (force) {
-        await db.delete(usuarios);
-        await db.delete(contasMatrizes);
-        await db.delete(pacotes);
-      }
-
-      const criados = await db.insert(pacotes).values(PACOTES).returning();
-      await db.insert(contasMatrizes).values(CONTAS);
-      await db.insert(usuarios).values(
-        CLIENTES.map((c) => ({
-          nome: c.nome,
-          email: c.email,
-          statusPagamento: c.statusPagamento,
-          ciclo: c.ciclo,
-          valor: c.valor,
-          proximaCobranca: c.proximaCobranca,
-          clienteDesde: c.clienteDesde,
-          pacoteId: criados.find((p) => p.nome === c.pacote)?.id ?? null,
-        })),
-      );
-
-      const depois = await contar();
-      return { seeded: true, ...depois };
-    }),
+    .handler(({ input }) => executarSeed({ force: input?.force ?? false })),
 };

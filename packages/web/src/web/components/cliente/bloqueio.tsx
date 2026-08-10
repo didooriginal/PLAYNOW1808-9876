@@ -1,13 +1,10 @@
 // TELA DE BLOQUEIO POR INADIMPLENCIA — unica coisa que o cliente atrasado ve.
 // Sem logins, sem senhas, sem suporte humano: apenas o caminho do pagamento.
-import { Copy, Check, Lock, MessageCircle, Receipt } from "lucide-react";
-import { useState } from "react";
-import { GlassCard, NeonButton, Pill } from "../ui/kit";
-import { brl, whatsappLink } from "@/lib/mock-data";
+import { Lock } from "lucide-react";
+import { GlassCard, Pill } from "../ui/kit";
+import { brl } from "@/lib/mock-data";
+import { PagarPix } from "./pagar-pix";
 import { ContadorVencimento, type Situacao } from "./contador";
-
-/** chave Pix da operacao — trocar aqui muda em todo o painel */
-const CHAVE_PIX = "pix@plaplusnow.com";
 
 export function TelaBloqueio({
   nome,
@@ -18,14 +15,6 @@ export function TelaBloqueio({
   situacao: Situacao;
   motivo: string;
 }) {
-  const [copiado, setCopiado] = useState(false);
-
-  async function copiarPix() {
-    await navigator.clipboard.writeText(CHAVE_PIX);
-    setCopiado(true);
-    setTimeout(() => setCopiado(false), 2000);
-  }
-
   return (
     <div className="space-y-5" data-testid="tela-bloqueio">
       <GlassCard strong accent="red" className="relative overflow-hidden p-6 sm:p-8">
@@ -65,43 +54,7 @@ export function TelaBloqueio({
       <ContadorVencimento situacao={situacao} />
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <GlassCard accent="cyan" className="p-5 sm:p-6">
-          <div className="flex items-center gap-2">
-            <Receipt className="size-4 text-neon-cyan" />
-            <div className="font-display text-sm font-bold text-white">Pagar por Pix</div>
-          </div>
-          <p className="mt-2 font-sans text-[12px] leading-relaxed text-white/45">
-            Copie a chave, pague o valor exato e envie o comprovante no WhatsApp. A liberação é
-            manual e sai em poucos minutos no horário comercial.
-          </p>
-          <div className="mt-4 flex items-center gap-2 rounded-xl border border-white/10 bg-black/35 p-3">
-            <span className="min-w-0 flex-1 truncate font-mono text-xs text-white/80">
-              {CHAVE_PIX}
-            </span>
-            <button
-              type="button"
-              onClick={copiarPix}
-              data-testid="copiar-pix"
-              className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white/50 transition-colors hover:border-neon-cyan/50 hover:text-neon-cyan"
-              aria-label="Copiar chave Pix"
-            >
-              {copiado ? <Check className="size-3.5 text-neon-cyan" /> : <Copy className="size-3.5" />}
-            </button>
-          </div>
-          <a
-            href={whatsappLink(
-              `Olá! Sou ${nome} e quero regularizar meu plano PLAPLUSNOW (${brl(situacao.valor)}).`,
-            )}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-3 block"
-          >
-            <NeonButton accent="cyan" size="sm" className="w-full">
-              <MessageCircle className="size-4" />
-              Enviar comprovante no WhatsApp
-            </NeonButton>
-          </a>
-        </GlassCard>
+        <PagarPix titulo="regularizar plano" />
 
         <GlassCard className="p-5 sm:p-6">
           <div className="font-display text-sm font-bold text-white">

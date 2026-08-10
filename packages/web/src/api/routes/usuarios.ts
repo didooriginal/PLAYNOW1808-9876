@@ -4,7 +4,7 @@ import { ORPCError } from "@orpc/server";
 import { base } from "../__core/app";
 import { adminOnly, authed } from "../middleware/auth";
 import { db } from "../database";
-import { contasMatrizes, historicoVencimento, pacotes, usuarios } from "../database/schema";
+import { contasMatrizes, historicoVencimento, pacotes, usuarios as tabelaUsuarios } from "../database/schema";
 import { garantirAlocacao } from "./alocacoes";
 import {
   FORMAS_PAGAMENTO,
@@ -53,28 +53,28 @@ const usuarioInput = z.object({
 const listarComPacote = () =>
   db
     .select({
-      id: usuarios.id,
-      nome: usuarios.nome,
-      email: usuarios.email,
-      telefone: usuarios.telefone,
-      statusPagamento: usuarios.statusPagamento,
-      formaPagamento: usuarios.formaPagamento,
-      termosAceitosEm: usuarios.termosAceitosEm,
-      vencimentoTravado: usuarios.vencimentoTravado,
-      pacoteId: usuarios.pacoteId,
-      ciclo: usuarios.ciclo,
-      valor: usuarios.valor,
-      proximaCobranca: usuarios.proximaCobranca,
-      clienteDesde: usuarios.clienteDesde,
-      admin: usuarios.admin,
+      id: tabelaUsuarios.id,
+      nome: tabelaUsuarios.nome,
+      email: tabelaUsuarios.email,
+      telefone: tabelaUsuarios.telefone,
+      statusPagamento: tabelaUsuarios.statusPagamento,
+      formaPagamento: tabelaUsuarios.formaPagamento,
+      termosAceitosEm: tabelaUsuarios.termosAceitosEm,
+      vencimentoTravado: tabelaUsuarios.vencimentoTravado,
+      pacoteId: tabelaUsuarios.pacoteId,
+      ciclo: tabelaUsuarios.ciclo,
+      valor: tabelaUsuarios.valor,
+      proximaCobranca: tabelaUsuarios.proximaCobranca,
+      clienteDesde: tabelaUsuarios.clienteDesde,
+      admin: tabelaUsuarios.admin,
       pacoteNome: pacotes.nome,
       pacoteServicos: pacotes.servicos,
     })
-    .from(usuarios)
-    .leftJoin(pacotes, eq(usuarios.pacoteId, pacotes.id))
-    .orderBy(asc(usuarios.nome));
+    .from(tabelaUsuarios)
+    .leftJoin(pacotes, eq(tabelaUsuarios.pacoteId, pacotes.id))
+    .orderBy(asc(tabelaUsuarios.nome));
 
-export const usuariosRoutes = {
+export const usuarios = {
   /** base de clientes com o pacote contratado resolvido */
   listar: adminOnly.handler(async () => {
     // mantem os status coerentes com a data de vencimento antes de listar
@@ -83,13 +83,13 @@ export const usuariosRoutes = {
   }),
 
   obter: adminOnly.input(z.object({ id: z.number().int() })).handler(async ({ input }) => {
-    const [row] = await db.select().from(usuarios).where(eq(usuarios.id, input.id));
+    const [row] = await db.select().from(tabelaUsuarios).where(eq(tabelaUsuarios.id, input.id));
     if (!row) throw new ORPCError("NOT_FOUND", { message: "Usuário não encontrado" });
     return row;
   }),
 
   criar: adminOnly.input(usuarioInput).handler(async ({ input }) => {
-    const [row] = await db.insert(usuarios).values(input).returning();
+    const [row] = await db.insert(tabelaUsuarios).values(input).returning();
     return row;
   }),
 
@@ -103,13 +103,13 @@ export const usuariosRoutes = {
       ) as Partial<typeof bruto>;
 
       // TRAVA DE VENCIMENTO: a data de cobranca nunca muda por edicao livre.
-      // Use `usuarios.alterarVencimento`, que exige motivo e grava historico.
+      // Use `tabelaUsuarios.alterarVencimento`, que exige motivo e grava historico.
       // (zod preenche defaults, entao so bloqueia quando veio valor real e diferente)
       if (patch.proximaCobranca) {
         const [atual] = await db
-          .select({ atualData: usuarios.proximaCobranca, travado: usuarios.vencimentoTravado })
-          .from(usuarios)
-          .where(eq(usuarios.id, id));
+          .select({ atualData: tabelaUsuarios.proximaCobranca, travado: tabelaUsuarios.vencimentoTravado })
+          .from(tabelaUsuarios)
+          .where(eq(tabelaUsuarios.id, id));
         if (atual?.travado && patch.proximaCobranca !== atual.atualData) {
           throw new ORPCError("FORBIDDEN", {
             message:
@@ -119,7 +119,7 @@ export const usuariosRoutes = {
         delete patch.proximaCobranca;
       }
 
-      const [row] = await db.update(usuarios).set(patch).where(eq(usuarios.id, id)).returning();
+      const [row] = await db.update(tabelaUsuarios).set(patch).where(eq(tabelaUsuarios.id, id)).returning();
       if (!row) throw new ORPCError("NOT_FOUND", { message: "Usuário não encontrado" });
       return row;
     }),
@@ -139,15 +139,15 @@ export const usuariosRoutes = {
       }),
     )
     .handler(async ({ input, context }) => {
-      const [cliente] = await db.select().from(usuarios).where(eq(usuarios.id, input.id));
+      const [cliente] = await db.select().from(tabelaUsuarios).where(eq(tabelaUsuarios.id, input.id));
       if (!cliente) throw new ORPCError("NOT_FOUND", { message: "Cliente não encontrado" });
 
       const novoStatus = statusEsperado(input.proximaCobranca, cliente.statusPagamento);
 
       const [row] = await db
-        .update(usuarios)
+        .update(tabelaUsuarios)
         .set({ proximaCobranca: input.proximaCobranca, statusPagamento: novoStatus })
-        .where(eq(usuarios.id, input.id))
+        .where(eq(tabelaUsuarios.id, input.id))
         .returning();
 
       await db.insert(historicoVencimento).values({
@@ -187,25 +187,25 @@ export const usuariosRoutes = {
   aceitarTermos: authed.handler(async ({ context }) => {
     const [cliente] = await db
       .select()
-      .from(usuarios)
-      .where(eq(usuarios.authUserId, context.user.id));
+      .from(tabelaUsuarios)
+      .where(eq(tabelaUsuarios.authUserId, context.user.id));
     if (!cliente) throw new ORPCError("NOT_FOUND", { message: "Cliente não encontrado" });
     const [row] = await db
-      .update(usuarios)
+      .update(tabelaUsuarios)
       .set({ termosAceitosEm: new Date() })
-      .where(eq(usuarios.id, cliente.id))
+      .where(eq(tabelaUsuarios.id, cliente.id))
       .returning();
     return { ok: true, termosAceitosEm: row?.termosAceitosEm ?? null };
   }),
 
   remover: adminOnly.input(z.object({ id: z.number().int() })).handler(async ({ input }) => {
-    await db.delete(usuarios).where(eq(usuarios.id, input.id));
+    await db.delete(tabelaUsuarios).where(eq(tabelaUsuarios.id, input.id));
     return { ok: true };
   }),
 
   /**
    * PAINEL DO CLIENTE — exige sessão. Resolve o cliente pelo vínculo
-   * `usuarios.auth_user_id` (fallback: e-mail da conta de login) e devolve o
+   * `tabelaUsuarios.auth_user_id` (fallback: e-mail da conta de login) e devolve o
    * pacote contratado + as credenciais (contas matrizes) de cada serviço.
    */
   painel: authed.handler(async ({ context }) => {
@@ -214,21 +214,21 @@ export const usuariosRoutes = {
 
     const [porVinculo] = await db
       .select()
-      .from(usuarios)
-      .where(eq(usuarios.authUserId, context.user.id));
+      .from(tabelaUsuarios)
+      .where(eq(tabelaUsuarios.authUserId, context.user.id));
 
     let cliente = porVinculo;
 
     if (!cliente) {
       const [porEmail] = await db
         .select()
-        .from(usuarios)
-        .where(eq(usuarios.email, context.user.email.toLowerCase()));
+        .from(tabelaUsuarios)
+        .where(eq(tabelaUsuarios.email, context.user.email.toLowerCase()));
       if (porEmail) {
         await db
-          .update(usuarios)
+          .update(tabelaUsuarios)
           .set({ authUserId: context.user.id })
-          .where(eq(usuarios.id, porEmail.id));
+          .where(eq(tabelaUsuarios.id, porEmail.id));
         cliente = { ...porEmail, authUserId: context.user.id };
       }
     }
@@ -325,12 +325,12 @@ export const usuariosRoutes = {
     .handler(async ({ input, context }) => {
       const [cliente] = await db
         .select()
-        .from(usuarios)
-        .where(eq(usuarios.authUserId, context.user.id));
+        .from(tabelaUsuarios)
+        .where(eq(tabelaUsuarios.authUserId, context.user.id));
       if (!cliente) throw new ORPCError("NOT_FOUND", { message: "Cliente não encontrado" });
 
       const [row] = await db
-        .update(usuarios)
+        .update(tabelaUsuarios)
         .set({
           pacoteId: input.pacoteId,
           ciclo: input.ciclo,
@@ -338,7 +338,7 @@ export const usuariosRoutes = {
           ...(input.telefone ? { telefone: input.telefone } : {}),
           statusPagamento: cliente.statusPagamento === "ativo" ? "ativo" : "pendente",
         })
-        .where(eq(usuarios.id, cliente.id))
+        .where(eq(tabelaUsuarios.id, cliente.id))
         .returning();
       return row;
     }),
@@ -347,14 +347,14 @@ export const usuariosRoutes = {
   eu: authed.handler(async ({ context }) => {
     const [cliente] = await db
       .select()
-      .from(usuarios)
-      .where(eq(usuarios.authUserId, context.user.id));
+      .from(tabelaUsuarios)
+      .where(eq(tabelaUsuarios.authUserId, context.user.id));
     const [porEmail] = cliente
       ? []
       : await db
           .select()
-          .from(usuarios)
-          .where(eq(usuarios.email, context.user.email.toLowerCase()));
+          .from(tabelaUsuarios)
+          .where(eq(tabelaUsuarios.email, context.user.email.toLowerCase()));
     const registro = cliente ?? porEmail ?? null;
     return {
       authId: context.user.id,
@@ -370,15 +370,15 @@ export const usuariosRoutes = {
     const [row] = await db
       .select({
         total: sql<number>`count(*)`,
-        ativos: sql<number>`coalesce(sum(case when ${usuarios.statusPagamento} = 'ativo' then 1 else 0 end), 0)`,
-        vencendo: sql<number>`coalesce(sum(case when ${usuarios.statusPagamento} = 'pendente' then 1 else 0 end), 0)`,
-        inadimplentes: sql<number>`coalesce(sum(case when ${usuarios.statusPagamento} in ('atrasado','suspenso') then 1 else 0 end), 0)`,
-        suspensos: sql<number>`coalesce(sum(case when ${usuarios.statusPagamento} = 'suspenso' then 1 else 0 end), 0)`,
-        mrr: sql<number>`coalesce(sum(case when ${usuarios.ciclo} = 'anual' then ${usuarios.valor} / 12.0 else ${usuarios.valor} end), 0)`,
-        emAtraso: sql<number>`coalesce(sum(case when ${usuarios.statusPagamento} in ('atrasado','suspenso') then ${usuarios.valor} else 0 end), 0)`,
+        ativos: sql<number>`coalesce(sum(case when ${tabelaUsuarios.statusPagamento} = 'ativo' then 1 else 0 end), 0)`,
+        vencendo: sql<number>`coalesce(sum(case when ${tabelaUsuarios.statusPagamento} = 'pendente' then 1 else 0 end), 0)`,
+        inadimplentes: sql<number>`coalesce(sum(case when ${tabelaUsuarios.statusPagamento} in ('atrasado','suspenso') then 1 else 0 end), 0)`,
+        suspensos: sql<number>`coalesce(sum(case when ${tabelaUsuarios.statusPagamento} = 'suspenso' then 1 else 0 end), 0)`,
+        mrr: sql<number>`coalesce(sum(case when ${tabelaUsuarios.ciclo} = 'anual' then ${tabelaUsuarios.valor} / 12.0 else ${tabelaUsuarios.valor} end), 0)`,
+        emAtraso: sql<number>`coalesce(sum(case when ${tabelaUsuarios.statusPagamento} in ('atrasado','suspenso') then ${tabelaUsuarios.valor} else 0 end), 0)`,
       })
-      .from(usuarios)
-      .where(eq(usuarios.admin, false));
+      .from(tabelaUsuarios)
+      .where(eq(tabelaUsuarios.admin, false));
     return row;
   }),
 };

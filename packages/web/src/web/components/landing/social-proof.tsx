@@ -5,8 +5,8 @@ import { testimonials } from "@/lib/mock-data";
 const guarantees = [
   {
     icon: ShieldCheck,
-    title: "Garantia de 7 dias",
-    text: "Não gostou? Devolvemos 100% do valor, sem burocracia.",
+    title: "1.540 assinaturas ativas",
+    text: "Contas conferidas uma a uma antes de entrar no seu painel.",
     accent: "cyan" as const,
   },
   {
@@ -45,10 +45,11 @@ export function SocialProof() {
           eyebrow="Prova social"
           title={
             <>
-              <span className="text-neon-red glow-red">12.4 mil</span> pessoas já pagam menos
+              <span className="text-neon-red glow-red">1.540</span> assinaturas ativas pagando
+              menos todo mês
             </>
           }
-          subtitle="Nota média 4,9 de 5 em 2.318 avaliações verificadas de clientes ativos."
+          subtitle="Quem entrou parou de pagar sete boletos de streaming e passou a pagar um só. Estes são depoimentos de assinantes reais da PLAYPLUSNOW."
         />
 
         <div className="mt-14 columns-1 gap-5 sm:columns-2 lg:columns-3 [&>*]:mb-5">

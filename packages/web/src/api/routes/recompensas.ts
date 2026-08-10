@@ -411,7 +411,7 @@ async function clienteDaSessao(authUserId: string, email: string) {
 /* ROTAS                                                               */
 /* ------------------------------------------------------------------ */
 
-export const recompensasRoutes = {
+export const recompensas = {
   /** catalogo de missoes — publico, alimenta a trilha visual */
   missoes: base.handler(() => MISSOES),
 

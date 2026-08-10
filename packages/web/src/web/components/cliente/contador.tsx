@@ -2,7 +2,8 @@
 import { useEffect, useState } from "react";
 import { CalendarClock, CircleAlert, ShieldCheck, TriangleAlert } from "lucide-react";
 import { GlassCard, NeonButton } from "../ui/kit";
-import { brl, whatsappLink } from "@/lib/mock-data";
+import { brl } from "@/lib/mock-data";
+import { irParaPagamento } from "@/lib/navegacao";
 
 export type Situacao = {
   status: string;
@@ -128,21 +129,17 @@ export function ContadorVencimento({ situacao }: { situacao: Situacao }) {
                 : `Depois do vencimento, os logins somem do painel automaticamente.`}
             </div>
           </div>
-          <a
-            href={whatsappLink(
-              critico
-                ? "Olá! Quero regularizar meu plano PLAPLUSNOW e liberar meus acessos."
-                : "Olá! Quero pagar a renovação do meu plano PLAPLUSNOW.",
-            )}
-            target="_blank"
-            rel="noreferrer"
-            className="shrink-0"
-          >
-            <NeonButton accent={critico ? "red" : "cyan"} size="sm" data-testid="pagar-agora">
+          <div className="shrink-0">
+            <NeonButton
+              accent={critico ? "red" : "cyan"}
+              size="sm"
+              data-testid="pagar-agora"
+              onClick={irParaPagamento}
+            >
               <CalendarClock className="size-4" />
               {critico ? "Regularizar agora" : "Pagar renovação"}
             </NeonButton>
-          </a>
+          </div>
         </div>
       )}
     </GlassCard>

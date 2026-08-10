@@ -1,7 +1,8 @@
 import { ArrowUpRight, Loader2, Sparkles } from "lucide-react";
 import { AppIcon } from "../app-icon";
 import { GlassCard, NeonButton, Pill } from "../ui/kit";
-import { brl, serviceById, whatsappLink } from "@/lib/mock-data";
+import { Link } from "wouter";
+import { brl, serviceById } from "@/lib/mock-data";
 import { useCombosCliente } from "../../queries/combos";
 import { useAplicativos } from "../../queries/aplicativos";
 
@@ -77,16 +78,7 @@ export function CombosSugeridos() {
               ))}
             </div>
 
-            <a
-              href={whatsappLink(
-                `Olá! Quero migrar para o combo ${combo.nome} (${brl(combo.preco)}/${
-                  combo.ciclo === "anual" ? "ano" : "mês"
-                }).`,
-              )}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-5"
-            >
+            <Link to={`/checkout?combo=${combo.id}`} className="mt-5 block">
               <NeonButton
                 accent={combo.destaque ? "cyan" : "purple"}
                 variant="outline"
@@ -96,7 +88,7 @@ export function CombosSugeridos() {
                 Quero este combo
                 <ArrowUpRight className="size-4" />
               </NeonButton>
-            </a>
+            </Link>
           </GlassCard>
         ))}
       </div>

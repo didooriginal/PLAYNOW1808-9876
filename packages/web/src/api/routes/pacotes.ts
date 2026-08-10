@@ -4,7 +4,7 @@ import { ORPCError } from "@orpc/server";
 import { base } from "../__core/app";
 import { adminOnly } from "../middleware/auth";
 import { db } from "../database";
-import { pacotes } from "../database/schema";
+import { pacotes as tabelaPacotes } from "../database/schema";
 
 const pacoteInput = z.object({
   nome: z.string().min(1),
@@ -20,18 +20,18 @@ const pacoteInput = z.object({
   ativo: z.boolean().default(true),
 });
 
-export const pacotesRoutes = {
+export const pacotes = {
   /** todos os pacotes cadastrados */
-  listar: base.handler(() => db.select().from(pacotes).orderBy(asc(pacotes.preco))),
+  listar: base.handler(() => db.select().from(tabelaPacotes).orderBy(asc(tabelaPacotes.preco))),
 
   obter: base.input(z.object({ id: z.number().int() })).handler(async ({ input }) => {
-    const [row] = await db.select().from(pacotes).where(eq(pacotes.id, input.id));
+    const [row] = await db.select().from(tabelaPacotes).where(eq(tabelaPacotes.id, input.id));
     if (!row) throw new ORPCError("NOT_FOUND", { message: "Pacote não encontrado" });
     return row;
   }),
 
   criar: adminOnly.input(pacoteInput).handler(async ({ input }) => {
-    const [row] = await db.insert(pacotes).values(input).returning();
+    const [row] = await db.insert(tabelaPacotes).values(input).returning();
     return row;
   }),
 
@@ -39,13 +39,13 @@ export const pacotesRoutes = {
     .input(pacoteInput.partial().extend({ id: z.number().int() }))
     .handler(async ({ input }) => {
       const { id, ...patch } = input;
-      const [row] = await db.update(pacotes).set(patch).where(eq(pacotes.id, id)).returning();
+      const [row] = await db.update(tabelaPacotes).set(patch).where(eq(tabelaPacotes.id, id)).returning();
       if (!row) throw new ORPCError("NOT_FOUND", { message: "Pacote não encontrado" });
       return row;
     }),
 
   remover: adminOnly.input(z.object({ id: z.number().int() })).handler(async ({ input }) => {
-    await db.delete(pacotes).where(eq(pacotes.id, input.id));
+    await db.delete(tabelaPacotes).where(eq(tabelaPacotes.id, input.id));
     return { ok: true };
   }),
 };

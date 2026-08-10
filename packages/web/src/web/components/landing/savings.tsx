@@ -2,7 +2,7 @@ import { ArrowRight, BadgeCheck, Flame, TrendingDown, Wallet } from "lucide-reac
 import { AppIcon } from "../app-icon";
 import { GlassCard, NeonButton, Pill, SectionTitle } from "../ui/kit";
 import { brl, retailOf, savingsPct } from "@/lib/mock-data";
-import { usePlanoDestaque } from "../../queries/planos";
+import { usePlanoDestaque } from "../../lib/planos";
 
 export function Savings() {
   // mesmo pacote em destaque do banco, usado no comparativo caro vs. combo

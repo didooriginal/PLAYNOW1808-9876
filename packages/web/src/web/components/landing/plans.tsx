@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { AppIcon } from "../app-icon";
 import { GlassCard, NeonButton, Pill, SectionTitle, accentHex } from "../ui/kit";
 import { brl, retailOf, savingsPct } from "@/lib/mock-data";
-import { usePlanos } from "../../queries/planos";
+import { usePlanos } from "../../lib/planos";
 
 export type Cycle = "monthly" | "yearly";
 
@@ -200,9 +200,9 @@ export function Plans() {
 
                 <div className="mt-6 flex-1" />
 
-                {/* cadastro primeiro: /signup cria a conta e leva ao WhatsApp para fechar */}
+                {/* checkout na plataforma: resumo + Pix + ativação automática */}
                 <Link
-                  to={`/signup?plano=${plan.id}&ciclo=${yearly ? "anual" : "mensal"}`}
+                  to={`/checkout?plano=${plan.id}&ciclo=${yearly ? "anual" : "mensal"}`}
                   className="block"
                 >
                   <NeonButton
@@ -216,7 +216,7 @@ export function Plans() {
                   </NeonButton>
                 </Link>
                 <p className="mt-3 text-center font-sans text-[11px] text-white/25">
-                  Crie sua conta e finalize no WhatsApp — ativação em até 10 minutos
+                  Pagamento por Pix no site — acessos liberados automaticamente
                 </p>
               </GlassCard>
             );

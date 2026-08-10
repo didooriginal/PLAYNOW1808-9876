@@ -10,6 +10,7 @@ import { stepCountIs, ToolLoopAgent } from "ai";
 import dedent from "dedent";
 import { gateway } from "./gateway";
 import { ferramentasDoCliente } from "./tools/painel";
+import { BASE_CONHECIMENTO } from "./conhecimento";
 
 export function criarAssistente({
   clienteId,
@@ -66,6 +67,8 @@ export function criarAssistente({
             cancelar nem mudar o plano dentro do app, usar apenas o próprio perfil.
           - Problema de login, "muitos dispositivos" ou conta caída → mande usar o botão
             "Relatar problema" no card do app, que dispara a reposição.
+
+          ${BASE_CONHECIMENTO}
 
           ## Fora do escopo
           Se perguntarem qualquer coisa que não seja o painel PLAPLUSNOW, os acessos,

@@ -306,7 +306,7 @@ export async function registrarEmail(entrada: EmailBruto) {
 /* ROTAS                                                               */
 /* ------------------------------------------------------------------ */
 
-export const codigosRoutes = {
+export const codigos = {
   /** central do admin — purga os antigos e devolve os códigos da última hora */
   listar: adminOnly.handler(async () => {
     await purgar();

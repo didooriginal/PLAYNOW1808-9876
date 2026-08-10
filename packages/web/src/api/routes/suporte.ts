@@ -33,7 +33,7 @@ async function clienteDaSessao(authUserId: string, email: string) {
   return porEmail ?? null;
 }
 
-export const suporteRoutes = {
+export const suporte = {
   /** cliente abre um chamado a partir de um acesso do painel */
   abrir: authed
     .input(

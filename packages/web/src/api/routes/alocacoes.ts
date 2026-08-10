@@ -3,7 +3,7 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { ORPCError } from "@orpc/server";
 import { adminOnly } from "../middleware/auth";
 import { db } from "../database";
-import { alocacoes, contasMatrizes, usuarios } from "../database/schema";
+import { alocacoes as tabelaAlocacoes, contasMatrizes, usuarios } from "../database/schema";
 
 /**
  * ALOCAÇÕES — vínculo real entre cliente e conta matriz.
@@ -17,9 +17,9 @@ import { alocacoes, contasMatrizes, usuarios } from "../database/schema";
 /** recalcula `vagasOcupadas` da conta a partir das alocações ativas */
 export async function sincronizarVagas(contaId: number) {
   const ativas = await db
-    .select({ id: alocacoes.id })
-    .from(alocacoes)
-    .where(and(eq(alocacoes.contaId, contaId), eq(alocacoes.status, "ativo")));
+    .select({ id: tabelaAlocacoes.id })
+    .from(tabelaAlocacoes)
+    .where(and(eq(tabelaAlocacoes.contaId, contaId), eq(tabelaAlocacoes.status, "ativo")));
   await db
     .update(contasMatrizes)
     .set({ vagasOcupadas: ativas.length })
@@ -35,12 +35,12 @@ export async function sincronizarVagas(contaId: number) {
 export async function garantirAlocacao(clienteId: number, servico: string) {
   const [existente] = await db
     .select()
-    .from(alocacoes)
+    .from(tabelaAlocacoes)
     .where(
       and(
-        eq(alocacoes.clienteId, clienteId),
-        eq(alocacoes.servico, servico),
-        eq(alocacoes.status, "ativo"),
+        eq(tabelaAlocacoes.clienteId, clienteId),
+        eq(tabelaAlocacoes.servico, servico),
+        eq(tabelaAlocacoes.status, "ativo"),
       ),
     );
   if (existente) return existente;
@@ -56,59 +56,59 @@ export async function garantirAlocacao(clienteId: number, servico: string) {
   if (!livre) return null;
 
   const [row] = await db
-    .insert(alocacoes)
+    .insert(tabelaAlocacoes)
     .values({ clienteId, contaId: livre.id, servico })
     .returning();
   await sincronizarVagas(livre.id);
   return row;
 }
 
-export const alocacoesRoutes = {
+export const alocacoes = {
   /** clientes vinculados a uma conta matriz (item "vínculo cliente × conta") */
   porConta: adminOnly
     .input(z.object({ contaId: z.number().int(), incluirHistorico: z.boolean().default(false) }))
     .handler(({ input }) => {
       const filtro = input.incluirHistorico
-        ? eq(alocacoes.contaId, input.contaId)
-        : and(eq(alocacoes.contaId, input.contaId), eq(alocacoes.status, "ativo"));
+        ? eq(tabelaAlocacoes.contaId, input.contaId)
+        : and(eq(tabelaAlocacoes.contaId, input.contaId), eq(tabelaAlocacoes.status, "ativo"));
 
       return db
         .select({
-          id: alocacoes.id,
-          clienteId: alocacoes.clienteId,
-          contaId: alocacoes.contaId,
-          servico: alocacoes.servico,
-          status: alocacoes.status,
-          motivo: alocacoes.motivo,
-          criadoEm: alocacoes.criadoEm,
-          liberadoEm: alocacoes.liberadoEm,
+          id: tabelaAlocacoes.id,
+          clienteId: tabelaAlocacoes.clienteId,
+          contaId: tabelaAlocacoes.contaId,
+          servico: tabelaAlocacoes.servico,
+          status: tabelaAlocacoes.status,
+          motivo: tabelaAlocacoes.motivo,
+          criadoEm: tabelaAlocacoes.criadoEm,
+          liberadoEm: tabelaAlocacoes.liberadoEm,
           clienteNome: usuarios.nome,
           clienteEmail: usuarios.email,
           clienteStatus: usuarios.statusPagamento,
         })
-        .from(alocacoes)
-        .innerJoin(usuarios, eq(alocacoes.clienteId, usuarios.id))
+        .from(tabelaAlocacoes)
+        .innerJoin(usuarios, eq(tabelaAlocacoes.clienteId, usuarios.id))
         .where(filtro)
-        .orderBy(desc(alocacoes.criadoEm));
+        .orderBy(desc(tabelaAlocacoes.criadoEm));
     }),
 
   /** mapa contaId → clientes ativos, para renderizar todas as contas de uma vez */
   mapa: adminOnly.handler(async () => {
     const rows = await db
       .select({
-        id: alocacoes.id,
-        contaId: alocacoes.contaId,
-        clienteId: alocacoes.clienteId,
-        servico: alocacoes.servico,
-        criadoEm: alocacoes.criadoEm,
+        id: tabelaAlocacoes.id,
+        contaId: tabelaAlocacoes.contaId,
+        clienteId: tabelaAlocacoes.clienteId,
+        servico: tabelaAlocacoes.servico,
+        criadoEm: tabelaAlocacoes.criadoEm,
         clienteNome: usuarios.nome,
         clienteEmail: usuarios.email,
         clienteStatus: usuarios.statusPagamento,
       })
-      .from(alocacoes)
-      .innerJoin(usuarios, eq(alocacoes.clienteId, usuarios.id))
-      .where(eq(alocacoes.status, "ativo"))
-      .orderBy(desc(alocacoes.criadoEm));
+      .from(tabelaAlocacoes)
+      .innerJoin(usuarios, eq(tabelaAlocacoes.clienteId, usuarios.id))
+      .where(eq(tabelaAlocacoes.status, "ativo"))
+      .orderBy(desc(tabelaAlocacoes.criadoEm));
 
     const mapa: Record<number, typeof rows> = {};
     for (const row of rows) {
@@ -131,9 +131,9 @@ export const alocacoesRoutes = {
       if (!cliente) throw new ORPCError("NOT_FOUND", { message: "Cliente não encontrado" });
 
       const ativas = await db
-        .select({ id: alocacoes.id, clienteId: alocacoes.clienteId })
-        .from(alocacoes)
-        .where(and(eq(alocacoes.contaId, input.contaId), eq(alocacoes.status, "ativo")));
+        .select({ id: tabelaAlocacoes.id, clienteId: tabelaAlocacoes.clienteId })
+        .from(tabelaAlocacoes)
+        .where(and(eq(tabelaAlocacoes.contaId, input.contaId), eq(tabelaAlocacoes.status, "ativo")));
 
       if (ativas.some((a) => a.clienteId === input.clienteId))
         throw new ORPCError("CONFLICT", { message: "Este cliente já está nesta conta" });
@@ -144,7 +144,7 @@ export const alocacoesRoutes = {
         });
 
       const [row] = await db
-        .insert(alocacoes)
+        .insert(tabelaAlocacoes)
         .values({ clienteId: input.clienteId, contaId: conta.id, servico: conta.servico })
         .returning();
       await sincronizarVagas(conta.id);
@@ -163,14 +163,14 @@ export const alocacoesRoutes = {
       }),
     )
     .handler(async ({ input }) => {
-      const [alocacao] = await db.select().from(alocacoes).where(eq(alocacoes.id, input.id));
+      const [alocacao] = await db.select().from(tabelaAlocacoes).where(eq(tabelaAlocacoes.id, input.id));
       if (!alocacao) throw new ORPCError("NOT_FOUND", { message: "Alocação não encontrada" });
       if (alocacao.status === "liberado") return alocacao;
 
       const [row] = await db
-        .update(alocacoes)
+        .update(tabelaAlocacoes)
         .set({ status: "liberado", motivo: input.motivo, liberadoEm: new Date() })
-        .where(eq(alocacoes.id, input.id))
+        .where(eq(tabelaAlocacoes.id, input.id))
         .returning();
       await sincronizarVagas(alocacao.contaId);
       return row;
@@ -182,18 +182,18 @@ export const alocacoesRoutes = {
     .handler(({ input }) =>
       db
         .select({
-          id: alocacoes.id,
-          status: alocacoes.status,
-          motivo: alocacoes.motivo,
-          criadoEm: alocacoes.criadoEm,
-          liberadoEm: alocacoes.liberadoEm,
+          id: tabelaAlocacoes.id,
+          status: tabelaAlocacoes.status,
+          motivo: tabelaAlocacoes.motivo,
+          criadoEm: tabelaAlocacoes.criadoEm,
+          liberadoEm: tabelaAlocacoes.liberadoEm,
           clienteNome: usuarios.nome,
           clienteEmail: usuarios.email,
         })
-        .from(alocacoes)
-        .innerJoin(usuarios, eq(alocacoes.clienteId, usuarios.id))
-        .where(eq(alocacoes.contaId, input.contaId))
-        .orderBy(desc(alocacoes.criadoEm)),
+        .from(tabelaAlocacoes)
+        .innerJoin(usuarios, eq(tabelaAlocacoes.clienteId, usuarios.id))
+        .where(eq(tabelaAlocacoes.contaId, input.contaId))
+        .orderBy(desc(tabelaAlocacoes.criadoEm)),
     ),
 
   /** clientes que ainda não têm vaga ativa na conta — alimenta o seletor do admin */
@@ -201,9 +201,9 @@ export const alocacoesRoutes = {
     .input(z.object({ contaId: z.number().int() }))
     .handler(async ({ input }) => {
       const ativas = await db
-        .select({ clienteId: alocacoes.clienteId })
-        .from(alocacoes)
-        .where(and(eq(alocacoes.contaId, input.contaId), eq(alocacoes.status, "ativo")));
+        .select({ clienteId: tabelaAlocacoes.clienteId })
+        .from(tabelaAlocacoes)
+        .where(and(eq(tabelaAlocacoes.contaId, input.contaId), eq(tabelaAlocacoes.status, "ativo")));
       const ocupados = ativas.map((a) => a.clienteId);
 
       const todos = await db
@@ -220,8 +220,8 @@ export const alocacoesRoutes = {
     .handler(async ({ input }) => {
       const rows = await db
         .select()
-        .from(alocacoes)
-        .where(and(eq(alocacoes.clienteId, input.clienteId), eq(alocacoes.status, "ativo")));
+        .from(tabelaAlocacoes)
+        .where(and(eq(tabelaAlocacoes.clienteId, input.clienteId), eq(tabelaAlocacoes.status, "ativo")));
       if (!rows.length) return [];
 
       const contas = await db

@@ -256,3 +256,83 @@
 - Central de Alertas (admin): OTP, TV, suporte, vencimento 3 dias/no dia, atraso diário. Webhook opcional via ALERTAS_WEBHOOK_URL.
 - Cliente: checklist obrigatório no 1º acesso, contador regressivo, sino de avisos, tela de bloqueio (Pix + WhatsApp) quando atrasado/suspenso.
 - Manual do Admin v1.1 com a seção "Central de Alertas e Regras de Fidelidade".
+
+---
+
+## Fase — Restauração do ambiente a partir do zip (09/08/2026)
+
+- Projeto recriado em `/home/user/playplusnow` via `app_init` (template 0.3.0, mesma
+  versão do zip) e código-fonte copiado por cima — infra gerenciada nova (.env, Turso, S3,
+  AI gateway) que o zip não trazia.
+- `bun install` (4 deps extras do web resolvidas: ai, @ai-sdk/react, better-auth, dedent).
+- `db:push` aplicado no banco novo → 14 tabelas do app + 4 do Better Auth.
+- `seed.ts` refatorado: nova função exportada `executarSeed()`, usada pela procedure
+  `seed.run` (admin) e pelo novo script `packages/web/scripts/seed.ts` (`bun run seed`),
+  que permite popular um banco novo sem sessão de admin.
+- Novo `packages/web/scripts/admin.ts` (`bun run admin <email> [remover]`) para promover
+  administrador.
+- Seed executado: 3 pacotes, 15 contas matrizes, 8 clientes.
+- Contas de teste: admin@playplusnow.com / Admin@2026 (admin) e
+  diego.silva@email.com / Cliente@2026 (cliente, casou com a linha do seed).
+- Verificado: typecheck 3/3, build OK, `/`, `/dashboard` e `/admin` logados sem erros de
+  console, overflowX 0 em 1440. Dev server em tmux `dev`, porta 4200.
+- Documentado em `SETUP.md` (como rodar, como trocar o Turso, pendências de lint).
+
+## Fase — Atualização estrutural SaaS (10/08/2026)
+
+Diretrizes do Diego (7 blocos). Decisões preenchidas por mim:
+- Pix: adaptador com modo simulado (provedor plugável depois).
+- Sala de Jogos: R$ 9,90/mês.
+- Saque: mínimo R$ 10, taxa R$ 3,50 (configurável em `configuracoes`).
+- Crédito em desconto: +25% de bônus; +1% de performance se a rede tiver >=90% em dia.
+
+Ordem: schema -> seed/landing -> rotas -> queries -> admin -> painel cliente -> IA -> testes.
+
+### Progresso 10/08 (sessão 2)
+- Rotas criadas e registradas no router: afiliados, giftcards, jogos, saude, winback, pix (+ webhook /api/webhooks/pix).
+- Landing atualizada: preços oficiais em mock-data (total R$ 252,40), 5 depoimentos reais, contador 1.540 assinaturas, "Garantia de 7 dias" removida (hero, social-proof, mock-data, seed).
+- Catálogo `aplicativos` semeado (15 apps, precoAvulso oficial) via semearAplicativos() — roda sempre no executarSeed.
+- ATENÇÃO: o db:push --force da sessão anterior apagou `usuarios` e `contas_matrizes`. Reseed feito (3 pacotes/15 contas/8 usuários) e novo script `bun run religar` recriou o vínculo auth->usuarios (admin@playplusnow.com volta a ser admin).
+- Queries criadas: afiliados, giftcards, jogos, saude, winback, pix.
+- Falta: views do admin (Gestão de Contas, Sala de Jogos, Saúde, Recuperação, Pix), painel do cliente (Sala de Jogos, Carteira/Afiliado, contador de economia, Pix), base de conhecimento da IA, build+smoke+deliver.
+- Views admin criadas e ligadas: gestao-contas-view, saude-view, jogos-view, recuperacao-view, comissoes-view (dentro da aba Afiliados), pix-view (dentro de Faturas).
+- Painel cliente: abas "Sala de Jogos" e "Indique e Ganhe", ContadorEconomia em Meus Acessos, PagarPix em Faturas.
+- IA: src/api/agent/conhecimento.ts (REGRAS_DE_USO + ESCALONAMENTO) injetado no assistente do cliente e no copiloto admin.
+- Verificado: typecheck 3/3, build 2/2, smoke Playwright sem erros de console, overflowX 0 em 1440 e 390.
+
+### Encerramento (10/08/2026)
+- setup.tsx: pendência de lint reduzida a 1 item (mobile `_layout.tsx`); pendência "aplicativos vazia" removida (resolvida pelo seed); depoimentos saíram da lista de mockados; PIX_WEBHOOK_TOKEN adicionado às integrações pendentes.
+- `bun run lint` → 1 erro (mobile `_layout.tsx`, template-managed, não corrigível).
+- `bun run typecheck` → 3/3. `bun run build` → 2/2.
+- smoke.py e smoke2.py → overflowX=0 e errors=[] em todas as páginas/abas, 1440px e 390px.
+- SETUP.md atualizado com a seção "Atualização estrutural (10/08/2026)": 7 blocos, 8 tabelas novas, 6 rotas novas + webhook Pix, parâmetros configuráveis, gateway Pix simulado, verificações e pendências.
+- Entregue via `deliver` (website, porta 4200).
+
+### Em aberto para o usuário
+- Manter o Turso provisionado aqui ou apontar para o banco dele.
+- Credenciais: EMAIL_WEBHOOK_TOKEN, PIX_WEBHOOK_TOKEN (provedor Pix real), WhatsApp/CallMeBot.
+
+### Checkout na plataforma (10/08/2026 — sessão 3)
+Objetivo: tirar o WhatsApp de TODO botão de compra. Compra e renovação acontecem
+no site, com Pix de baixa automática e ativação sem intervenção humana.
+
+- API: `routes/checkout.ts` (resumo/pagar/status/meusPedidos) + `lib/pedidos.ts`
+  (precificarPedido, aplicarPedido, faturaDoPedido, cobrancaViva). O front nunca
+  manda preço — só a escolha; o servidor precifica pela tabela do banco.
+- `cobrancas_pix` ganhou `descricao` e `pedido` (JSON). `confirmarPagamento`
+  aplica o pedido, quita a fatura, reativa o cliente, empurra o vencimento para
+  o próximo ciclo (pagamento de fatura simples) e apura comissão do indicador.
+- Página `/checkout`: resumo, Pix copia-e-cola, polling e redirect para o painel.
+- CTAs migrados: planos, montador, combos (landing e painel), cadastro, login
+  (`?next=checkout`), faturas do painel (`Pagar com Pix` por fatura), upgrades,
+  tela de bloqueio (PagarPix embutido) e contador de vencimento
+  (`irParaPagamento` em `lib/navegacao.ts`). Sala de Jogos ganhou atalho
+  `/checkout?jogos=1`. WhatsApp ficou só em suporte.
+- Correções: título "Pacote Pacote 03" → "Pacote 03"; competência já quitada não
+  reabre fatura paga (cobrança avulsa); PagarPix invalida faturas/usuarios/
+  recompensas quando o Pix é confirmado.
+- Verificado: typecheck 3/3, build 2/2, lint só o erro template do mobile.
+  E2E real: checkout combo+jogos R$ 74,34 → webhook → cliente ativo, apps
+  alocados, salaJogos on; fatura em aberto → Pagar com Pix → confirmado;
+  tela de bloqueio → Pix → cliente volta a ativo e vencimento avança.
+  smoke.py (agora com /checkout) e smoke2.py: overflowX=0, errors=[].

@@ -4,7 +4,7 @@ import { ORPCError } from "@orpc/server";
 import { base } from "../__core/app";
 import { adminOnly } from "../middleware/auth";
 import { db } from "../database";
-import { aplicativos, contasMatrizes, pacotes } from "../database/schema";
+import { aplicativos as tabelaAplicativos, contasMatrizes, pacotes } from "../database/schema";
 
 /**
  * CATÁLOGO DE APLICATIVOS.
@@ -38,20 +38,20 @@ const aplicativoInput = z.object({
   ativo: z.boolean().default(true),
 });
 
-export const aplicativosRoutes = {
+export const aplicativos = {
   /** catálogo completo — leitura pública (ícones, landing, formulários) */
-  listar: base.handler(() => db.select().from(aplicativos).orderBy(asc(aplicativos.nome))),
+  listar: base.handler(() => db.select().from(tabelaAplicativos).orderBy(asc(tabelaAplicativos.nome))),
 
   criar: adminOnly.input(aplicativoInput).handler(async ({ input }) => {
     const slug = slugify(input.slug || input.nome);
     if (!slug) throw new ORPCError("BAD_REQUEST", { message: "Nome inválido para gerar o slug" });
 
-    const [existente] = await db.select().from(aplicativos).where(eq(aplicativos.slug, slug));
+    const [existente] = await db.select().from(tabelaAplicativos).where(eq(tabelaAplicativos.slug, slug));
     if (existente)
       throw new ORPCError("CONFLICT", { message: `Já existe um app com o slug "${slug}"` });
 
     const [row] = await db
-      .insert(aplicativos)
+      .insert(tabelaAplicativos)
       .values({
         ...input,
         slug,
@@ -66,9 +66,9 @@ export const aplicativosRoutes = {
     .handler(async ({ input }) => {
       const { id, slug, ...patch } = input;
       const [row] = await db
-        .update(aplicativos)
+        .update(tabelaAplicativos)
         .set({ ...patch, ...(slug ? { slug: slugify(slug) } : {}) })
-        .where(eq(aplicativos.id, id))
+        .where(eq(tabelaAplicativos.id, id))
         .returning();
       if (!row) throw new ORPCError("NOT_FOUND", { message: "Aplicativo não encontrado" });
       return row;
@@ -79,7 +79,7 @@ export const aplicativosRoutes = {
    * pacote ou conta matriz — evita pacote apontando para app inexistente.
    */
   remover: adminOnly.input(z.object({ id: z.number().int() })).handler(async ({ input }) => {
-    const [app] = await db.select().from(aplicativos).where(eq(aplicativos.id, input.id));
+    const [app] = await db.select().from(tabelaAplicativos).where(eq(tabelaAplicativos.id, input.id));
     if (!app) throw new ORPCError("NOT_FOUND", { message: "Aplicativo não encontrado" });
 
     const contas = await db
@@ -98,7 +98,7 @@ export const aplicativosRoutes = {
         message: `${emUso.length} pacote(s) incluem este app. Edite-os antes.`,
       });
 
-    await db.delete(aplicativos).where(eq(aplicativos.id, input.id));
+    await db.delete(tabelaAplicativos).where(eq(tabelaAplicativos.id, input.id));
     return { ok: true };
   }),
 };

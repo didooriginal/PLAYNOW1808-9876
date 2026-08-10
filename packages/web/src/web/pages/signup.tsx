@@ -5,11 +5,11 @@ import { Check, Eye, EyeOff, MessageCircle, TriangleAlert, UserPlus } from "luci
 import { AuthField, AuthShell, inputClass } from "../components/auth-shell";
 import { AppIcon } from "../components/app-icon";
 import { NeonButton, accentHex } from "../components/ui/kit";
-import { brl, serviceById, whatsappLink, type ServiceId } from "@/lib/mock-data";
+import { serviceById, type ServiceId } from "@/lib/mock-data";
 import { authClient } from "../lib/auth";
 import { client } from "../lib/api";
 import { usePacotes } from "../queries/pacotes";
-import { pacoteParaPlano } from "../queries/planos";
+import { pacoteParaPlano } from "../lib/planos";
 
 function traduzErro(code?: string, message?: string) {
   switch (code) {
@@ -39,7 +39,7 @@ export default function SignupPage() {
   const ciclo = params.get("ciclo") === "anual" ? "anual" : "mensal";
   // combo à la carte montado na calculadora da landing
   const comboIds = useMemo(() => {
-    const raw = params.get("combo");
+    const raw = params.get("apps");
     if (!raw) return [] as ServiceId[];
     return raw
       .split(",")
@@ -54,6 +54,16 @@ export default function SignupPage() {
       }) as ServiceId[];
   }, [params]);
   const comboPreco = Number(params.get("preco") ?? 0);
+  /** o cadastro veio do checkout: depois de criar a conta volta para o pagamento */
+  const destinoPagamento = useMemo(() => {
+    const p = new URLSearchParams(params);
+    p.delete("next");
+    const query = p.toString();
+    return query ? `/checkout?${query}` : "/checkout";
+  }, [params]);
+  const temPedido = Boolean(
+    params.get("plano") || params.get("combo") || params.get("apps") || params.get("jogos"),
+  );
   /** codigo de indicacao vindo do link `?ref=CODIGO` */
   const ref = (params.get("ref") ?? "").trim().toUpperCase();
   const { data: indicacao } = useQuery({
@@ -117,7 +127,7 @@ export default function SignupPage() {
       }
     }
 
-    // grava o pacote escolhido no cadastro do cliente (pagamento segue no WhatsApp)
+    // grava a intenção de compra; o pacote só é ativado quando o Pix é confirmado
     try {
       await client.usuarios.escolherPacote({
         pacoteId: pacote?.id ?? null,
@@ -131,16 +141,8 @@ export default function SignupPage() {
 
     setCarregando(false);
 
-    const conta = email.trim().toLowerCase();
-    const mensagem = plano
-      ? `Olá! Acabei de criar minha conta na PLAPLUSNOW (${conta}) e quero finalizar a assinatura do pacote ${plano.name} — ${ciclo === "anual" ? "plano anual" : "plano mensal"}, ${brl(valorMes)}/mês.`
-      : combo
-        ? `Olá! Acabei de criar minha conta na PLAPLUSNOW (${conta}) e quero finalizar meu combo personalizado: ${combo
-            .map((id) => serviceById(id).name)
-            .join(", ")} — ${brl(valorMes)}/mês.`
-        : `Olá! Acabei de criar minha conta na PLAPLUSNOW (${conta}) e quero finalizar minha assinatura.`;
-    window.open(whatsappLink(mensagem), "_blank", "noopener,noreferrer");
-    navigate("/dashboard");
+    // pagamento acontece na plataforma: segue direto para o checkout Pix
+    navigate(temPedido ? destinoPagamento : "/dashboard");
   }
 
   const hex = accentHex[plano?.accent ?? "red"];
@@ -155,7 +157,7 @@ export default function SignupPage() {
           <span className="text-neon-red glow-red">garanta sua vaga</span>
         </>
       }
-      subtitle="Leva 30 segundos. Depois de cadastrar, você é levado ao WhatsApp para confirmar o pagamento e os acessos são liberados na sua área do cliente."
+      subtitle="Leva 30 segundos. Depois de cadastrar, você paga por Pix aqui mesmo e os acessos são liberados automaticamente na sua área do cliente."
     >
       {ref && indicacao?.valido && (
         <div className="mb-6 flex items-center gap-3 rounded-2xl border border-neon-purple/40 bg-neon-purple/[0.08] p-4">
@@ -270,7 +272,7 @@ export default function SignupPage() {
           />
         </AuthField>
 
-        <AuthField label="WhatsApp" hint="Usamos para confirmar o pagamento e enviar os acessos.">
+        <AuthField label="WhatsApp" hint="Usamos só para suporte e avisos importantes.">
           <input
             type="tel"
             value={telefone}
@@ -318,13 +320,13 @@ export default function SignupPage() {
           ) : (
             <>
               <MessageCircle className="size-4" />
-              Criar conta e finalizar
+              {temPedido ? "Criar conta e ir para o pagamento" : "Criar conta"}
             </>
           )}
         </NeonButton>
 
         <ul className="space-y-2">
-          {["Sem cartão agora — pagamento confirmado no WhatsApp", "Cancele quando quiser, sem multa"].map(
+          {["Pagamento por Pix na plataforma, com baixa automática", "Cancele quando quiser, sem multa"].map(
             (t) => (
               <li key={t} className="flex items-start gap-2 font-sans text-[11px] text-white/35">
                 <Check className="mt-0.5 size-3 shrink-0 text-neon-cyan" />

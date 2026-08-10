@@ -2,7 +2,7 @@ import { z } from "zod";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { adminOnly, authed } from "../middleware/auth";
 import { db } from "../database";
-import { notificacoes, usuarios } from "../database/schema";
+import { notificacoes as tabelaNotificacoes, usuarios } from "../database/schema";
 import {
   DIAS_AVISO_PREVIO,
   diasAteVencimento,
@@ -43,7 +43,7 @@ type NovoAlerta = {
 export async function notificar(alerta: NovoAlerta) {
   try {
     const [row] = await db
-      .insert(notificacoes)
+      .insert(tabelaNotificacoes)
       .values({
         escopo: alerta.escopo,
         clienteId: alerta.clienteId ?? null,
@@ -54,7 +54,7 @@ export async function notificar(alerta: NovoAlerta) {
         destino: alerta.destino ?? "",
         chave: alerta.chave,
       })
-      .onConflictDoNothing({ target: notificacoes.chave })
+      .onConflictDoNothing({ target: tabelaNotificacoes.chave })
       .returning();
     if (row && alerta.escopo === "admin") void dispararWebhook(row);
     return row ?? null;
@@ -68,7 +68,7 @@ export async function notificar(alerta: NovoAlerta) {
  * Configure `ALERTAS_WEBHOOK_URL` no .env para receber os alertas do admin
  * fora do painel. Falha de rede nunca quebra a operacao.
  */
-async function dispararWebhook(alerta: typeof notificacoes.$inferSelect) {
+async function dispararWebhook(alerta: typeof tabelaNotificacoes.$inferSelect) {
   const url = process.env.ALERTAS_WEBHOOK_URL;
   if (!url) return;
   try {
@@ -157,7 +157,7 @@ export async function varrerVencimentos(forcar = false) {
         severidade: "critico",
         titulo: `Pagamento em atraso há ${Math.abs(dias)} ${Math.abs(dias) === 1 ? "dia" : "dias"}`,
         mensagem:
-          "Os logins e o suporte ficam bloqueados até a regularização. Envie o comprovante para liberar na hora.",
+          "Os logins e o suporte ficam bloqueados até a regularização. Pague o Pix no painel e tudo volta na hora.",
         destino: "faturas",
         chave: `atraso:${cliente.id}:${hojeChave}`,
       });
@@ -193,7 +193,7 @@ export async function varrerVencimentos(forcar = false) {
 
 const LIMITE = 80;
 
-export const notificacoesRoutes = {
+export const notificacoes = {
   /** fila de alertas do admin (roda a varredura antes de responder) */
   listar: adminOnly
     .input(
@@ -205,35 +205,35 @@ export const notificacoesRoutes = {
       await varrerVencimentos();
 
       const filtro = input.apenasNaoLidas
-        ? and(eq(notificacoes.escopo, "admin"), eq(notificacoes.lida, false))
-        : eq(notificacoes.escopo, "admin");
+        ? and(eq(tabelaNotificacoes.escopo, "admin"), eq(tabelaNotificacoes.lida, false))
+        : eq(tabelaNotificacoes.escopo, "admin");
 
       const itens = await db
         .select({
-          id: notificacoes.id,
-          tipo: notificacoes.tipo,
-          severidade: notificacoes.severidade,
-          titulo: notificacoes.titulo,
-          mensagem: notificacoes.mensagem,
-          destino: notificacoes.destino,
-          lida: notificacoes.lida,
-          criadoEm: notificacoes.criadoEm,
-          clienteId: notificacoes.clienteId,
+          id: tabelaNotificacoes.id,
+          tipo: tabelaNotificacoes.tipo,
+          severidade: tabelaNotificacoes.severidade,
+          titulo: tabelaNotificacoes.titulo,
+          mensagem: tabelaNotificacoes.mensagem,
+          destino: tabelaNotificacoes.destino,
+          lida: tabelaNotificacoes.lida,
+          criadoEm: tabelaNotificacoes.criadoEm,
+          clienteId: tabelaNotificacoes.clienteId,
           clienteNome: usuarios.nome,
         })
-        .from(notificacoes)
-        .leftJoin(usuarios, eq(notificacoes.clienteId, usuarios.id))
+        .from(tabelaNotificacoes)
+        .leftJoin(usuarios, eq(tabelaNotificacoes.clienteId, usuarios.id))
         .where(filtro)
-        .orderBy(desc(notificacoes.criadoEm))
+        .orderBy(desc(tabelaNotificacoes.criadoEm))
         .limit(LIMITE);
 
       const [contagem] = await db
         .select({
-          naoLidas: sql<number>`coalesce(sum(case when ${notificacoes.lida} = 0 then 1 else 0 end), 0)`,
-          criticos: sql<number>`coalesce(sum(case when ${notificacoes.lida} = 0 and ${notificacoes.severidade} = 'critico' then 1 else 0 end), 0)`,
+          naoLidas: sql<number>`coalesce(sum(case when ${tabelaNotificacoes.lida} = 0 then 1 else 0 end), 0)`,
+          criticos: sql<number>`coalesce(sum(case when ${tabelaNotificacoes.lida} = 0 and ${tabelaNotificacoes.severidade} = 'critico' then 1 else 0 end), 0)`,
         })
-        .from(notificacoes)
-        .where(eq(notificacoes.escopo, "admin"));
+        .from(tabelaNotificacoes)
+        .where(eq(tabelaNotificacoes.escopo, "admin"));
 
       return { itens, naoLidas: contagem?.naoLidas ?? 0, criticos: contagem?.criticos ?? 0 };
     }),
@@ -259,9 +259,9 @@ export const notificacoesRoutes = {
 
     const itens = await db
       .select()
-      .from(notificacoes)
-      .where(and(eq(notificacoes.escopo, "cliente"), eq(notificacoes.clienteId, id)))
-      .orderBy(desc(notificacoes.criadoEm))
+      .from(tabelaNotificacoes)
+      .where(and(eq(tabelaNotificacoes.escopo, "cliente"), eq(tabelaNotificacoes.clienteId, id)))
+      .orderBy(desc(tabelaNotificacoes.criadoEm))
       .limit(30);
 
     return { itens, naoLidas: itens.filter((i) => !i.lida).length };
@@ -271,9 +271,9 @@ export const notificacoesRoutes = {
     .input(z.object({ ids: z.array(z.number().int()).min(1) }))
     .handler(async ({ input }) => {
       await db
-        .update(notificacoes)
+        .update(tabelaNotificacoes)
         .set({ lida: true })
-        .where(inArray(notificacoes.id, input.ids));
+        .where(inArray(tabelaNotificacoes.id, input.ids));
       return { ok: true };
     }),
 
@@ -288,9 +288,9 @@ export const notificacoesRoutes = {
           .where(eq(usuarios.authUserId, context.user.id));
         if (!registro?.admin) return { ok: false };
         await db
-          .update(notificacoes)
+          .update(tabelaNotificacoes)
           .set({ lida: true })
-          .where(eq(notificacoes.escopo, "admin"));
+          .where(eq(tabelaNotificacoes.escopo, "admin"));
         return { ok: true };
       }
 
@@ -307,9 +307,9 @@ export const notificacoesRoutes = {
       const alvo = cliente?.id ?? porEmail?.id ?? null;
       if (!alvo) return { ok: false };
       await db
-        .update(notificacoes)
+        .update(tabelaNotificacoes)
         .set({ lida: true })
-        .where(and(eq(notificacoes.escopo, "cliente"), eq(notificacoes.clienteId, alvo)));
+        .where(and(eq(tabelaNotificacoes.escopo, "cliente"), eq(tabelaNotificacoes.clienteId, alvo)));
       return { ok: true };
     }),
 

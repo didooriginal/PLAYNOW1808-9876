@@ -3,7 +3,7 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { ORPCError } from "@orpc/server";
 import { adminOnly, authed } from "../middleware/auth";
 import { db } from "../database";
-import { faturas, usuarios } from "../database/schema";
+import { faturas as tabelaFaturas, usuarios } from "../database/schema";
 import { recalcularProgresso } from "./recompensas";
 
 /**
@@ -78,9 +78,9 @@ export async function gerarFaturas(cliente: ClienteFatura, cupom = "", desconto 
   const inicio = parseData(cliente.clienteDesde);
   const existentes = await db
     .select()
-    .from(faturas)
-    .where(eq(faturas.clienteId, cliente.id))
-    .orderBy(desc(faturas.competencia));
+    .from(tabelaFaturas)
+    .where(eq(tabelaFaturas.clienteId, cliente.id))
+    .orderBy(desc(tabelaFaturas.competencia));
 
   if (!inicio || cliente.valor <= 0) return existentes;
 
@@ -88,7 +88,7 @@ export async function gerarFaturas(cliente: ClienteFatura, cupom = "", desconto 
   const hoje = new Date();
   const jaTem = new Set(existentes.map((f) => f.competencia));
 
-  type Nova = typeof faturas.$inferInsert;
+  type Nova = typeof tabelaFaturas.$inferInsert;
   const novas: Nova[] = [];
   const serie: { competencia: string; vencimento: string }[] = [];
 
@@ -135,14 +135,14 @@ export async function gerarFaturas(cliente: ClienteFatura, cupom = "", desconto 
     });
   });
 
-  if (novas.length) await db.insert(faturas).values(novas).onConflictDoNothing();
+  if (novas.length) await db.insert(tabelaFaturas).values(novas).onConflictDoNothing();
 
   let lista = novas.length
     ? await db
         .select()
-        .from(faturas)
-        .where(eq(faturas.clienteId, cliente.id))
-        .orderBy(desc(faturas.competencia))
+        .from(tabelaFaturas)
+        .where(eq(tabelaFaturas.clienteId, cliente.id))
+        .orderBy(desc(tabelaFaturas.competencia))
     : existentes;
 
   /* --- cupom da Jornada na fatura em aberto ----------------------- */
@@ -152,9 +152,9 @@ export async function gerarFaturas(cliente: ClienteFatura, cupom = "", desconto 
     const novoFinal = centavos(emAberto.valor * (1 - novoDesconto / 100));
     if (emAberto.cupom !== cupom || emAberto.desconto !== novoDesconto) {
       await db
-        .update(faturas)
+        .update(tabelaFaturas)
         .set({ cupom, desconto: novoDesconto, valorFinal: novoFinal })
-        .where(eq(faturas.id, emAberto.id));
+        .where(eq(tabelaFaturas.id, emAberto.id));
       lista = lista.map((f) =>
         f.id === emAberto.id
           ? { ...f, cupom, desconto: novoDesconto, valorFinal: novoFinal }
@@ -180,7 +180,7 @@ async function clienteDaSessao(authUserId: string, email: string) {
 /* ROTAS                                                               */
 /* ------------------------------------------------------------------ */
 
-export const faturasRoutes = {
+export const faturas = {
   /** Faturas do cliente logado, com o cupom da Jornada ja aplicado. */
   minhas: authed.handler(async ({ context }) => {
     const cliente = await clienteDaSessao(context.user.id, context.user.email);
@@ -205,7 +205,7 @@ export const faturasRoutes = {
     };
   }),
 
-  /** Visao do admin: todas as faturas, com nome do cliente. */
+  /** Visao do admin: todas as tabelaFaturas, com nome do cliente. */
   listar: adminOnly.handler(async () => {
     const clientes = await db.select().from(usuarios).where(eq(usuarios.admin, false));
 
@@ -214,7 +214,7 @@ export const faturasRoutes = {
       await gerarFaturas(c, progresso.cupomAtivo ?? "", progresso.cupomDesconto ?? 0);
     }
 
-    const todas = await db.select().from(faturas).orderBy(desc(faturas.competencia));
+    const todas = await db.select().from(tabelaFaturas).orderBy(desc(tabelaFaturas.competencia));
     const nomes = new Map(clientes.map((c) => [c.id, c.nome] as const));
     const telefones = new Map(clientes.map((c) => [c.id, c.telefone ?? ""] as const));
 
@@ -227,7 +227,7 @@ export const faturasRoutes = {
 
   /** KPIs de faturamento reais, calculados sobre a tabela `faturas`. */
   resumo: adminOnly.handler(async () => {
-    const todas = await db.select().from(faturas);
+    const todas = await db.select().from(tabelaFaturas);
     const hoje = new Date();
     const limite = new Date(hoje.getTime() + 7 * DIA_MS);
 
@@ -251,7 +251,7 @@ export const faturasRoutes = {
   }),
 
   /**
-   * Serie historica de receita, derivada das faturas. Devolve os ultimos N
+   * Serie historica de receita, derivada das tabelaFaturas. Devolve os ultimos N
    * meses de competencia com o valor efetivamente faturado (ja com desconto),
    * usada no grafico de MRR do painel admin.
    */
@@ -259,7 +259,7 @@ export const faturasRoutes = {
     .input(z.object({ meses: z.number().min(3).max(24).default(7) }).optional())
     .handler(async ({ input }) => {
       const meses = input?.meses ?? 7;
-      const todas = await db.select().from(faturas);
+      const todas = await db.select().from(tabelaFaturas);
       const clientes = await db
         .select({ id: usuarios.id, ciclo: usuarios.ciclo })
         .from(usuarios);
@@ -311,26 +311,26 @@ export const faturasRoutes = {
   registrarPagamento: adminOnly
     .input(z.object({ id: z.number(), pago: z.boolean().default(true) }))
     .handler(async ({ input }) => {
-      const [fatura] = await db.select().from(faturas).where(eq(faturas.id, input.id));
+      const [fatura] = await db.select().from(tabelaFaturas).where(eq(tabelaFaturas.id, input.id));
       if (!fatura) throw new ORPCError("NOT_FOUND", { message: "Fatura não encontrada" });
 
       const hojeIso = new Date().toISOString().slice(0, 10);
       const vencida = new Date(`${fatura.vencimento}T12:00:00`).getTime() < Date.now();
 
       await db
-        .update(faturas)
+        .update(tabelaFaturas)
         .set(
           input.pago
             ? { status: "pago", pagoEm: hojeIso }
             : { status: vencida ? "vencido" : "aberto", pagoEm: "" },
         )
-        .where(eq(faturas.id, input.id));
+        .where(eq(tabelaFaturas.id, input.id));
 
       // reflete no cadastro do cliente para os demais paineis
       const pendentes = await db
-        .select({ id: faturas.id })
-        .from(faturas)
-        .where(and(eq(faturas.clienteId, fatura.clienteId), inArray(faturas.status, ["vencido"])));
+        .select({ id: tabelaFaturas.id })
+        .from(tabelaFaturas)
+        .where(and(eq(tabelaFaturas.clienteId, fatura.clienteId), inArray(tabelaFaturas.status, ["vencido"])));
 
       await db
         .update(usuarios)

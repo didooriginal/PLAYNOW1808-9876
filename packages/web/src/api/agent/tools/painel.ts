@@ -265,7 +265,8 @@ export function ferramentasDoCliente(clienteId: number) {
             status: f.status,
             pagoEm: f.pagoEm || null,
           })),
-          comoPagar: "botão Pagar na aba Faturas — abre o WhatsApp do time PLAPLUSNOW",
+          comoPagar:
+            "botão Pagar com Pix na aba Faturas — gera o copia-e-cola na hora e a baixa é automática",
         };
       },
     }),

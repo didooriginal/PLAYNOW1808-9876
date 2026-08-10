@@ -13,6 +13,7 @@ import {
   LifeBuoy,
   Loader2,
   Trophy,
+  Gamepad2,
   Tv,
   LayoutGrid,
   MessageCircle,
@@ -22,7 +23,9 @@ import {
   TriangleAlert,
   Wallet,
 } from "lucide-react";
+import { Link } from "wouter";
 import { cn } from "@/lib/utils";
+import { EVENTO_ABA } from "@/lib/navegacao";
 import { AppIcon } from "../components/app-icon";
 import { RelatarProblema } from "../components/cliente/relatar-problema";
 import { ComoAcessarModal } from "../components/cliente/como-acessar";
@@ -53,6 +56,10 @@ import { ChecklistBoasVindas } from "../components/cliente/boas-vindas";
 import { ContadorVencimento } from "../components/cliente/contador";
 import { TelaBloqueio } from "../components/cliente/bloqueio";
 import { AvisosCliente } from "../components/cliente/avisos";
+import { SalaJogos } from "../components/cliente/sala-jogos";
+import { CarteiraAfiliado } from "../components/cliente/carteira";
+import { ContadorEconomia } from "../components/cliente/economia";
+import { PagarPix } from "../components/cliente/pagar-pix";
 
 /** dados vindos do banco (usuarios.painel) */
 type PainelCliente = NonNullable<ReturnType<typeof usePainelCliente>["data"]>;
@@ -355,7 +362,13 @@ function ActivePlanCard({
 
 /* ------------------------------------------------------------------ */
 
-function InvoicesView({ cliente }: { cliente: Cliente }) {
+function InvoicesView({
+  cliente,
+  onPagar,
+}: {
+  cliente: Cliente;
+  onPagar: (faturaId: number) => void;
+}) {
   // faturas reais, geradas no servidor a partir do historico do cliente.
   // O cupom da Jornada (3 renovacoes em dia = 15% OFF) ja vem aplicado na
   // fatura em aberto.
@@ -495,17 +508,9 @@ function InvoicesView({ cliente }: { cliente: Cliente }) {
                   pago em {dataBr(inv.pagoEm)}
                 </span>
               ) : (
-                <a
-                  href={whatsappLink(
-                    `Olá! Quero pagar a fatura ${inv.numero} de ${brl(inv.valorFinal)} da PLAPLUSNOW.`,
-                  )}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <NeonButton accent="red" size="sm">
-                    Pagar
-                  </NeonButton>
-                </a>
+                <NeonButton accent="red" size="sm" onClick={() => onPagar(inv.id)}>
+                  Pagar com Pix
+                </NeonButton>
               )}
             </div>
           ))}
@@ -541,17 +546,12 @@ function UpgradesView() {
             <p className="mt-2 flex-1 font-sans text-sm leading-relaxed text-white/50">
               {u.description}
             </p>
-            <a
-              href={whatsappLink(`Olá! Quero contratar: ${u.title} (${u.price}).`)}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-5"
-            >
+            <Link to={u.destino} className="mt-5 block">
               <NeonButton accent={u.accent} variant="outline" size="sm" className="w-full">
                 Quero este upgrade
                 <ArrowUpRight className="size-4" />
               </NeonButton>
-            </a>
+            </Link>
           </GlassCard>
         ))}
       </div>
@@ -584,6 +584,7 @@ function UpgradesView() {
 
 export default function DashboardPage() {
   const [active, setActive] = useState("acessos");
+  const [faturaPix, setFaturaPix] = useState<number | null>(null);
   const { data, isPending, isError, error } = usePainelCliente();
   const chamados = useMeusChamados();
   const netflix = useMinhaTelaNetflix();
@@ -596,6 +597,18 @@ export default function DashboardPage() {
     }
     window.addEventListener("ppn:ir-netflix", ir);
     return () => window.removeEventListener("ppn:ir-netflix", ir);
+  }, []);
+
+  // componentes filhos pedem para abrir uma aba (ex.: "pagar" -> faturas)
+  useEffect(() => {
+    function trocar(evento: Event) {
+      const aba = (evento as CustomEvent<string>).detail;
+      if (!aba) return;
+      setActive(aba);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+    window.addEventListener(EVENTO_ABA, trocar);
+    return () => window.removeEventListener(EVENTO_ABA, trocar);
   }, []);
 
   const nav: NavItem[] = useMemo(
@@ -613,6 +626,8 @@ export default function DashboardPage() {
         badge: netflix.data?.pendente ? "1" : undefined,
       },
       { id: "jornada", label: "Jornada / Recompensas", icon: Trophy },
+      { id: "jogos", label: "Sala de Jogos", icon: Gamepad2 },
+      { id: "carteira", label: "Indique e Ganhe", icon: Wallet },
       { id: "novidades", label: "Novidades/Upgrades", icon: Sparkles, badge: String(upgrades.length) },
       { id: "faturas", label: "Faturas", icon: Receipt },
       {
@@ -701,6 +716,8 @@ export default function DashboardPage() {
               {active === "acessos" && "Meus Acessos"}
               {active === "netflix" && "Desbloquear Tela Netflix"}
               {active === "jornada" && "Jornada do Cliente"}
+              {active === "jogos" && "Sala de Jogos"}
+              {active === "carteira" && "Indique e Ganhe"}
               {active === "novidades" && "Novidades e Upgrades"}
               {active === "faturas" && "Minhas Faturas"}
               {active === "suporte" && "Suporte"}
@@ -712,6 +729,10 @@ export default function DashboardPage() {
                 "Tela bloqueada na TV? Escolha o cenário que você está vendo e resolva em menos de 1 minuto."}
               {active === "jornada" &&
                 "Suba de nível, cumpra missões e desbloqueie prêmios indicando amigos."}
+              {active === "jogos" &&
+                "Acesso liberado na hora pelo painel, sem passar pelo suporte."}
+              {active === "carteira" &&
+                "Seu link, sua rede e o que fazer com a comissão: sacar em Pix ou virar desconto na mensalidade."}
               {active === "novidades" && "Novos apps, telas extras e formas de pagar menos."}
               {active === "faturas" && "Acompanhe pagamentos, vencimentos e recibos."}
               {active === "suporte" && "Relate um problema e acompanhe o andamento do chamado."}
@@ -723,6 +744,12 @@ export default function DashboardPage() {
           {active === "acessos" && (
             <>
               <ContadorVencimento situacao={situacao} />
+              <ContadorEconomia
+                apps={acessos.map((a) => a.servico)}
+                valorPago={cliente.valor}
+                ciclo={cliente.ciclo}
+                clienteDesde={cliente.clienteDesde}
+              />
               <ActivePlanCard cliente={cliente} pacote={pacote} apps={acessos.length} />
               <CodigoRecente />
               {acessos.length > 0 ? (
@@ -748,7 +775,22 @@ export default function DashboardPage() {
 
           {active === "jornada" && <JornadaCliente />}
           {active === "novidades" && <UpgradesView />}
-          {active === "faturas" && <InvoicesView cliente={cliente} />}
+          {active === "jogos" && <SalaJogos />}
+          {active === "carteira" && <CarteiraAfiliado />}
+          {active === "faturas" && (
+            <>
+              <PagarPix key={faturaPix ?? "aberta"} faturaId={faturaPix ?? undefined} />
+              <InvoicesView
+                cliente={cliente}
+                onPagar={(faturaId) => {
+                  setFaturaPix(faturaId);
+                  document
+                    .getElementById("pagar-pix")
+                    ?.scrollIntoView({ behavior: "smooth", block: "center" });
+                }}
+              />
+            </>
+          )}
           {active === "suporte" && <SuporteClienteView />}
         </div>
       </PanelShell>

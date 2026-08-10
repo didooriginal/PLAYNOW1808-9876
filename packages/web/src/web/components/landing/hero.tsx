@@ -3,7 +3,7 @@ import { AppIcon } from "../app-icon";
 import { Logo } from "../logo";
 import { GlassCard, NeonButton, Pill } from "../ui/kit";
 import { brl, retailOf, savingsPct, services, socialStats } from "@/lib/mock-data";
-import { usePlanoDestaque } from "../../queries/planos";
+import { usePlanoDestaque } from "../../lib/planos";
 
 function IconMarquee() {
   const row = [...services, ...services];
@@ -44,10 +44,10 @@ export function Hero() {
                 Ativação em até 10 min
               </Pill>
               <Pill accent="cyan" icon={<ShieldCheck className="size-3" />}>
-                Garantia de 7 dias
+                1.540 assinaturas ativas
               </Pill>
               <Pill accent="purple" icon={<Star className="size-3" />}>
-                4.9/5 · 2.318 avaliações
+                4,9/5 na avaliação dos clientes
               </Pill>
             </div>
 

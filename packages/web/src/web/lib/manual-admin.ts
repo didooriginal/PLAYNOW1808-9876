@@ -590,7 +590,7 @@ export const MANUAL: SecaoManual[] = [
           },
           {
             termo: "Bloqueio por inadimplência",
-            desc: "Cliente atrasado ou suspenso perde tudo na hora: logins e senhas somem, códigos e desbloqueio de TV param de responder, o suporte humano é pausado e só resta a tela de pagamento com Pix e WhatsApp.",
+            desc: "Cliente atrasado ou suspenso perde tudo na hora: logins e senhas somem, códigos e desbloqueio de TV param de responder, o suporte humano é pausado e só resta a tela de pagamento com Pix, que dá baixa automática e libera tudo sozinho.",
           },
           {
             termo: "Trava de vencimento",

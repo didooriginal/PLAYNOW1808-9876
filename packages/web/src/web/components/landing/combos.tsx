@@ -1,7 +1,8 @@
 import { Sparkles, Zap } from "lucide-react";
 import { AppIcon } from "../app-icon";
 import { GlassCard, NeonButton, Pill, SectionTitle, accentHex } from "../ui/kit";
-import { brl, serviceById, whatsappLink } from "@/lib/mock-data";
+import { Link } from "wouter";
+import { brl, serviceById } from "@/lib/mock-data";
 import { useVitrineCombos } from "../../queries/combos";
 import { useAplicativos } from "../../queries/aplicativos";
 
@@ -105,16 +106,7 @@ export function Combos() {
                 ))}
               </div>
 
-              <a
-                href={whatsappLink(
-                  `Olá! Quero o combo ${combo.nome} por ${brl(combo.preco)}/${
-                    combo.ciclo === "anual" ? "ano" : "mês"
-                  }.`,
-                )}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-6"
-              >
+              <Link to={`/checkout?combo=${combo.id}`} className="mt-6 block">
                 <NeonButton
                   accent={combo.destaque ? "cyan" : "purple"}
                   variant={combo.destaque ? "solid" : "outline"}
@@ -123,7 +115,7 @@ export function Combos() {
                   <Zap className="size-4" />
                   Assinar combo
                 </NeonButton>
-              </a>
+              </Link>
             </GlassCard>
           ))}
         </div>

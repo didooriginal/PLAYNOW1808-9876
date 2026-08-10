@@ -208,18 +208,18 @@ export function Builder() {
         )}
       </div>
 
-      {/* cadastro primeiro: /signup registra a conta e depois abre o WhatsApp */}
+      {/* checkout na plataforma: o servidor refaz a conta e gera o Pix */}
       <Link
-        to={`/signup?combo=${selected.join(",")}&preco=${total.toFixed(2)}`}
+        to={`/checkout?apps=${selected.join(",")}`}
         className="mt-4 block"
       >
         <NeonButton accent="red" size="lg" className="w-full" disabled={selected.length === 0}>
           <UserPlus className="size-4" />
-          Criar conta e finalizar
+          Assinar e pagar por Pix
         </NeonButton>
       </Link>
       <p className="mt-2.5 text-center font-sans text-[10px] leading-relaxed text-white/25">
-        Sem cartão agora. Um atendente confirma os acessos antes do pagamento.
+        Pagamento por Pix na plataforma. Os acessos entram no painel assim que o pagamento cai.
       </p>
     </>
   );

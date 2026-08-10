@@ -4,6 +4,10 @@ import {
   AlertTriangle,
   BarChart3,
   Boxes,
+  Gamepad2,
+  HeartPulse,
+  HeartHandshake,
+  Wallet,
   CircleDollarSign,
   Copy,
   Database,
@@ -39,6 +43,13 @@ import { ManualView } from "../components/admin/manual-view";
 import { NetflixTvView } from "../components/admin/netflix-tv-view";
 import { CopilotoAdmin } from "../components/admin/copiloto";
 import { AlertasView } from "../components/admin/alertas-view";
+import { GestaoContasView } from "../components/admin/gestao-contas-view";
+import { JogosView } from "../components/admin/jogos-view";
+import { SaudeView } from "../components/admin/saude-view";
+import { RecuperacaoView } from "../components/admin/recuperacao-view";
+import { SenhasView } from "../components/admin/senhas-view";
+import { ComissoesView } from "../components/admin/comissoes-view";
+import { PixView } from "../components/admin/pix-view";
 import { PanelShell, type NavItem } from "../components/panel-shell";
 import {
   GlassCard,
@@ -1475,6 +1486,10 @@ export default function AdminPage() {
       badge: aplicativos.data ? String(aplicativos.data.length) : undefined,
     },
     { id: "clientes", label: "Clientes", icon: Users },
+    { id: "gestaocontas", label: "Gestão de Contas", icon: Wallet },
+    { id: "saude", label: "Saúde & Estoque", icon: HeartPulse },
+    { id: "jogos", label: "Sala de Jogos", icon: Gamepad2 },
+    { id: "winback", label: "Recuperação", icon: HeartHandshake },
     {
       id: "afiliados",
       label: "Afiliados/Gamificação",
@@ -1506,6 +1521,7 @@ export default function AdminPage() {
       icon: BellRing,
       badge: alertas.data?.naoLidas ? String(alertas.data.naoLidas) : undefined,
     },
+    { id: "senhas", label: "Senhas & Acesso", icon: KeyRound },
     { id: "manual", label: "Manual do Admin", icon: BookOpen },
   ];
 
@@ -1525,6 +1541,22 @@ export default function AdminPage() {
       sub: "Problemas relatados pelos clientes — resolva e responda direto daqui.",
     },
     clientes: { title: "Clientes", sub: "Base completa de assinantes e seus pacotes." },
+    gestaocontas: {
+      title: "Gestão de Contas",
+      sub: "Saldo de gift card de cada matriz, custo mensal, alerta de saldo crítico e os parâmetros do negócio.",
+    },
+    saude: {
+      title: "Saúde & Estoque",
+      sub: "Contas que estão falhando, entrada pausada automaticamente, remanejamento para reserva e alerta de estoque no limite.",
+    },
+    jogos: {
+      title: "Sala de Jogos",
+      sub: "Pool de contas do adicional. A liberação para o cliente é automática — você só mantém o pool abastecido.",
+    },
+    winback: {
+      title: "Recuperação de Clientes",
+      sub: "Régua automática de win-back: quem saiu há mais de 15 dias entra na fila com cupom pronto.",
+    },
     afiliados: {
       title: "Afiliados / Gamificação",
       sub: "Quem indicou quem, XP acumulado, níveis e prêmios liberados — tudo calculado automaticamente.",
@@ -1541,6 +1573,10 @@ export default function AdminPage() {
     alertas: {
       title: "Central de Alertas",
       sub: "Fila automática de tudo que exige ação: códigos pedidos, desbloqueio de TV, vencimentos próximos e clientes atrasados.",
+    },
+    senhas: {
+      title: "Senhas & Acesso",
+      sub: "Pedidos de 'esqueci minha senha'. O cliente recebe o link por e-mail automaticamente — aqui você acompanha e gera link manual quando precisar.",
     },
     manual: {
       title: "Manual do Admin",
@@ -1595,12 +1631,27 @@ export default function AdminPage() {
             </>
           )}
           {active === "aplicativos" && <AppsView />}
-          {active === "afiliados" && <AfiliadosView />}
+          {active === "afiliados" && (
+            <>
+              <AfiliadosView />
+              <ComissoesView />
+            </>
+          )}
+          {active === "gestaocontas" && <GestaoContasView />}
+          {active === "saude" && <SaudeView />}
+          {active === "jogos" && <JogosView />}
+          {active === "winback" && <RecuperacaoView />}
           {active === "suporte" && <SuporteView />}
-          {active === "faturas" && <InvoicesAdminView />}
+          {active === "faturas" && (
+            <>
+              <InvoicesAdminView />
+              <PixView />
+            </>
+          )}
           {active === "codigos" && <CodigosView />}
           {active === "netflixtv" && <NetflixTvView />}
           {active === "alertas" && <AlertasView onIr={setActive} />}
+          {active === "senhas" && <SenhasView />}
           {active === "manual" && <ManualView />}
         </div>
       </PanelShell>

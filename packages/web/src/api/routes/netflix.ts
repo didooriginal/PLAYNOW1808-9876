@@ -83,7 +83,7 @@ function mascarar(email: string) {
   return `${visivel}${"*".repeat(Math.max(2, usuario.length - visivel.length - fim.length))}${fim}@${dominio}`;
 }
 
-export const netflixRoutes = {
+export const netflix = {
   /**
    * Tudo que a secao "Desbloquear Tela Netflix" precisa em uma chamada:
    * se o cliente tem Netflix, o codigo de e-mail mais recente (Opcao A) e o

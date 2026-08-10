@@ -1,26 +1,34 @@
 import type { RouterClient } from "@orpc/server";
 import { createApp } from "./__core/app";
 import { ping } from "./routes/ping";
-import { pacotesRoutes } from "./routes/pacotes";
-import { contasRoutes } from "./routes/contas";
-import { usuariosRoutes } from "./routes/usuarios";
+import { pacotes } from "./routes/pacotes";
+import { contas } from "./routes/contas";
+import { usuarios } from "./routes/usuarios";
 import { seed } from "./routes/seed";
-import { aplicativosRoutes } from "./routes/aplicativos";
-import { alocacoesRoutes } from "./routes/alocacoes";
-import { suporteRoutes } from "./routes/suporte";
-import { recompensasRoutes } from "./routes/recompensas";
-import { faturasRoutes } from "./routes/faturas";
-import { combosRoutes } from "./routes/combos";
-import { codigosRoutes, registrarEmail } from "./routes/codigos";
-import { netflixRoutes } from "./routes/netflix";
-import { notificacoesRoutes } from "./routes/notificacoes";
+import { aplicativos } from "./routes/aplicativos";
+import { alocacoes } from "./routes/alocacoes";
+import { suporte } from "./routes/suporte";
+import { recompensas } from "./routes/recompensas";
+import { faturas } from "./routes/faturas";
+import { combos } from "./routes/combos";
+import { codigos, registrarEmail } from "./routes/codigos";
+import { netflix } from "./routes/netflix";
+import { notificacoes } from "./routes/notificacoes";
+import { afiliados } from "./routes/afiliados";
+import { giftcards } from "./routes/giftcards";
+import { jogos } from "./routes/jogos";
+import { saude } from "./routes/saude";
+import { winback } from "./routes/winback";
+import { pix, confirmarPagamento } from "./routes/pix";
+import { checkout } from "./routes/checkout";
+import { senha } from "./routes/senha";
 import { auth } from "./auth";
 import { criarAssistente } from "./agent";
 import { criarCopiloto } from "./agent/admin";
 import { createAgentUIStreamResponse } from "ai";
 import { eq } from "drizzle-orm";
 import { db } from "./database";
-import { usuarios } from "./database/schema";
+import { usuarios as tabelaUsuarios } from "./database/schema";
 
 // API features are oRPC procedures, one file per feature in ./routes/,
 // composed into this router — typed end-to-end via the clients
@@ -28,18 +36,26 @@ import { usuarios } from "./database/schema";
 // Patterns and examples: skills/app/references/api.md
 export const router = {
   ping,
-  pacotes: pacotesRoutes,
-  contas: contasRoutes,
-  usuarios: usuariosRoutes,
-  aplicativos: aplicativosRoutes,
-  alocacoes: alocacoesRoutes,
-  suporte: suporteRoutes,
-  recompensas: recompensasRoutes,
-  faturas: faturasRoutes,
-  combos: combosRoutes,
-  codigos: codigosRoutes,
-  netflix: netflixRoutes,
-  notificacoes: notificacoesRoutes,
+  pacotes,
+  contas,
+  usuarios,
+  aplicativos,
+  alocacoes,
+  suporte,
+  recompensas,
+  faturas,
+  combos,
+  codigos,
+  netflix,
+  notificacoes,
+  afiliados,
+  giftcards,
+  jogos,
+  saude,
+  winback,
+  pix,
+  checkout,
+  senha,
   seed,
 };
 
@@ -109,15 +125,15 @@ app.post("/api/agent/messages", async (c) => {
 
   const [porVinculo] = await db
     .select()
-    .from(usuarios)
-    .where(eq(usuarios.authUserId, session.user.id));
+    .from(tabelaUsuarios)
+    .where(eq(tabelaUsuarios.authUserId, session.user.id));
   const cliente =
     porVinculo ??
     (
       await db
         .select()
-        .from(usuarios)
-        .where(eq(usuarios.email, session.user.email.toLowerCase()))
+        .from(tabelaUsuarios)
+        .where(eq(tabelaUsuarios.email, session.user.email.toLowerCase()))
     )[0];
 
   if (!cliente) return c.json({ erro: "cliente não encontrado" }, 404);
@@ -147,15 +163,15 @@ app.post("/api/agent/admin-messages", async (c) => {
 
   const [porVinculo] = await db
     .select()
-    .from(usuarios)
-    .where(eq(usuarios.authUserId, session.user.id));
+    .from(tabelaUsuarios)
+    .where(eq(tabelaUsuarios.authUserId, session.user.id));
   const eu =
     porVinculo ??
     (
       await db
         .select()
-        .from(usuarios)
-        .where(eq(usuarios.email, session.user.email.toLowerCase()))
+        .from(tabelaUsuarios)
+        .where(eq(tabelaUsuarios.email, session.user.email.toLowerCase()))
     )[0];
 
   if (!eu) return c.json({ erro: "usuário não encontrado" }, 404);
@@ -173,6 +189,39 @@ app.post("/api/agent/admin-messages", async (c) => {
     agent,
     uiMessages: messages as Parameters<typeof createAgentUIStreamResponse>[0]["uiMessages"],
   });
+});
+
+/**
+ * WEBHOOK DO GATEWAY PIX — baixa automática.
+ * Aceita os formatos mais comuns ({ txid }, { pix: [{ txid }] }, { data: { id } }).
+ * Protegido por `PIX_WEBHOOK_TOKEN` quando a variável existir no .env.
+ */
+app.post("/api/webhooks/pix", async (c) => {
+  const esperado = process.env.PIX_WEBHOOK_TOKEN;
+  if (esperado && c.req.header("x-webhook-token") !== esperado) {
+    return c.json({ ok: false, erro: "token inválido" }, 401);
+  }
+
+  let payload: Record<string, unknown> = {};
+  try {
+    payload = (await c.req.json()) as Record<string, unknown>;
+  } catch {
+    return c.json({ ok: false, erro: "corpo inválido" }, 400);
+  }
+
+  const lista = Array.isArray(payload.pix) ? (payload.pix as Record<string, unknown>[]) : [];
+  const dados = (payload.data ?? {}) as Record<string, unknown>;
+  const txid =
+    (typeof payload.txid === "string" && payload.txid) ||
+    (typeof lista[0]?.txid === "string" && (lista[0].txid as string)) ||
+    (typeof dados.txid === "string" && dados.txid) ||
+    (typeof dados.id === "string" && dados.id) ||
+    "";
+
+  if (!txid) return c.json({ ok: false, erro: "txid ausente" }, 400);
+
+  const resultado = await confirmarPagamento(txid, "webhook");
+  return resultado.ok ? c.json({ ok: true }, 200) : c.json(resultado, 404);
 });
 
 export default app;

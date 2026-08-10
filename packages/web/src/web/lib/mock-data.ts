@@ -47,20 +47,20 @@ export type Service = {
 };
 
 export const services: Service[] = [
-  { id: "netflix", name: "Netflix", mono: "N", color: "#e50914", retail: 20, price: 20, category: "Streaming" },
-  { id: "disney", name: "Disney+", mono: "D+", color: "#4f8ef7", retail: 18.9, price: 18.9, category: "Streaming" },
-  { id: "prime", name: "Amazon Prime Video", mono: "PV", color: "#00a8e1", retail: 15, price: 15, category: "Streaming" },
-  { id: "hbomax", name: "HBO Max", mono: "MAX", color: "#8b5cf6", retail: 15, price: 15, category: "Streaming" },
-  { id: "paramount", name: "Paramount+", mono: "P+", color: "#0064ff", retail: 15, price: 15, category: "Streaming" },
-  { id: "appletv", name: "Apple TV+", mono: "TV+", color: "#d4d4d8", retail: 15, price: 15, category: "Streaming" },
-  { id: "spotify", name: "Spotify", mono: "S", color: "#1db954", retail: 15, price: 15, category: "Música" },
-  { id: "youtube", name: "YouTube Premium", mono: "YT", color: "#ff0033", retail: 15, price: 15, category: "Streaming" },
-  { id: "crunchyroll", name: "Crunchyroll", mono: "CR", color: "#f47521", retail: 15, price: 15, category: "Asiático" },
-  { id: "globoplay", name: "Globoplay", mono: "G", color: "#ff5722", retail: 20, price: 20, category: "Streaming" },
-  { id: "star", name: "Star+", mono: "★+", color: "#e0b04a", retail: 15, price: 15, category: "Streaming" },
-  { id: "deezer", name: "Deezer", mono: "DZ", color: "#a238ff", retail: 15, price: 15, category: "Música" },
-  { id: "canva", name: "Canva Pro", mono: "C", color: "#00c4cc", retail: 15, price: 15, category: "Produtividade" },
-  { id: "iptv", name: "IPTV + Canais ao vivo", mono: "IP", color: "#22d3ee", retail: 35, price: 35, category: "IPTV" },
+  { id: "netflix", name: "Netflix", mono: "N", color: "#e50914", retail: 59.9, price: 59.9, category: "Streaming" },
+  { id: "disney", name: "Disney+", mono: "D+", color: "#4f8ef7", retail: 43.9, price: 43.9, category: "Streaming" },
+  { id: "prime", name: "Amazon Prime Video", mono: "PV", color: "#00a8e1", retail: 20, price: 20, category: "Streaming" },
+  { id: "hbomax", name: "HBO Max", mono: "MAX", color: "#8b5cf6", retail: 55.9, price: 55.9, category: "Streaming" },
+  { id: "paramount", name: "Paramount+", mono: "P+", color: "#0064ff", retail: 19.9, price: 19.9, category: "Streaming" },
+  { id: "appletv", name: "Apple TV+", mono: "TV+", color: "#d4d4d8", retail: 21.9, price: 21.9, category: "Streaming" },
+  { id: "spotify", name: "Spotify", mono: "S", color: "#1db954", retail: 21.9, price: 21.9, category: "Música" },
+  { id: "youtube", name: "YouTube Premium", mono: "YT", color: "#ff0033", retail: 25.9, price: 25.9, category: "Streaming" },
+  { id: "crunchyroll", name: "Crunchyroll", mono: "CR", color: "#f47521", retail: 24.9, price: 24.9, category: "Asiático" },
+  { id: "globoplay", name: "Globoplay", mono: "G", color: "#ff5722", retail: 24.9, price: 24.9, category: "Streaming" },
+  { id: "star", name: "Star+", mono: "★+", color: "#e0b04a", retail: 27.9, price: 27.9, category: "Streaming" },
+  { id: "deezer", name: "Deezer", mono: "DZ", color: "#a238ff", retail: 20.9, price: 20.9, category: "Música" },
+  { id: "canva", name: "Canva Pro", mono: "C", color: "#00c4cc", retail: 34.9, price: 34.9, category: "Produtividade" },
+  { id: "iptv", name: "IPTV + Canais ao vivo", mono: "IP", color: "#22d3ee", retail: 45, price: 45, category: "IPTV" },
 ];
 
 /**
@@ -183,7 +183,6 @@ export const plans: Plan[] = [
       "Netflix em 4K",
       "Suporte prioritário 24/7",
       "Reposição automática de conta",
-      "Garantia de 7 dias",
     ],
     slotsLeft: 5,
   },
@@ -229,59 +228,51 @@ export type Testimonial = {
 
 export const testimonials: Testimonial[] = [
   {
-    name: "Camila Ribeiro",
-    handle: "@camila.rib",
-    city: "Rio de Janeiro · RJ",
-    text: "Pagava quase R$ 210 por mês em assinaturas. Migrei pro combo de 7 apps e caiu pra R$ 59,90. Ainda não acredito.",
+    name: "Lucas M.",
+    handle: "@lucas.m",
+    city: "Cliente PLAYPLUSNOW",
+    text: "Antes eu gastava mais de 250 reais por mês com várias assinaturas separadas. Agora com o combo pago super pouco e tenho acesso a tudo em um só lugar!",
     stars: 5,
-    since: "cliente há 1 ano",
+    since: "assinante ativo",
   },
   {
-    name: "Lucas Ferraz",
-    handle: "@lucasferraz",
-    city: "Belo Horizonte · MG",
-    text: "Suporte responde em minutos no WhatsApp. Deu problema na conta do Max num sábado à noite e resolveram na hora.",
+    name: "Juliana S.",
+    handle: "@juliana.s",
+    city: "Cliente PLAYPLUSNOW",
+    text: "O suporte e a liberação foram super rápidos. A qualidade do streaming é impecável e a economia no final do mês faz toda a diferença.",
     stars: 5,
-    since: "cliente há 8 meses",
+    since: "assinante ativo",
   },
   {
-    name: "Juliana Prado",
-    handle: "@ju.prado",
-    city: "Curitiba · PR",
-    text: "Montei meu combo do jeito que eu quis: Netflix, Crunchyroll e Spotify. Painel mostra login e senha na hora.",
+    name: "Felipe R.",
+    handle: "@felipe.r",
+    city: "Cliente PLAYPLUSNOW",
+    text: "Melhor plataforma de entretenimento que já usei. Além de economizar muito, o painel é super fácil de mexer e nunca cai.",
     stars: 5,
-    since: "cliente há 5 meses",
+    since: "assinante ativo",
   },
   {
-    name: "Rafael Monteiro",
-    handle: "@rafa.monteiro",
-    city: "Recife · PE",
-    text: "Já tô no segundo ano. Nunca perdi acesso, e quando a matriz cai eles repõem antes de eu reclamar.",
+    name: "Beatriz L.",
+    handle: "@beatriz.l",
+    city: "Cliente PLAYPLUSNOW",
+    text: "Eu era cismada com essas plataformas compartilhadas, mas o serviço é de alta qualidade e o atendimento é nota 10. Recomendo demais!",
     stars: 5,
-    since: "cliente há 2 anos",
+    since: "assinante ativo",
   },
   {
-    name: "Beatriz Aguiar",
-    handle: "@bia.aguiar",
-    city: "São Paulo · SP",
-    text: "O plano anual saiu com 2 meses grátis. Melhor custo-benefício que achei em qualquer lugar.",
+    name: "Ricardo P.",
+    handle: "@ricardo.p",
+    city: "Cliente PLAYPLUSNOW",
+    text: "Economizo mais de 60% todos os meses comparado ao que eu gastava antes. Vale cada centavo, parabéns pela estrutura!",
     stars: 5,
-    since: "cliente há 11 meses",
-  },
-  {
-    name: "Diego Nunes",
-    handle: "@dieguinho.n",
-    city: "Porto Alegre · RS",
-    text: "Instalei o IPTV na TV da sala em 10 minutos com o tutorial deles. Canal de futebol sem travar.",
-    stars: 5,
-    since: "cliente há 4 meses",
+    since: "assinante ativo",
   },
 ];
 
 export const socialStats = [
-  { value: "12.4k", label: "assinaturas ativas" },
-  { value: "4.9/5", label: "nota média (2.318 avaliações)" },
-  { value: "R$ 1,8M", label: "economizados pelos clientes" },
+  { value: "1.540", label: "assinaturas ativas" },
+  { value: "R$ 192", label: "economia média por mês" },
+  { value: "76%", label: "mais barato que assinar separado" },
   { value: "< 3 min", label: "tempo médio de suporte" },
 ];
 
@@ -296,6 +287,8 @@ export type Upgrade = {
   price: string;
   tag: string;
   accent: Accent;
+  /** para onde o botão leva — checkout por Pix ou seção da landing */
+  destino: string;
 };
 
 export const upgrades: Upgrade[] = [
@@ -305,6 +298,7 @@ export const upgrades: Upgrade[] = [
     price: "+ R$ 19,90/mês",
     tag: "Novo",
     accent: "cyan",
+    destino: "/checkout?apps=iptv",
   },
   {
     title: "Subir para o 15 em 1",
@@ -312,6 +306,7 @@ export const upgrades: Upgrade[] = [
     price: "+ R$ 40,00/mês",
     tag: "Upgrade",
     accent: "red",
+    destino: "/#pacotes",
   },
   {
     title: "Trocar para o plano anual",
@@ -319,6 +314,7 @@ export const upgrades: Upgrade[] = [
     price: "R$ 47,90/mês",
     tag: "Economize R$ 144",
     accent: "purple",
+    destino: "/#pacotes",
   },
   {
     title: "Segunda tela na Netflix",
@@ -326,6 +322,7 @@ export const upgrades: Upgrade[] = [
     price: "+ R$ 12,90/mês",
     tag: "Popular",
     accent: "cyan",
+    destino: "/checkout?apps=netflix",
   },
 ];
 

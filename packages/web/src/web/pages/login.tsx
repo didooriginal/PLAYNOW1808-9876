@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link, useLocation } from "wouter";
+import { useMemo, useState } from "react";
+import { Link, useLocation, useSearch } from "wouter";
 import { Eye, EyeOff, LogIn, TriangleAlert } from "lucide-react";
 import { AuthField, AuthShell, inputClass } from "../components/auth-shell";
 import { NeonButton } from "../components/ui/kit";
@@ -22,6 +22,16 @@ function traduzErro(code?: string, message?: string) {
 
 export default function LoginPage() {
   const [, navigate] = useLocation();
+  const search = useSearch();
+  const params = useMemo(() => new URLSearchParams(search), [search]);
+  /** veio do checkout: volta para o pagamento em vez do painel */
+  const voltarParaCheckout = useMemo(() => {
+    if (params.get("next") !== "checkout") return null;
+    const p = new URLSearchParams(params);
+    p.delete("next");
+    const query = p.toString();
+    return query ? `/checkout?${query}` : "/checkout";
+  }, [params]);
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [verSenha, setVerSenha] = useState(false);
@@ -43,7 +53,7 @@ export default function LoginPage() {
     }
 
     // administrador cai direto no painel de gestão; cliente na área de acessos
-    let destino = "/dashboard";
+    let destino = voltarParaCheckout ?? "/dashboard";
     try {
       const eu = await client.usuarios.eu();
       if (eu.admin) destino = "/admin";
@@ -64,7 +74,7 @@ export default function LoginPage() {
           <span className="text-neon-cyan glow-cyan">sempre à mão</span>
         </>
       }
-      subtitle="Entre para ver as credenciais de cada streaming do seu pacote, a próxima cobrança e o suporte direto no WhatsApp."
+      subtitle="Entre para ver as credenciais de cada streaming do seu pacote, pagar por Pix na hora e acompanhar a próxima cobrança."
     >
       <form onSubmit={entrar} className="space-y-5">
         <AuthField label="E-mail">
@@ -100,6 +110,16 @@ export default function LoginPage() {
             </button>
           </div>
         </AuthField>
+
+        <div className="-mt-2 text-right">
+          <Link
+            to="/esqueci-senha"
+            className="font-sans text-xs font-semibold text-neon-cyan/80 transition-colors hover:text-neon-cyan hover:underline"
+            data-testid="link-esqueci-senha"
+          >
+            Esqueci minha senha
+          </Link>
+        </div>
 
         {erro && (
           <div className="flex items-start gap-2.5 rounded-xl border border-neon-red/35 bg-neon-red/10 px-4 py-3">

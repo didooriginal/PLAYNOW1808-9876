@@ -4,7 +4,7 @@ import { ORPCError } from "@orpc/server";
 import { base } from "../__core/app";
 import { adminOnly } from "../middleware/auth";
 import { db } from "../database";
-import { aplicativos, combos } from "../database/schema";
+import { aplicativos, combos as tabelaCombos } from "../database/schema";
 
 /**
  * COMBO INTELIGENTE.
@@ -49,14 +49,14 @@ const comCalculo = <T extends { preco: number; precoCheio: number }>(row: T) => 
     row.precoCheio > 0 ? Math.round((1 - row.preco / row.precoCheio) * 100) : 0,
 });
 
-export const combosRoutes = {
+export const combos = {
   /** vitrine pública da landing — só combos ativos e marcados para a landing */
   vitrine: base.handler(async () => {
     const rows = await db
       .select()
-      .from(combos)
-      .where(and(eq(combos.ativo, true), eq(combos.visivelLanding, true)))
-      .orderBy(asc(combos.preco));
+      .from(tabelaCombos)
+      .where(and(eq(tabelaCombos.ativo, true), eq(tabelaCombos.visivelLanding, true)))
+      .orderBy(asc(tabelaCombos.preco));
     return rows.map(comCalculo);
   }),
 
@@ -64,21 +64,21 @@ export const combosRoutes = {
   paraCliente: base.handler(async () => {
     const rows = await db
       .select()
-      .from(combos)
-      .where(and(eq(combos.ativo, true), eq(combos.visivelCliente, true)))
-      .orderBy(asc(combos.preco));
+      .from(tabelaCombos)
+      .where(and(eq(tabelaCombos.ativo, true), eq(tabelaCombos.visivelCliente, true)))
+      .orderBy(asc(tabelaCombos.preco));
     return rows.map(comCalculo);
   }),
 
   /** lista completa (admin) */
   listar: adminOnly.handler(async () => {
-    const rows = await db.select().from(combos).orderBy(asc(combos.nome));
+    const rows = await db.select().from(tabelaCombos).orderBy(asc(tabelaCombos.nome));
     return rows.map(comCalculo);
   }),
 
   criar: adminOnly.input(comboInput).handler(async ({ input }) => {
     const precoCheio = await somaAvulsa(input.apps);
-    const [row] = await db.insert(combos).values({ ...input, precoCheio }).returning();
+    const [row] = await db.insert(tabelaCombos).values({ ...input, precoCheio }).returning();
     return comCalculo(row);
   }),
 
@@ -86,7 +86,7 @@ export const combosRoutes = {
     .input(comboInput.partial().extend({ id: z.number().int() }))
     .handler(async ({ input }) => {
       const { id, ...patch } = input;
-      const [atual] = await db.select().from(combos).where(eq(combos.id, id));
+      const [atual] = await db.select().from(tabelaCombos).where(eq(tabelaCombos.id, id));
       if (!atual) throw new ORPCError("NOT_FOUND", { message: "Combo não encontrado" });
 
       const apps = patch.apps ?? atual.apps ?? [];
@@ -95,15 +95,15 @@ export const combosRoutes = {
 
       const precoCheio = await somaAvulsa(apps);
       const [row] = await db
-        .update(combos)
+        .update(tabelaCombos)
         .set({ ...patch, precoCheio })
-        .where(eq(combos.id, id))
+        .where(eq(tabelaCombos.id, id))
         .returning();
       return comCalculo(row);
     }),
 
   remover: adminOnly.input(z.object({ id: z.number().int() })).handler(async ({ input }) => {
-    const [row] = await db.delete(combos).where(eq(combos.id, input.id)).returning();
+    const [row] = await db.delete(tabelaCombos).where(eq(tabelaCombos.id, input.id)).returning();
     if (!row) throw new ORPCError("NOT_FOUND", { message: "Combo não encontrado" });
     return { ok: true };
   }),
