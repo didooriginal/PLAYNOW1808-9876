@@ -48,7 +48,7 @@ export function AdminRoute({ children }: { children: ReactNode }) {
           <ShieldAlert className="mx-auto size-7 text-neon-red" />
           <h1 className="mt-4 font-display text-lg font-bold text-white">Acesso restrito</h1>
           <p className="mt-2 font-sans text-sm leading-relaxed text-white/45">
-            Esta área é exclusiva da administração da PLAPLUSNOW. Sua conta está autenticada como
+            Esta área é exclusiva da administração da PLAYPLUSNOW. Sua conta está autenticada como
             cliente.
           </p>
           <Link to="/dashboard" className="mt-6 inline-block">

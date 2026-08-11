@@ -141,7 +141,7 @@ function LinkIndicacao({
     window.setTimeout(() => setCopiado(false), 1800);
   }
 
-  const convite = `Fala! Eu uso a PLAPLUSNOW pra assinar todos os meus streamings por um preço só. Se você entrar pelo meu link a gente ganha vantagem: ${link}`;
+  const convite = `Fala! Eu uso a PLAYPLUSNOW pra assinar todos os meus streamings por um preço só. Se você entrar pelo meu link a gente ganha vantagem: ${link}`;
 
   return (
     <GlassCard accent="purple" className="relative overflow-hidden p-5 sm:p-6">

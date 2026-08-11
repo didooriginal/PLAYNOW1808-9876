@@ -1,10 +1,11 @@
-// ASSISTENTE PLAPLUSNOW — chat flutuante do painel do cliente.
+// ASSISTENTE PLAYPLUSNOW — chat flutuante do painel do cliente.
 // Bottom sheet no celular, painel ancorado no canto no desktop.
 import { useEffect, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { Bot, Loader2, MessageCircleQuestion, Send, Sparkles, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useArrastavel } from "../../lib/arrastavel";
 import { NeonButton } from "../ui/kit";
 
 const SUGESTOES = [
@@ -90,18 +91,27 @@ export function AssistenteIA({ cliente }: { cliente: { nome: string; apps: numbe
   }, [ocupado, sendMessage]);
 
   const primeiroNome = cliente.nome.split(" ")[0] ?? "";
+  const arrasto = useArrastavel("ppn:assistente:pos");
 
   return (
     <>
-      {/* botão flutuante — acima da nav mobile e ao lado do badge Runable */}
+      {/* botão flutuante — arrastável; parte de cima da nav mobile */}
       {!aberto && (
         <button
           type="button"
+          {...arrasto.props}
           onClick={() => setAberto(true)}
+          onDoubleClick={arrasto.resetar}
           data-testid="abrir-assistente"
-          aria-label="Abrir assistente PLAPLUSNOW"
-          className="group fixed bottom-28 right-4 z-[70] flex items-center gap-2 rounded-full border border-neon-cyan/45 bg-black/70 py-3 pl-3 pr-4 backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-neon-cyan sm:bottom-20 sm:right-6"
-          style={{ boxShadow: "0 18px 50px -18px rgba(34,211,238,0.85)" }}
+          aria-label="Abrir assistente PLAYPLUSNOW (arraste para mover)"
+          title="Arraste para mover · duplo clique volta ao canto"
+          className={cn(
+            "group fixed bottom-28 right-4 z-[70] flex touch-none select-none items-center gap-2 rounded-full border border-neon-cyan/45 bg-black/70 py-3 pl-3 pr-4 backdrop-blur-xl hover:border-neon-cyan sm:bottom-20 sm:right-6",
+            arrasto.arrastando
+              ? "scale-105 cursor-grabbing border-neon-cyan"
+              : "cursor-grab transition-all hover:-translate-y-0.5",
+          )}
+          style={{ boxShadow: "0 18px 50px -18px rgba(34,211,238,0.85)", ...arrasto.style }}
         >
           <span className="relative flex size-8 items-center justify-center rounded-full bg-neon-cyan/15">
             <Bot className="size-4 text-neon-cyan" />
@@ -124,7 +134,7 @@ export function AssistenteIA({ cliente }: { cliente: { nome: string; apps: numbe
 
           <div
             role="dialog"
-            aria-label="Assistente PLAPLUSNOW"
+            aria-label="Assistente PLAYPLUSNOW"
             className="glass-strong relative flex h-[82dvh] w-full max-w-md animate-modal-in flex-col overflow-hidden rounded-t-3xl border-white/12 sm:h-[600px] sm:max-h-[80dvh] sm:rounded-3xl"
             style={{ boxShadow: "0 40px 120px -40px rgba(34,211,238,0.6)" }}
           >
@@ -139,7 +149,7 @@ export function AssistenteIA({ cliente }: { cliente: { nome: string; apps: numbe
                 <Bot className="size-5 text-neon-cyan" />
               </span>
               <div className="min-w-0 flex-1">
-                <div className="font-display text-sm font-bold text-white">Assistente PLAPLUSNOW</div>
+                <div className="font-display text-sm font-bold text-white">Assistente PLAYPLUSNOW</div>
                 <div className="flex items-center gap-1.5 font-sans text-[11px] text-white/40">
                   <span className="size-1.5 rounded-full bg-emerald-400" />
                   online · responde na hora

@@ -29,12 +29,12 @@ export const PARAMETROS_PADRAO = {
   winbackDias: 15,
   /** desconto do cupom de win-back */
   winbackDesconto: 30,
-  /** preço mensal do adicional Sala de Jogos */
+  /** preço mensal do adicional Futebol Ao Vivo */
   precoSalaJogos: 9.9,
-  /** horas que uma liberação da Sala de Jogos permanece válida */
+  /** horas que uma liberação da Futebol Ao Vivo permanece válida */
   horasLiberacaoJogos: 12,
-  /** provedor de Pix ativo: simulado | mercadopago | efi | asaas | pagarme */
-  pixProvedor: "simulado",
+  /** provedor de Pix ativo (produção): mercadopago | efi | asaas | pagarme */
+  pixProvedor: "mercadopago",
 } as const;
 
 export type Parametros = { [K in keyof typeof PARAMETROS_PADRAO]: (typeof PARAMETROS_PADRAO)[K] };

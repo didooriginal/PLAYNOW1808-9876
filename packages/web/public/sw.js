@@ -1,4 +1,4 @@
-/* PLAPLUSNOW — service worker mínimo do PWA.
+/* PLAYPLUSNOW — service worker mínimo do PWA.
    Estratégia: network-first com fallback de cache. Nunca cacheia API, auth
    nem arquivos internos do dev server (Vite/HMR). */
 

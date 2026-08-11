@@ -3,6 +3,7 @@ import { AlertTriangle, Check, Clock, LifeBuoy, Loader2, MessageSquare } from "l
 import { cn } from "@/lib/utils";
 import { AppIcon } from "../app-icon";
 import { GlassCard, NeonButton, accentHex } from "../ui/kit";
+import { Ajuda } from "../ui/tooltip";
 import { whatsappLink } from "@/lib/mock-data";
 import {
   rotuloStatusChamado,
@@ -57,9 +58,11 @@ function ChamadoCard({ chamado }: { chamado: Chamado }) {
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
+        <Ajuda ajuda="suporte.resposta" />
         <input
           value={resposta}
           onChange={(e) => setResposta(e.target.value)}
+          aria-label="Resposta ou observação interna do chamado"
           placeholder="Resposta / observação interna"
           className="min-w-48 flex-1 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 font-sans text-xs text-white placeholder:text-white/25 focus:border-neon-cyan/50 focus:outline-none"
         />
@@ -92,7 +95,7 @@ function ChamadoCard({ chamado }: { chamado: Chamado }) {
         )}
         <a
           href={whatsappLink(
-            `Olá ${chamado.clienteNome}! Sobre o seu chamado "${rotuloTipo(chamado.tipo)}" na PLAPLUSNOW — já estamos resolvendo.`,
+            `Olá ${chamado.clienteNome}! Sobre o seu chamado "${rotuloTipo(chamado.tipo)}" na PLAYPLUSNOW — já estamos resolvendo.`,
           )}
           target="_blank"
           rel="noreferrer"

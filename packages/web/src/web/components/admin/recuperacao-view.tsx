@@ -1,6 +1,7 @@
 import { Check, Copy, HeartHandshake, Loader2, MessageCircle, RefreshCw, X } from "lucide-react";
 import { useState } from "react";
 import { GlassCard, NeonButton, Pill } from "../ui/kit";
+import { Ajuda, Tooltip } from "../ui/tooltip";
 import {
   useEncerrarWinback,
   useMarcarWinbackEnviado,
@@ -37,21 +38,30 @@ export function RecuperacaoView() {
           <div className="mt-3 font-display text-2xl font-extrabold text-white">
             {data?.resumo.pendentes ?? 0}
           </div>
-          <div className="font-sans text-xs text-white/40">ofertas prontas para disparar</div>
+          <div className="flex items-center gap-1.5 font-sans text-xs text-white/40">
+            ofertas prontas para disparar
+            <Ajuda ajuda="winback.pendentes" />
+          </div>
         </GlassCard>
         <GlassCard className="p-5">
           <MessageCircle className="size-5 text-neon-cyan" />
           <div className="mt-3 font-display text-2xl font-extrabold text-white">
             {data?.resumo.enviados ?? 0}
           </div>
-          <div className="font-sans text-xs text-white/40">aguardando resposta</div>
+          <div className="flex items-center gap-1.5 font-sans text-xs text-white/40">
+            aguardando resposta
+            <Ajuda ajuda="winback.enviados" />
+          </div>
         </GlassCard>
         <GlassCard className="p-5">
           <Check className="size-5 text-emerald-400" />
           <div className="mt-3 font-display text-2xl font-extrabold text-white">
             {data?.resumo.recuperados ?? 0}
           </div>
-          <div className="font-sans text-xs text-white/40">clientes recuperados</div>
+          <div className="flex items-center gap-1.5 font-sans text-xs text-white/40">
+            clientes recuperados
+            <Ajuda ajuda="winback.recuperados" />
+          </div>
         </GlassCard>
       </div>
 
@@ -62,10 +72,12 @@ export function RecuperacaoView() {
           <span className="text-white/60">{data?.descontoBase ?? 30}%</span> que sobe nas etapas
           seguintes. Ao marcar como enviado, o cupom já fica preso na conta do cliente.
         </p>
-        <NeonButton accent="cyan" onClick={() => varrer.mutate({})} disabled={varrer.isPending}>
-          {varrer.isPending ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
-          Atualizar fila
-        </NeonButton>
+        <Tooltip texto="winback.varrer" titulo="Atualizar fila">
+          <NeonButton accent="cyan" onClick={() => varrer.mutate({})} disabled={varrer.isPending}>
+            {varrer.isPending ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+            Atualizar fila
+          </NeonButton>
+        </Tooltip>
       </div>
 
       <div className="space-y-3">
@@ -97,6 +109,7 @@ export function RecuperacaoView() {
               <span className="rounded-lg border border-white/12 px-3 py-1.5 font-mono text-[11px] text-neon-cyan">
                 {i.cupom}
               </span>
+              <Tooltip texto="winback.copiar" titulo="Copiar mensagem">
               <button
                 type="button"
                 onClick={() => {
@@ -109,7 +122,9 @@ export function RecuperacaoView() {
                 {copiado === i.id ? <Check className="mr-1 inline size-3" /> : <Copy className="mr-1 inline size-3" />}
                 Copiar mensagem
               </button>
+              </Tooltip>
               {i.whatsapp && (
+                <Tooltip texto="winback.whatsapp" titulo="Abrir WhatsApp">
                 <a
                   href={i.whatsapp}
                   target="_blank"
@@ -119,8 +134,10 @@ export function RecuperacaoView() {
                   <MessageCircle className="mr-1 inline size-3" />
                   Abrir WhatsApp
                 </a>
+                </Tooltip>
               )}
               {i.status === "pendente" && (
+                <Tooltip texto="winback.marcarEnviado" titulo="Marcar enviado">
                 <button
                   type="button"
                   onClick={() => marcar.mutate({ id: i.id })}
@@ -128,8 +145,10 @@ export function RecuperacaoView() {
                 >
                   Marcar enviado + travar cupom
                 </button>
+                </Tooltip>
               )}
               {i.status !== "recuperado" && (
+                <Tooltip texto="winback.voltou" titulo="Cliente voltou">
                 <button
                   type="button"
                   onClick={() => encerrar.mutate({ id: i.id, status: "recuperado" })}
@@ -138,8 +157,10 @@ export function RecuperacaoView() {
                   <Check className="mr-1 inline size-3" />
                   Voltou
                 </button>
+                </Tooltip>
               )}
               {i.status !== "descartado" && (
+                <Tooltip texto="winback.descartar" titulo="Descartar">
                 <button
                   type="button"
                   onClick={() => encerrar.mutate({ id: i.id, status: "descartado" })}
@@ -148,6 +169,7 @@ export function RecuperacaoView() {
                   <X className="mr-1 inline size-3" />
                   Descartar
                 </button>
+                </Tooltip>
               )}
             </div>
           </GlassCard>

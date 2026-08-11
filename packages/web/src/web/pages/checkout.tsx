@@ -4,8 +4,10 @@ import {
   ArrowRight,
   Check,
   Copy,
+  CreditCard,
   Loader2,
   QrCode,
+  RefreshCw,
   ShieldCheck,
   TriangleAlert,
 } from "lucide-react";
@@ -20,11 +22,12 @@ import {
   useStatusCheckout,
   type PedidoInput,
 } from "../queries/checkout";
+import { useCriarAssinatura } from "../queries/assinaturas";
 
 /**
  * CHECKOUT — pagamento dentro da plataforma.
  * Chega aqui vindo de qualquer botão de compra (plano, combo, montador,
- * Sala de Jogos, upgrade do painel). Gera o Pix, acompanha o pagamento e,
+ * Futebol Ao Vivo, upgrade do painel). Gera o Pix, acompanha o pagamento e,
  * quando cai, o pacote é ativado sozinho e o cliente vai para o painel.
  */
 
@@ -68,6 +71,9 @@ export default function CheckoutPage() {
   const resumo = useResumoCheckout(pedido, pronto);
 
   const pagar = usePagarCheckout();
+  const assinar = useCriarAssinatura();
+  /** Pix (pagamento único) ou cartão (assinatura recorrente do Mercado Pago) */
+  const [metodo, setMetodo] = useState<"pix" | "cartao">("pix");
   const [txid, setTxid] = useState<string | null>(null);
   const [copiado, setCopiado] = useState(false);
   const status = useStatusCheckout(txid);
@@ -97,7 +103,7 @@ export default function CheckoutPage() {
           <span className="text-neon-cyan glow-cyan">aqui mesmo</span>
         </>
       }
-      subtitle="Pague por Pix na própria plataforma. A baixa é automática e os acessos aparecem no seu painel em segundos — sem depender de atendimento."
+      subtitle="Pague por Pix ou assine no cartão com cobrança automática. A baixa é automática e os acessos aparecem no seu painel em segundos — sem depender de atendimento."
     >
       <div className="space-y-4">
         {/* ---------------- resumo do pedido ---------------- */}
@@ -196,8 +202,120 @@ export default function CheckoutPage() {
           </div>
         )}
 
-        {/* ---------------- pagamento ---------------- */}
-        {session && pronto && resumo.data && (
+        {/* ---------------- escolha da forma de pagamento ---------------- */}
+        {session && pronto && resumo.data && !pagar.data && (
+          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+            <div className="font-sans text-[10px] uppercase tracking-[0.2em] text-white/35">
+              Como você quer pagar
+            </div>
+
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                data-testid="metodo-pix"
+                onClick={() => setMetodo("pix")}
+                className={`rounded-xl border p-4 text-left transition ${
+                  metodo === "pix"
+                    ? "border-neon-cyan/60 bg-neon-cyan/10"
+                    : "border-white/10 bg-black/25 hover:border-white/25"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <QrCode className="size-4 text-neon-cyan" />
+                  <span className="font-display text-sm font-bold text-white">Pix</span>
+                </div>
+                <p className="mt-1.5 font-sans text-[11.5px] leading-relaxed text-white/45">
+                  Pagamento único. Cai na hora e libera o acesso automaticamente. Você renova
+                  quando quiser.
+                </p>
+              </button>
+
+              <button
+                type="button"
+                data-testid="metodo-cartao"
+                onClick={() => setMetodo("cartao")}
+                className={`rounded-xl border p-4 text-left transition ${
+                  metodo === "cartao"
+                    ? "border-neon-purple/60 bg-neon-purple/10"
+                    : "border-white/10 bg-black/25 hover:border-white/25"
+                }`}
+              >
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <CreditCard className="size-4 shrink-0 text-neon-purple" />
+                  <span className="whitespace-nowrap font-display text-sm font-bold text-white">
+                    Cartão
+                  </span>
+                  <Pill accent="purple">automático</Pill>
+                </div>
+                <p className="mt-1.5 font-sans text-[11.5px] leading-relaxed text-white/45">
+                  Assinatura recorrente: cobramos {brl(resumo.data.valor)} por{" "}
+                  {resumo.data.periodo} sozinho, sem você lembrar de pagar. Cancele quando
+                  quiser.
+                </p>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ---------------- cartão: assinatura recorrente ---------------- */}
+        {session && pronto && resumo.data && metodo === "cartao" && !pagar.data && (
+          <div className="rounded-2xl border border-neon-purple/25 bg-neon-purple/[0.05] p-5">
+            <div className="flex items-center gap-2">
+              <RefreshCw className="size-4 text-neon-purple" />
+              <span className="font-display text-sm font-bold text-white">
+                Assinar no cartão
+              </span>
+            </div>
+
+            <p className="mt-2 font-sans text-[12px] leading-relaxed text-white/50">
+              Você informa o cartão no ambiente seguro do Mercado Pago — os dados não passam
+              pelo nosso servidor. A partir do aceite, a cobrança de {brl(resumo.data.valor)}{" "}
+              acontece a cada {resumo.data.periodo} automaticamente e seu acesso nunca cai por
+              esquecimento.
+            </p>
+
+            <NeonButton
+              accent="purple"
+              size="lg"
+              className="mt-4 w-full"
+              data-testid="assinar-cartao-checkout"
+              disabled={assinar.isPending}
+              onClick={() => {
+                assinar.mutate(pedido, {
+                  onSuccess: (dados) => {
+                    if (dados.initPoint) window.location.href = dados.initPoint;
+                  },
+                });
+              }}
+            >
+              {assinar.isPending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <CreditCard className="size-4" />
+              )}
+              Assinar por {brl(resumo.data.valor)} / {resumo.data.periodo}
+            </NeonButton>
+
+            {assinar.isError && (
+              <p className="mt-3 inline-flex items-start gap-2 font-sans text-xs text-neon-red">
+                <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
+                {assinar.error?.message}
+              </p>
+            )}
+
+            {assinar.data?.initPoint && (
+              <a
+                href={assinar.data.initPoint}
+                className="mt-3 block text-center font-sans text-[11px] text-neon-purple underline-offset-2 hover:underline"
+              >
+                Não abriu? Clique aqui para informar o cartão
+              </a>
+            )}
+          </div>
+        )}
+
+        {/* ---------------- pix ---------------- */}
+        {session && pronto && resumo.data && (metodo === "pix" || pagar.data) && (
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
@@ -235,6 +353,14 @@ export default function CheckoutPage() {
 
             {pagar.data && (
               <div className="mt-4">
+                {pagar.data.qrBase64 && !pago && (
+                  <img
+                    src={`data:image/png;base64,${pagar.data.qrBase64}`}
+                    alt="QR Code do Pix"
+                    className="mx-auto mb-3 size-48 rounded-xl border border-white/10 bg-white p-2"
+                  />
+                )}
+
                 <div className="rounded-xl border border-white/10 bg-black/35 p-3">
                   <div className="font-sans text-[10px] uppercase tracking-wider text-white/35">
                     Pix copia e cola
@@ -261,6 +387,17 @@ export default function CheckoutPage() {
                   {copiado ? "Código copiado" : "Copiar código Pix"}
                 </button>
 
+                {pagar.data.linkPagamento && !pago && (
+                  <a
+                    href={pagar.data.linkPagamento}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-2 block text-center font-sans text-[11px] text-white/40 underline-offset-2 hover:text-neon-cyan hover:underline"
+                  >
+                    abrir a página de pagamento do Mercado Pago
+                  </a>
+                )}
+
                 <p className="mt-3 font-sans text-[11px] leading-relaxed text-white/35">
                   {pago
                     ? "Pagamento confirmado! Estamos liberando seus acessos e abrindo seu painel…"
@@ -279,6 +416,7 @@ export default function CheckoutPage() {
             )}
           </div>
         )}
+
       </div>
     </AuthShell>
   );

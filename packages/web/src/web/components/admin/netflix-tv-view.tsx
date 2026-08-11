@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { GlassCard, NeonButton, Pill } from "../ui/kit";
+import { Tooltip } from "../ui/tooltip";
 import { useFilaTvNetflix, useResponderTv, haQuantoTempoTv, horaCurta } from "../../queries/netflix";
 
 /**
@@ -122,14 +123,15 @@ export function NetflixTvView() {
                     pendente ? "bg-amber-400/[0.04]" : "hover:bg-white/[0.02]",
                   )}
                 >
+                  <Tooltip texto="netflix.codigoTv" titulo="Código da TV">
                   <button
                     type="button"
+                    aria-label={`Copiar código da TV ${s.codigoTv}`}
                     onClick={() => {
                       void navigator.clipboard?.writeText(s.codigoTv);
                       setCopiado(s.id);
                       setTimeout(() => setCopiado(null), 1800);
                     }}
-                    title="Copiar código da TV"
                     className="flex items-center gap-2 rounded-xl border px-4 py-2 transition-colors"
                     style={{ borderColor: `${NETFLIX}55`, background: `${NETFLIX}12` }}
                   >
@@ -145,6 +147,7 @@ export function NetflixTvView() {
                       <Copy className="size-3.5 text-white/40" />
                     )}
                   </button>
+                  </Tooltip>
 
                   <div className="min-w-[170px] flex-1">
                     <div className="font-display text-sm font-bold text-white">

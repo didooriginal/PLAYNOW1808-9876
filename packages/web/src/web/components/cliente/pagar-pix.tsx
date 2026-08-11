@@ -99,6 +99,14 @@ export function PagarPix({
               </span>
             </div>
 
+            {gerar.data.qrBase64 && !pago && (
+              <img
+                src={`data:image/png;base64,${gerar.data.qrBase64}`}
+                alt="QR Code do Pix"
+                className="mx-auto mt-3 size-44 rounded-xl border border-white/10 bg-white p-2"
+              />
+            )}
+
             <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.03] p-3">
               <div className="font-sans text-[10px] uppercase tracking-wider text-white/35">
                 Pix copia e cola
@@ -126,6 +134,17 @@ export function PagarPix({
               )}
               {copiado ? "Código copiado" : "Copiar código Pix"}
             </button>
+
+            {gerar.data.linkPagamento && !pago && (
+              <a
+                href={gerar.data.linkPagamento}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-2 block text-center font-sans text-[11px] text-white/40 underline-offset-2 hover:text-neon-purple hover:underline"
+              >
+                abrir a página de pagamento do Mercado Pago
+              </a>
+            )}
 
             <p className="mt-3 font-sans text-[11px] text-white/30">
               {pago

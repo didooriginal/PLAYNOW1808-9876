@@ -18,6 +18,7 @@ import {
 import { cn } from "@/lib/utils";
 import { AppIcon } from "../app-icon";
 import { GlassCard, NeonButton, ProgressBar } from "../ui/kit";
+import { Rotulo, Tooltip } from "../ui/tooltip";
 import { brl, serviceById } from "@/lib/mock-data";
 import {
   useContas,
@@ -121,16 +122,17 @@ function ClientesVinculados({
               </div>
               <div className="truncate font-mono text-[9px] text-white/30">{v.clienteEmail}</div>
             </div>
-            <button
-              type="button"
-              aria-label={`Liberar vaga de ${v.clienteNome}`}
-              title="Liberar vaga (mantém o cadastro e o histórico)"
-              disabled={liberar.isPending}
-              onClick={() => liberar.mutate({ id: v.id, motivo: "manual" })}
-              className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-white/10 text-white/35 transition-colors hover:border-amber-400/50 hover:text-amber-300"
-            >
-              <UserMinus className="size-3" />
-            </button>
+            <Tooltip texto="conta.liberarVaga" titulo="Liberar vaga">
+              <button
+                type="button"
+                aria-label={`Liberar vaga de ${v.clienteNome}`}
+                disabled={liberar.isPending}
+                onClick={() => liberar.mutate({ id: v.id, motivo: "manual" })}
+                className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-white/10 text-white/35 transition-colors hover:border-amber-400/50 hover:text-amber-300"
+              >
+                <UserMinus className="size-3" />
+              </button>
+            </Tooltip>
           </div>
         ))}
         {vinculos.length === 0 && (
@@ -141,6 +143,7 @@ function ClientesVinculados({
       {alocando ? (
         <div className="mt-3 space-y-2">
           <select
+            aria-label="Cliente que vai ocupar a vaga"
             value={escolhido}
             onChange={(e) => setEscolhido(e.target.value ? Number(e.target.value) : "")}
             className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 font-sans text-xs text-white focus:border-neon-cyan/50 focus:outline-none"
@@ -229,7 +232,10 @@ function EditorVagas({ conta, onClose }: { conta: Conta; onClose: () => void }) 
           cancelar
         </button>
       </div>
-      <div className="mt-2.5 flex items-center gap-2">
+      <Rotulo ajuda="contas.totalVagas" htmlFor="conta-vagas" className="mt-2.5">
+        Total de vagas
+      </Rotulo>
+      <div className="mt-1.5 flex items-center gap-2">
         <button
           type="button"
           aria-label="Diminuir"
@@ -239,9 +245,11 @@ function EditorVagas({ conta, onClose }: { conta: Conta; onClose: () => void }) 
           −
         </button>
         <input
+          id="conta-vagas"
           type="number"
           min={1}
           max={50}
+          aria-label="Total de vagas"
           value={valor}
           onChange={(e) => setValor(Number(e.target.value))}
           className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-center font-display text-sm font-bold text-white focus:border-neon-purple/60 focus:outline-none"
@@ -420,13 +428,13 @@ export function ContaMatrizCard({ acc, vinculos }: { acc: Conta; vinculos: Vincu
           <SlidersHorizontal className="size-3.5 shrink-0" />
           Editar vagas
         </NeonButton>
+        <Tooltip texto="conta.liberarTodas" titulo="Repor vagas" className="flex-1">
         <NeonButton
           accent="red"
           variant="outline"
           size="sm"
-          className="flex-1 whitespace-nowrap px-2"
+          className="w-full whitespace-nowrap px-2"
           disabled={busy || ocupadas === 0}
-          title="Libera todas as vagas para realocação — mantém histórico e cadastros"
           onClick={() => repor.mutate({ id: acc.id })}
         >
           {repor.isPending ? (
@@ -436,6 +444,8 @@ export function ContaMatrizCard({ acc, vinculos }: { acc: Conta; vinculos: Vincu
           )}
           Repor
         </NeonButton>
+        </Tooltip>
+        <Tooltip texto="conta.copiarLogin" titulo="Copiar login">
         <button
           type="button"
           className="flex size-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/40 transition-colors hover:border-white/25 hover:text-white"
@@ -446,6 +456,8 @@ export function ContaMatrizCard({ acc, vinculos }: { acc: Conta; vinculos: Vincu
         >
           <Copy className="size-3.5" />
         </button>
+        </Tooltip>
+        <Tooltip texto="conta.excluir" titulo="Excluir conta matriz">
         <button
           type="button"
           className="flex size-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/40 transition-colors hover:border-neon-red/50 hover:text-neon-red"
@@ -455,6 +467,7 @@ export function ContaMatrizCard({ acc, vinculos }: { acc: Conta; vinculos: Vincu
         >
           <Trash2 className="size-3.5" />
         </button>
+        </Tooltip>
       </div>
     </GlassCard>
   );

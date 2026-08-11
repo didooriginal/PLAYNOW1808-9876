@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Loader2, Monitor, Plus, Sparkles, Store, Trash2, Users } from "lucide-react";
 import { AppIcon } from "../app-icon";
 import { GlassCard, NeonButton, Pill, accentHex } from "../ui/kit";
+import { Ajuda, Campo, Rotulo, TituloSecao, Tooltip } from "../ui/tooltip";
 import { brl } from "@/lib/mock-data";
 import {
   useAtualizarCombo,
@@ -28,25 +29,34 @@ function Toggle({
   onClick,
   label,
   icon,
+  ajuda,
 }: {
   on: boolean;
   onClick: () => void;
   label: string;
   icon: React.ReactNode;
+  /** chave do dicionário de ajuda; o "i" fica ao lado do switch, nunca dentro
+      dele — botão dentro de botão é HTML inválido e quebra o clique. */
+  ajuda?: string;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={
-        on
-          ? "flex items-center gap-2 rounded-xl border border-neon-cyan/50 bg-neon-cyan/[0.1] px-3 py-2 font-sans text-xs font-semibold text-white"
-          : "flex items-center gap-2 rounded-xl border border-white/10 px-3 py-2 font-sans text-xs text-white/40 transition-colors hover:border-white/25 hover:text-white"
-      }
-    >
-      {icon}
-      {label}
-    </button>
+    <span className="inline-flex items-center gap-1.5">
+      <button
+        type="button"
+        role="switch"
+        aria-checked={on}
+        onClick={onClick}
+        className={
+          on
+            ? "flex items-center gap-2 rounded-xl border border-neon-cyan/50 bg-neon-cyan/[0.1] px-3 py-2 font-sans text-xs font-semibold text-white"
+            : "flex items-center gap-2 rounded-xl border border-white/10 px-3 py-2 font-sans text-xs text-white/40 transition-colors hover:border-white/25 hover:text-white"
+        }
+      >
+        {icon}
+        {label}
+      </button>
+      {ajuda && <Ajuda ajuda={ajuda} />}
+    </span>
   );
 }
 
@@ -113,15 +123,19 @@ export function ComboBuilder({ apps }: { apps: AppMinimo[] }) {
     <GlassCard strong accent="cyan" className="p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2">
-            <Sparkles className="size-4 text-neon-cyan" />
-            <span className="font-display text-sm font-bold text-white">Combo Inteligente</span>
-            {lista.length > 0 && (
-              <span className="rounded-full bg-neon-cyan/15 px-2 py-0.5 font-sans text-[10px] font-semibold text-neon-cyan">
-                {lista.length}
-              </span>
-            )}
-          </div>
+          <TituloSecao
+            ajuda="combo.apps"
+            icone={<Sparkles className="size-4 text-neon-cyan" />}
+            acao={
+              lista.length > 0 ? (
+                <span className="rounded-full bg-neon-cyan/15 px-2 py-0.5 font-sans text-[10px] font-semibold text-neon-cyan">
+                  {lista.length}
+                </span>
+              ) : undefined
+            }
+          >
+            Combo Inteligente
+          </TituloSecao>
           <p className="mt-1.5 font-sans text-xs text-white/40">
             Escolha 2 ou mais apps, defina o preço promocional e o desconto aparece sozinho na
             landing e no painel do cliente.
@@ -142,9 +156,12 @@ export function ComboBuilder({ apps }: { apps: AppMinimo[] }) {
       {aberto && (
         <div className="mt-5 space-y-4 rounded-2xl border border-white/[0.07] bg-black/25 p-4">
           <div>
-            <div className="font-sans text-[11px] uppercase tracking-[0.2em] text-white/35">
+            <Rotulo
+              ajuda="combo.apps"
+              sufixo={sel.length > 0 ? `${sel.length} marcados` : undefined}
+            >
               1. Selecione os aplicativos
-            </div>
+            </Rotulo>
             <div className="mt-3 flex max-h-56 flex-wrap gap-2 overflow-y-auto pr-1">
               {disponiveis.map((app) => {
                 const on = sel.includes(app.slug);
@@ -169,30 +186,45 @@ export function ComboBuilder({ apps }: { apps: AppMinimo[] }) {
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <input
-              className={inputCls}
-              placeholder="Nome do combo"
-              value={form.nome}
-              onChange={(e) => set("nome", e.target.value)}
-            />
-            <input
-              className={inputCls}
-              placeholder="Chamada curta (opcional)"
-              value={form.descricao}
-              onChange={(e) => set("descricao", e.target.value)}
-            />
-            <input
-              className={inputCls}
-              type="number"
-              step="0.01"
-              aria-label="Preço promocional"
-              placeholder="Preço promocional"
-              value={form.preco}
-              onChange={(e) => set("preco", Number(e.target.value))}
-            />
+            <Campo label="Nome do combo" ajuda="combo.nome" htmlFor="combo-nome" obrigatorio>
+              <input
+                id="combo-nome"
+                className={inputCls}
+                placeholder="Ex.: Combo Cinema"
+                value={form.nome}
+                onChange={(e) => set("nome", e.target.value)}
+              />
+            </Campo>
+            <Campo label="Chamada curta" ajuda="combo.descricao" htmlFor="combo-descricao">
+              <input
+                id="combo-descricao"
+                className={inputCls}
+                placeholder="Opcional"
+                value={form.descricao}
+                onChange={(e) => set("descricao", e.target.value)}
+              />
+            </Campo>
+            <Campo
+              label="Preço promocional"
+              ajuda="combo.preco"
+              htmlFor="combo-preco"
+              obrigatorio
+              dica={desconto > 0 ? `${desconto}% abaixo da soma avulsa` : undefined}
+            >
+              <input
+                id="combo-preco"
+                className={inputCls}
+                type="number"
+                step="0.01"
+                placeholder="0,00"
+                value={form.preco}
+                onChange={(e) => set("preco", Number(e.target.value))}
+              />
+            </Campo>
+            <Campo label="Ciclo" ajuda="combo.ciclo" htmlFor="combo-ciclo">
             <select
+              id="combo-ciclo"
               className={inputCls}
-              aria-label="Ciclo de cobrança"
               value={form.ciclo}
               onChange={(e) => set("ciclo", e.target.value as "mensal" | "anual")}
             >
@@ -203,6 +235,7 @@ export function ComboBuilder({ apps }: { apps: AppMinimo[] }) {
                 Anual
               </option>
             </select>
+            </Campo>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -210,18 +243,21 @@ export function ComboBuilder({ apps }: { apps: AppMinimo[] }) {
               on={form.visivelLanding}
               onClick={() => set("visivelLanding", !form.visivelLanding)}
               label="Mostrar na landing"
+              ajuda="combo.visivelLanding"
               icon={<Store className="size-3.5" />}
             />
             <Toggle
               on={form.visivelCliente}
               onClick={() => set("visivelCliente", !form.visivelCliente)}
               label="Sugerir ao cliente"
+              ajuda="combo.visivelCliente"
               icon={<Users className="size-3.5" />}
             />
             <Toggle
               on={form.destaque}
               onClick={() => set("destaque", !form.destaque)}
               label="Destaque"
+              ajuda="combo.destaque"
               icon={<Sparkles className="size-3.5" />}
             />
           </div>
@@ -302,6 +338,7 @@ export function ComboBuilder({ apps }: { apps: AppMinimo[] }) {
                     )}
                   </div>
                 </div>
+                <Tooltip texto="combo.remover" titulo="Remover combo">
                 <button
                   type="button"
                   aria-label="Remover combo"
@@ -311,6 +348,7 @@ export function ComboBuilder({ apps }: { apps: AppMinimo[] }) {
                 >
                   <Trash2 className="size-3.5" />
                 </button>
+                </Tooltip>
               </div>
 
               <div className="mt-3 flex flex-wrap gap-1.5">
@@ -326,6 +364,7 @@ export function ComboBuilder({ apps }: { apps: AppMinimo[] }) {
                     atualizar.mutate({ id: combo.id, visivelLanding: !combo.visivelLanding })
                   }
                   label="Landing"
+                  ajuda="combo.visivelLanding"
                   icon={<Store className="size-3.5" />}
                 />
                 <Toggle
@@ -334,12 +373,14 @@ export function ComboBuilder({ apps }: { apps: AppMinimo[] }) {
                     atualizar.mutate({ id: combo.id, visivelCliente: !combo.visivelCliente })
                   }
                   label="Painel do cliente"
+                  ajuda="combo.visivelCliente"
                   icon={<Monitor className="size-3.5" />}
                 />
                 <Toggle
                   on={combo.ativo}
                   onClick={() => atualizar.mutate({ id: combo.id, ativo: !combo.ativo })}
                   label={combo.ativo ? "Ativo" : "Inativo"}
+                  ajuda="combo.ativo"
                   icon={<Sparkles className="size-3.5" />}
                 />
               </div>

@@ -72,7 +72,7 @@ export const MANUAL: SecaoManual[] = [
         itens: [
           {
             termo: "Conta matriz",
-            desc: "A assinatura real que a PLAPLUSNOW paga no serviço (ex.: uma conta Netflix). Tem e-mail, senha, um número total de vagas e uma data de vencimento.",
+            desc: "A assinatura real que a PLAYPLUSNOW paga no serviço (ex.: uma conta Netflix). Tem e-mail, senha, um número total de vagas e uma data de vencimento.",
           },
           {
             termo: "Vaga / alocação",

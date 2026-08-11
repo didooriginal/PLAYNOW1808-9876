@@ -13,7 +13,7 @@ import {
   LifeBuoy,
   Loader2,
   Trophy,
-  Gamepad2,
+  Goal,
   Tv,
   LayoutGrid,
   MessageCircle,
@@ -53,7 +53,7 @@ import { useMeusChamados } from "../queries/suporte";
 import { useMinhasFaturas, rotuloCompetencia, dataBr } from "../queries/faturas";
 import { useMinhaTelaNetflix } from "../queries/netflix";
 import { ChecklistBoasVindas } from "../components/cliente/boas-vindas";
-import { ContadorVencimento } from "../components/cliente/contador";
+import { ContadorVencimento, FaixaConfianca } from "../components/cliente/contador";
 import { TelaBloqueio } from "../components/cliente/bloqueio";
 import { AvisosCliente } from "../components/cliente/avisos";
 import { SalaJogos } from "../components/cliente/sala-jogos";
@@ -344,7 +344,7 @@ function ActivePlanCard({
             Renova automaticamente em {cliente.proximaCobranca || "—"}
           </p>
           <a
-            href={whatsappLink("Olá! Quero falar sobre o meu pacote na PLAPLUSNOW.")}
+            href={whatsappLink("Olá! Quero falar sobre o meu pacote na PLAYPLUSNOW.")}
             target="_blank"
             rel="noreferrer"
             className="mt-4 block"
@@ -626,7 +626,7 @@ export default function DashboardPage() {
         badge: netflix.data?.pendente ? "1" : undefined,
       },
       { id: "jornada", label: "Jornada / Recompensas", icon: Trophy },
-      { id: "jogos", label: "Sala de Jogos", icon: Gamepad2 },
+      { id: "jogos", label: "Futebol Ao Vivo", icon: Goal },
       { id: "carteira", label: "Indique e Ganhe", icon: Wallet },
       { id: "novidades", label: "Novidades/Upgrades", icon: Sparkles, badge: String(upgrades.length) },
       { id: "faturas", label: "Faturas", icon: Receipt },
@@ -687,7 +687,7 @@ export default function DashboardPage() {
         <div className="mx-auto max-w-5xl space-y-6">
           <div className="flex items-center justify-between gap-3">
             <div className="font-display text-lg font-extrabold tracking-tight text-white">
-              PLAPLUSNOW
+              PLAYPLUSNOW
             </div>
             <AvisosCliente />
           </div>
@@ -716,7 +716,7 @@ export default function DashboardPage() {
               {active === "acessos" && "Meus Acessos"}
               {active === "netflix" && "Desbloquear Tela Netflix"}
               {active === "jornada" && "Jornada do Cliente"}
-              {active === "jogos" && "Sala de Jogos"}
+              {active === "jogos" && "Futebol Ao Vivo"}
               {active === "carteira" && "Indique e Ganhe"}
               {active === "novidades" && "Novidades e Upgrades"}
               {active === "faturas" && "Minhas Faturas"}
@@ -740,6 +740,8 @@ export default function DashboardPage() {
             </div>
             <AvisosCliente />
           </div>
+
+          <FaixaConfianca situacao={situacao} />
 
           {active === "acessos" && (
             <>

@@ -42,14 +42,14 @@ export function SocialProof() {
     <section id="depoimentos" className="relative px-4 py-20 sm:px-6 sm:py-28">
       <div className="mx-auto max-w-7xl">
         <SectionTitle
-          eyebrow="Prova social"
+          eyebrow="Quem acredita na gente"
           title={
             <>
               <span className="text-neon-red glow-red">1.540</span> assinaturas ativas pagando
               menos todo mês
             </>
           }
-          subtitle="Quem entrou parou de pagar sete boletos de streaming e passou a pagar um só. Estes são depoimentos de assinantes reais da PLAYPLUSNOW."
+          subtitle="Quem entrou parou de pagar uma fatura por streaming e passou a pagar uma só. Estes são depoimentos de assinantes reais da PLAYPLUSNOW."
         />
 
         <div className="mt-14 columns-1 gap-5 sm:columns-2 lg:columns-3 [&>*]:mb-5">

@@ -453,7 +453,7 @@ export function ferramentasDoAdmin() {
             slug: a.slug,
             nome: a.nome,
             categoria: a.categoria,
-            precoPlaplusnow: brl(a.preco),
+            precoPlayplusnow: brl(a.preco),
             precoAvulsoMercado: brl(a.precoAvulso),
             ativo: a.ativo,
           })),

@@ -1,6 +1,7 @@
 import { Activity, ArrowRightLeft, HeartPulse, Loader2, PackageSearch, RefreshCw, ShieldAlert } from "lucide-react";
 import { AppIcon } from "../app-icon";
 import { GlassCard, NeonButton, Pill, ProgressBar } from "../ui/kit";
+import { Ajuda } from "../ui/tooltip";
 import {
   useAlternarReserva,
   useFalhasRecentes,
@@ -76,6 +77,7 @@ export function SaudeView() {
       {/* -------- estoque por serviço -------- */}
       <GlassCard className="p-5">
         <span className="font-display text-sm font-bold text-white">Estoque por serviço</span>
+        <Ajuda ajuda="saude.estoquePorServico" lado="bottom" />
         <div className="mt-4 space-y-3">
           {(data?.estoque ?? []).map((e) => (
             <div key={e.servico} className="rounded-2xl bg-white/[0.03] px-4 py-3">
@@ -106,6 +108,7 @@ export function SaudeView() {
       {/* -------- contas em risco -------- */}
       <GlassCard className="p-5">
         <span className="font-display text-sm font-bold text-white">Contas com falhas</span>
+        <Ajuda ajuda="saude.contasFalhas" lado="bottom" />
         <div className="mt-4 space-y-2">
           {(data?.emRisco ?? []).map((c) => (
             <div key={c.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white/[0.03] px-4 py-3">
@@ -163,6 +166,7 @@ export function SaudeView() {
         <div className="flex items-center gap-2">
           <Activity className="size-4 text-neon-red" />
           <span className="font-display text-sm font-bold text-white">Últimas falhas relatadas</span>
+          <Ajuda ajuda="saude.ultimasFalhas" lado="bottom" />
         </div>
         <div className="mt-4 space-y-1.5">
           {(falhas.data ?? []).map((f) => (

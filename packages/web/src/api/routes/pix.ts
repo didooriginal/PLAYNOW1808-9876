@@ -8,100 +8,81 @@ import { db } from "../database";
 import { cobrancasPix, faturas, usuarios } from "../database/schema";
 import { aplicarPedido, type Pedido } from "../lib/pedidos";
 import { apurarComissoes } from "./afiliados";
+import {
+  ambienteMP,
+  buscarPagamento,
+  criarPagamentoPix,
+  ErroMercadoPago,
+  mercadoPagoConfigurado,
+  urlWebhookMP,
+  urlPublicaSegura,
+} from "../lib/mercadopago";
+import { avisarAdminPagamento } from "../lib/aviso-pagamento";
 
 /**
- * GATEWAY PIX — adaptador plugável
+ * GATEWAY PIX — PRODUÇÃO (Mercado Pago)
  * ------------------------------------------------------------------
- * A operação hoje roda no Pix manual (cliente paga, manda print, alguém dá
- * baixa). Este módulo troca isso por cobrança com baixa automática SEM
- * amarrar o produto a um provedor específico.
+ * O modo simulado foi REMOVIDO: toda cobrança Pix nasce na API do Mercado
+ * Pago (`POST /v1/payments`, `payment_method_id: pix`) e a baixa chega pelo
+ * webhook `/api/webhooks/mercadopago`. Dinheiro real, QR real.
  *
- * O provedor ativo vem do parâmetro `pixProvedor` (painel → Gestão de Contas):
+ * O provedor ativo vem do parâmetro `pixProvedor` (painel → Gestão de Contas).
+ * Hoje existe um: `mercadopago`. Plugar outro (efi, asaas, pagarme) é escrever
+ * uma função no mapa PROVEDORES — nada mais no sistema muda.
  *
- *   simulado     → gera um BR Code válido a partir da chave em PIX_CHAVE e
- *                  aceita confirmação manual. Serve para operar já, hoje.
- *   mercadopago | efi | asaas | pagarme → basta implementar `criarCobranca`
- *                  no mapa PROVEDORES abaixo; o resto do sistema não muda.
- *
- * A baixa é sempre a mesma função (`confirmarPagamento`), venha ela do
- * webhook do provedor ou do clique do admin — um caminho só, sem divergência.
+ * PLANO B (mantido de propósito): o admin ainda dá baixa manual em
+ * `pix.confirmar`, para quem pagou em dinheiro, transferência ou fora do
+ * gateway. É o mesmo `confirmarPagamento`, então não existe caminho divergente.
  */
-
-/* ------------------------------------------------------------------ */
-/* BR CODE (Pix copia-e-cola) — EMV padrão Bacen                       */
-/* ------------------------------------------------------------------ */
-
-function campo(id: string, valor: string) {
-  return `${id}${String(valor.length).padStart(2, "0")}${valor}`;
-}
-
-/** CRC16-CCITT (polinômio 0x1021), exigido no fim do payload */
-export function crc16(payload: string) {
-  let crc = 0xffff;
-  for (let i = 0; i < payload.length; i++) {
-    crc ^= payload.charCodeAt(i) << 8;
-    for (let bit = 0; bit < 8; bit++) {
-      crc = crc & 0x8000 ? ((crc << 1) ^ 0x1021) & 0xffff : (crc << 1) & 0xffff;
-    }
-  }
-  return crc.toString(16).toUpperCase().padStart(4, "0");
-}
-
-function semAcento(texto: string, tamanho: number) {
-  return texto
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/[^A-Za-z0-9 ]/g, "")
-    .toUpperCase()
-    .slice(0, tamanho)
-    .trim();
-}
-
-/** monta o copia-e-cola estático com valor e txid */
-export function montarBrCode(opcoes: {
-  chave: string;
-  valor: number;
-  beneficiario: string;
-  cidade: string;
-  txid: string;
-}) {
-  const merchant =
-    campo("00", "br.gov.bcb.pix") + campo("01", opcoes.chave.slice(0, 77));
-  const payload =
-    campo("00", "01") +
-    campo("26", merchant) +
-    campo("52", "0000") +
-    campo("53", "986") +
-    campo("54", opcoes.valor.toFixed(2)) +
-    campo("58", "BR") +
-    campo("59", semAcento(opcoes.beneficiario, 25) || "PLAYPLUSNOW") +
-    campo("60", semAcento(opcoes.cidade, 15) || "RIO DE JANEIRO") +
-    campo("62", campo("05", opcoes.txid.slice(0, 25)));
-  const comCrc = `${payload}6304`;
-  return comCrc + crc16(comCrc);
-}
 
 /* ------------------------------------------------------------------ */
 /* PROVEDORES                                                          */
 /* ------------------------------------------------------------------ */
 
-type PedidoCobranca = { valor: number; txid: string; descricao: string };
-type RespostaCobranca = { copiaECola: string; expiraEm: Date };
+type PedidoCobranca = {
+  valor: number;
+  txid: string;
+  descricao: string;
+  emailPagador: string;
+  nomePagador: string;
+};
+
+type RespostaCobranca = {
+  copiaECola: string;
+  expiraEm: Date;
+  provedorId: string;
+  qrBase64: string;
+  linkPagamento: string;
+};
 
 const EXPIRA_MIN = 60;
 
 const PROVEDORES: Record<string, (p: PedidoCobranca) => Promise<RespostaCobranca>> = {
-  simulado: async (p) => ({
-    copiaECola: montarBrCode({
-      chave: process.env.PIX_CHAVE || "contato@playplusnow.com",
+  mercadopago: async (p) => {
+    const pagamento = await criarPagamentoPix({
       valor: p.valor,
-      beneficiario: process.env.PIX_BENEFICIARIO || "PLAYPLUSNOW",
-      cidade: process.env.PIX_CIDADE || "RIO DE JANEIRO",
-      txid: p.txid,
-    }),
-    expiraEm: new Date(Date.now() + EXPIRA_MIN * 60 * 1000),
-  }),
+      descricao: p.descricao,
+      referencia: p.txid,
+      emailPagador: p.emailPagador,
+      nomePagador: p.nomePagador,
+      expiraEmMinutos: EXPIRA_MIN,
+    });
+    if (!pagamento.copiaECola && !pagamento.linkPagamento) {
+      throw new ORPCError("BAD_GATEWAY", {
+        message: "Mercado Pago não devolveu o QR do Pix. Tente novamente.",
+      });
+    }
+    return {
+      copiaECola: pagamento.copiaECola,
+      expiraEm: pagamento.expiraEm,
+      provedorId: pagamento.id,
+      qrBase64: pagamento.qrBase64,
+      linkPagamento: pagamento.linkPagamento,
+    };
+  },
 };
+
+const PROVEDOR_PADRAO = "mercadopago";
 
 /**
  * Cria uma cobrança Pix para qualquer coisa: fatura em aberto ou pedido novo
@@ -114,15 +95,52 @@ export async function abrirCobranca(entrada: {
   faturaId?: number | null;
   pedido?: Pedido | null;
 }) {
+  if (!mercadoPagoConfigurado()) {
+    throw new ORPCError("SERVICE_UNAVAILABLE", {
+      message:
+        "Pagamento indisponível: MERCADOPAGO_ACCESS_TOKEN não está configurado no servidor.",
+    });
+  }
+
   const params = await lerParametros();
-  const provedor = params.pixProvedor;
-  const criar = PROVEDORES[provedor] ?? PROVEDORES.simulado;
+  const provedor = PROVEDORES[params.pixProvedor] ? params.pixProvedor : PROVEDOR_PADRAO;
+  const criar = PROVEDORES[provedor];
   const txid = gerarTxid(entrada.clienteId);
-  const resposta = await criar({
-    valor: entrada.valor,
-    txid,
-    descricao: entrada.descricao,
-  });
+
+  const [pagador] = await db
+    .select({ nome: usuarios.nome, email: usuarios.email })
+    .from(usuarios)
+    .where(eq(usuarios.id, entrada.clienteId));
+
+  let resposta: RespostaCobranca;
+  try {
+    resposta = await criar({
+      valor: entrada.valor,
+      txid,
+      descricao: entrada.descricao,
+      emailPagador: pagador?.email || "cliente@playplusnow.com",
+      nomePagador: pagador?.nome || "Cliente PLAYPLUSNOW",
+    });
+  } catch (e) {
+    if (e instanceof ErroMercadoPago) {
+      // o admin precisa saber que o gateway recusou — senão o cliente
+      // simplesmente "não consegue pagar" e ninguém descobre por quê
+      await notificar({
+        escopo: "admin",
+        clienteId: entrada.clienteId,
+        tipo: "pagamento",
+        severidade: "critico",
+        titulo: "Falha ao gerar cobrança no Mercado Pago",
+        mensagem: `${e.detalhe} (HTTP ${e.status}). Confira as credenciais em Gestão de Contas.`,
+        destino: "pix",
+        chave: `mp:falha:${txid}`,
+      });
+      throw new ORPCError("BAD_GATEWAY", {
+        message: `Não foi possível gerar o Pix agora (${e.detalhe}). Tente novamente em instantes.`,
+      });
+    }
+    throw e;
+  }
 
   await db.insert(cobrancasPix).values({
     clienteId: entrada.clienteId,
@@ -133,6 +151,9 @@ export async function abrirCobranca(entrada: {
     descricao: entrada.descricao,
     pedido: entrada.pedido ?? null,
     copiaECola: resposta.copiaECola,
+    provedorId: resposta.provedorId,
+    qrBase64: resposta.qrBase64,
+    linkPagamento: resposta.linkPagamento,
     status: "aguardando",
     expiraEm: resposta.expiraEm,
   });
@@ -142,6 +163,8 @@ export async function abrirCobranca(entrada: {
     valor: entrada.valor,
     descricao: entrada.descricao,
     copiaECola: resposta.copiaECola,
+    qrBase64: resposta.qrBase64,
+    linkPagamento: resposta.linkPagamento,
     provedor,
     expiraEm: resposta.expiraEm.toISOString(),
     status: "aguardando" as const,
@@ -171,7 +194,15 @@ async function clienteDaSessao(authUserId: string) {
  * passado, preservando o dia escolhido pelo cliente.
  */
 function avancarVencimento(atual: string | null, ciclo: "mensal" | "anual") {
-  if (!atual || !/^\d{4}-\d{2}-\d{2}$/.test(atual)) return null;
+  // sem data válida no cadastro (ou cliente novo): conta a partir de hoje —
+  // mensal = +30 dias, anual = +1 ano
+  if (!atual || !/^\d{4}-\d{2}-\d{2}$/.test(atual)) {
+    const base = new Date();
+    base.setHours(0, 0, 0, 0);
+    if (ciclo === "anual") base.setFullYear(base.getFullYear() + 1);
+    else base.setDate(base.getDate() + 30);
+    return base.toISOString().slice(0, 10);
+  }
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
   const data = new Date(`${atual}T00:00:00`);
@@ -184,7 +215,10 @@ function avancarVencimento(atual: string | null, ciclo: "mensal" | "anual") {
   return data.toISOString().slice(0, 10);
 }
 
-export async function confirmarPagamento(txid: string, origem: "webhook" | "admin") {
+export async function confirmarPagamento(
+  txid: string,
+  origem: "webhook" | "admin" | "assinatura",
+) {
   const [cobranca] = await db.select().from(cobrancasPix).where(eq(cobrancasPix.txid, txid));
   if (!cobranca) return { ok: false, motivo: "cobrança não encontrada" };
   if (cobranca.status === "pago") return { ok: true, jaEstava: true };
@@ -240,18 +274,71 @@ export async function confirmarPagamento(txid: string, origem: "webhook" | "admi
     }
   }
 
+  // aviso ao admin: alerta no painel + e-mail (quando o Resend está ligado)
+  const [atualizado] = await db
+    .select({ nome: usuarios.nome, proximaCobranca: usuarios.proximaCobranca })
+    .from(usuarios)
+    .where(eq(usuarios.id, cobranca.clienteId));
+
+  await avisarAdminPagamento({
+    clienteId: cobranca.clienteId,
+    clienteNome: atualizado?.nome,
+    valor: cobranca.valor,
+    descricao: cobranca.descricao || "Mensalidade PLAYPLUSNOW",
+    origem,
+    referencia: cobranca.txid,
+    proximaCobranca: atualizado?.proximaCobranca || null,
+  });
+
+  // aviso ao cliente: some do painel a faixa de bloqueio e confirma a liberação
   await notificar({
-    escopo: "admin",
+    escopo: "cliente",
     clienteId: cobranca.clienteId,
     tipo: "pagamento",
     severidade: "info",
-    titulo: "Pagamento Pix confirmado",
-    mensagem: `R$ ${cobranca.valor.toFixed(2).replace(".", ",")} confirmados via ${origem}. Acesso liberado automaticamente.`,
+    titulo: "Pagamento confirmado",
+    mensagem: `Recebemos R$ ${cobranca.valor.toFixed(2).replace(".", ",")}. Seu acesso está liberado.`,
     destino: "faturas",
-    chave: `pix:pago:${cobranca.txid}`,
+    chave: `pago:cliente:${cobranca.txid}`,
   });
 
   return { ok: true, jaEstava: false, clienteId: cobranca.clienteId };
+}
+
+/**
+ * RECONFERÊNCIA ATIVA — pergunta ao Mercado Pago se a cobrança já foi paga.
+ *
+ * O webhook é o caminho principal, mas ele depende de o site estar publicado
+ * e alcançável. Esta função é a rede de segurança: o painel do cliente e o
+ * checkout chamam a cada consulta, então o pagamento cai mesmo se a
+ * notificação atrasar, falhar ou o ambiente ser local.
+ */
+export async function sincronizarCobranca(txid: string) {
+  const [cobranca] = await db.select().from(cobrancasPix).where(eq(cobrancasPix.txid, txid));
+  if (!cobranca) return null;
+  if (cobranca.status !== "aguardando" || !cobranca.provedorId) return cobranca;
+
+  try {
+    const pagamento = await buscarPagamento(cobranca.provedorId);
+    if (pagamento.status === "approved") {
+      await confirmarPagamento(txid, "webhook");
+    } else if (["cancelled", "rejected", "refunded"].includes(pagamento.status)) {
+      await db
+        .update(cobrancasPix)
+        .set({ status: "cancelado" })
+        .where(eq(cobrancasPix.id, cobranca.id));
+    } else if (cobranca.expiraEm && cobranca.expiraEm < new Date()) {
+      await db
+        .update(cobrancasPix)
+        .set({ status: "expirado" })
+        .where(eq(cobrancasPix.id, cobranca.id));
+    }
+  } catch {
+    /* indisponibilidade do gateway não pode quebrar a tela do cliente */
+  }
+
+  const [fresca] = await db.select().from(cobrancasPix).where(eq(cobrancasPix.txid, txid));
+  return fresca ?? cobranca;
 }
 
 export const pix = {
@@ -295,6 +382,8 @@ export const pix = {
           valor: viva.valor,
           descricao: viva.descricao,
           copiaECola: viva.copiaECola,
+          qrBase64: viva.qrBase64,
+          linkPagamento: viva.linkPagamento,
           provedor: viva.provedor,
           expiraEm: viva.expiraEm.toISOString(),
           status: viva.status,
@@ -314,10 +403,13 @@ export const pix = {
     .input(z.object({ txid: z.string().min(4) }))
     .handler(async ({ context, input }) => {
       const cliente = await clienteDaSessao(context.user.id);
-      const [cobranca] = await db
-        .select()
+      const [dono] = await db
+        .select({ id: cobrancasPix.id })
         .from(cobrancasPix)
         .where(and(eq(cobrancasPix.txid, input.txid), eq(cobrancasPix.clienteId, cliente.id)));
+      if (!dono) throw new ORPCError("NOT_FOUND", { message: "Cobrança não encontrada" });
+
+      const cobranca = await sincronizarCobranca(input.txid);
       if (!cobranca) throw new ORPCError("NOT_FOUND", { message: "Cobrança não encontrada" });
       return {
         status: cobranca.status,
@@ -349,9 +441,12 @@ export const pix = {
       .limit(60);
 
     return {
-      provedor: params.pixProvedor,
+      provedor: PROVEDORES[params.pixProvedor] ? params.pixProvedor : PROVEDOR_PADRAO,
       provedoresDisponiveis: Object.keys(PROVEDORES),
-      chaveConfigurada: Boolean(process.env.PIX_CHAVE),
+      chaveConfigurada: mercadoPagoConfigurado(),
+      ambiente: ambienteMP(),
+      urlWebhook: urlWebhookMP(),
+      dominioPublico: urlPublicaSegura(),
       cobrancas: linhas.map((l) => ({
         ...l,
         criadoEm: l.criadoEm.toISOString(),

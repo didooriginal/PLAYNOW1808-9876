@@ -106,7 +106,7 @@ export async function gerarFaturas(cliente: ClienteFatura, cupom = "", desconto 
     }
   }
 
-  const rotulo = cliente.pacoteNome ? `Assinatura ${cliente.pacoteNome}` : "Assinatura PLAPLUSNOW";
+  const rotulo = cliente.pacoteNome ? `Assinatura ${cliente.pacoteNome}` : "Assinatura PLAYPLUSNOW";
   const atrasadoOuSuspenso =
     cliente.statusPagamento === "atrasado" || cliente.statusPagamento === "suspenso";
 

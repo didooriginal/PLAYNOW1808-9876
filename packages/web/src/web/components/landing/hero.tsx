@@ -55,16 +55,20 @@ export function Hero() {
               Chega de pagar caro
               <br />
               em{" "}
-              <span className="relative inline-block">
-                <span className="stroke-title">várias</span>
+              <span className="relative inline-block text-neon-red [text-shadow:0_0_28px_rgba(255,31,61,0.45)]">
+                várias
+                <span
+                  aria-hidden
+                  className="absolute -bottom-1 left-0 h-[3px] w-full rounded-full bg-gradient-to-r from-neon-red to-transparent"
+                />
               </span>{" "}
               assinaturas.
             </h1>
 
             <p className="mx-auto mt-6 max-w-xl text-center font-sans text-base leading-relaxed text-white/55 sm:text-lg lg:mx-0 lg:text-left">
-              A PLAPLUSNOW junta Netflix, Disney+, Max, Prime, Spotify e mais 9 plataformas em um
-              único combo compartilhado. Você escolhe os apps, paga uma fração do preço e gerencia
-              tudo em um painel só.
+              Quer curtir seus streamings favoritos economizando de verdade? A PLAYPLUSNOW dá acesso
+              aos melhores conteúdos do mercado com preço acessível e suporte especializado. Assine,
+              economize e aproveite.
             </p>
 
             <div className="mt-9 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-center lg:justify-start">
@@ -117,7 +121,7 @@ export function Hero() {
                     Combo ativo
                   </span>
                 </div>
-                <span className="font-display text-xs font-semibold text-neon-cyan">MEGA PROMO</span>
+                <span className="font-display text-xs font-semibold text-neon-cyan">{mega.name}</span>
               </div>
 
               <div className="mt-6 flex items-end justify-between gap-4">
@@ -127,9 +131,11 @@ export function Hero() {
                   </div>
                   <div className="mt-1 flex items-baseline gap-1">
                     <span className="font-display text-5xl font-extrabold text-white glow-red">
-                      59
+                      {Math.trunc(mega.monthly)}
                     </span>
-                    <span className="font-display text-2xl font-bold text-white/70">,90</span>
+                    <span className="font-display text-2xl font-bold text-white/70">
+                      ,{Math.round((mega.monthly % 1) * 100).toString().padStart(2, "0")}
+                    </span>
                     <span className="ml-1 font-sans text-xs text-white/35">/mês</span>
                   </div>
                 </div>
@@ -144,14 +150,12 @@ export function Hero() {
                 </div>
               </div>
 
-              <div className="mt-7 grid grid-cols-4 gap-3">
-                {(["netflix", "disney", "hbomax", "prime", "spotify", "youtube", "crunchyroll", "iptv"] as const).map(
-                  (id) => (
-                    <div key={id} className="flex flex-col items-center gap-1.5">
-                      <AppIcon id={id} size="sm" active />
-                    </div>
-                  ),
-                )}
+              <div className="mt-7 grid grid-cols-5 gap-3 sm:grid-cols-5">
+                {mega.items.map((id) => (
+                  <div key={id} className="flex flex-col items-center gap-1.5">
+                    <AppIcon id={id} size="sm" active />
+                  </div>
+                ))}
               </div>
 
               <div className="mt-7 rounded-2xl border border-white/8 bg-white/[0.03] p-4">

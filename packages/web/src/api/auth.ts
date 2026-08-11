@@ -15,7 +15,7 @@ import {
  * Autenticação e-mail + senha (Better Auth).
  * As tabelas próprias do Better Auth (user/session/account/verification) ficam em
  * ./database/auth-schema.ts. Cada conta criada é VINCULADA a uma linha de `usuarios`
- * (a base de clientes da PLAPLUSNOW) através de `usuarios.auth_user_id`.
+ * (a base de clientes da PLAYPLUSNOW) através de `usuarios.auth_user_id`.
  */
 export const auth = betterAuth({
   basePath: "/api/auth",

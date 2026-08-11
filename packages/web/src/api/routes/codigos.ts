@@ -126,7 +126,6 @@ const APELIDOS: Record<string, string[]> = {
   deezer: ["deezer"],
   canva: ["canva"],
   capcut: ["capcut", "bytedance"],
-  telecine: ["telecine"],
   dazn: ["dazn"],
   premiere: ["premiere"],
   combate: ["combate"],
@@ -380,7 +379,7 @@ export const codigos = {
       .where(eq(usuarios.authUserId, context.user.id));
     if (!cliente) return [];
     // inadimplente nao ve codigos de acesso
-    if (estaBloqueado(cliente.statusPagamento)) return [];
+    if (estaBloqueado(cliente.statusPagamento, cliente.confiancaAte)) return [];
 
     const minhasContas = await db
       .select({ email: contasMatrizes.email })

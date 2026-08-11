@@ -548,7 +548,7 @@ export default function SetupPage() {
                     <CopyValue label="Senha" value="Cliente@2026" secreto />
                   </div>
                   <p className="mt-5 border-t border-white/[0.07] pt-4 font-sans text-xs leading-relaxed text-white/35">
-                    O cadastro caiu em cima da linha do seed (Diego Dias Silva, pacote Mega Promo),
+                    O cadastro caiu em cima da linha do seed (Diego Dias Silva, pacote Turbo),
                     então o painel abre com dados reais.
                   </p>
                 </GlassCard>
@@ -558,7 +558,7 @@ export default function SetupPage() {
             <Secao id="dados" eyebrow="Seed" titulo="Dados populados">
               <div className="grid gap-4 sm:grid-cols-3">
                 {[
-                  { n: "3", label: "Pacotes", nota: "Pacote 03, Mega Promo, 15 em 1", accent: "red" as const },
+                  { n: "3", label: "Pacotes", nota: "Pacote 03, Turbo, 15 em 1", accent: "red" as const },
                   { n: "15", label: "Contas matrizes", nota: "Netflix, Disney+, HBO Max, Spotify, IPTV…", accent: "cyan" as const },
                   { n: "9", label: "Usuários", nota: "8 clientes + 1 conta admin", accent: "purple" as const },
                 ].map((s) => (

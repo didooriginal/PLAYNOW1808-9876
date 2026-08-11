@@ -4,7 +4,8 @@ import { ORPCError } from "@orpc/server";
 import { authed, withUser } from "../middleware/auth";
 import { db } from "../database";
 import { cobrancasPix, usuarios } from "../database/schema";
-import { abrirCobranca } from "./pix";
+import { abrirCobranca, sincronizarCobranca } from "./pix";
+import { CICLOS } from "../lib/ciclos";
 import {
   cobrancaViva,
   enxugar,
@@ -26,7 +27,7 @@ const entrada = z.object({
   pacoteId: z.number().int().nullable().optional(),
   comboId: z.number().int().nullable().optional(),
   apps: z.array(z.string()).optional(),
-  ciclo: z.enum(["mensal", "anual"]).optional(),
+  ciclo: z.enum(CICLOS).optional(),
   jogos: z.boolean().optional(),
 });
 
@@ -75,6 +76,8 @@ export const checkout = {
         valor: viva.valor,
         descricao: viva.descricao,
         copiaECola: viva.copiaECola,
+        qrBase64: viva.qrBase64,
+        linkPagamento: viva.linkPagamento,
         provedor: viva.provedor,
         expiraEm: viva.expiraEm.toISOString(),
         status: viva.status,
@@ -100,10 +103,14 @@ export const checkout = {
   /** o checkout consulta até virar "pago" e então libera o painel */
   status: authed.input(z.object({ txid: z.string().min(4) })).handler(async ({ context, input }) => {
     const cliente = await clienteDaSessao(context.user.id);
-    const [cobranca] = await db
-      .select()
+    const [dono] = await db
+      .select({ id: cobrancasPix.id })
       .from(cobrancasPix)
       .where(and(eq(cobrancasPix.txid, input.txid), eq(cobrancasPix.clienteId, cliente.id)));
+    if (!dono) throw new ORPCError("NOT_FOUND", { message: "Cobrança não encontrada" });
+
+    // reconfere no Mercado Pago antes de responder: não dependemos só do webhook
+    const cobranca = await sincronizarCobranca(input.txid);
     if (!cobranca) throw new ORPCError("NOT_FOUND", { message: "Cobrança não encontrada" });
     return {
       status: cobranca.status,

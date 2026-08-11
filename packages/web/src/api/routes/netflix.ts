@@ -74,10 +74,10 @@ async function minhasContasNetflix(clienteId: number) {
     );
 }
 
-/** mascara o e-mail da matriz: "mat****01@plaplusnow.com" */
+/** mascara o e-mail da matriz: "mat****01@playplusnow.com" */
 function mascarar(email: string) {
   const [usuario, dominio] = email.split("@");
-  if (!usuario || !dominio) return "conta da PLAPLUSNOW";
+  if (!usuario || !dominio) return "conta da PLAYPLUSNOW";
   const visivel = usuario.slice(0, 3);
   const fim = usuario.length > 5 ? usuario.slice(-2) : "";
   return `${visivel}${"*".repeat(Math.max(2, usuario.length - visivel.length - fim.length))}${fim}@${dominio}`;
@@ -92,7 +92,7 @@ export const netflix = {
   minhaTela: authed.handler(async ({ context }) => {
     const cliente = await clienteDaSessao(context.user.id);
     // inadimplente nao recebe codigo nem abre pedido de TV
-    if (estaBloqueado(cliente.statusPagamento)) {
+    if (estaBloqueado(cliente.statusPagamento, cliente.confiancaAte)) {
       return {
         bloqueado: true as const,
         motivo: MSG_BLOQUEIO,
@@ -172,7 +172,7 @@ export const netflix = {
     )
     .handler(async ({ context, input }) => {
       const cliente = await clienteDaSessao(context.user.id);
-      if (estaBloqueado(cliente.statusPagamento)) {
+      if (estaBloqueado(cliente.statusPagamento, cliente.confiancaAte)) {
         throw new ORPCError("FORBIDDEN", { message: MSG_BLOQUEIO });
       }
       const codigo = normalizarCodigoTv(input.codigoTv);

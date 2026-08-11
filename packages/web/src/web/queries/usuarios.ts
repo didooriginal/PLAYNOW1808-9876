@@ -54,6 +54,21 @@ export function useAceitarTermos() {
   );
 }
 
+/**
+ * CRÉDITO DE CONFIANÇA — libera o cliente inadimplente por 48h (padrão) como se
+ * ele estivesse em dia. Invalida também o painel do cliente, então o acesso dele
+ * volta no próximo refetch sem precisar de logout.
+ */
+export function useConcederConfianca() {
+  const invalidar = useInvalidarUsuarios();
+  return useMutation(orpc.usuarios.concederConfianca.mutationOptions({ onSuccess: invalidar }));
+}
+
+export function useRevogarConfianca() {
+  const invalidar = useInvalidarUsuarios();
+  return useMutation(orpc.usuarios.revogarConfianca.mutationOptions({ onSuccess: invalidar }));
+}
+
 /** Trava de vencimento: unica forma de mudar a data de cobranca. */
 export function useAlterarVencimento() {
   const invalidar = useInvalidarUsuarios();

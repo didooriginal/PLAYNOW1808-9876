@@ -1,7 +1,7 @@
 // PEDIDOS DO CHECKOUT — preço calculado no servidor e ativação automática.
 //
 // Todo botão de compra do site cai aqui: plano da landing, combo pronto, combo
-// montado na calculadora e o adicional Sala de Jogos. O front NUNCA manda o
+// montado na calculadora e o adicional Futebol Ao Vivo. O front NUNCA manda o
 // valor — ele manda o que o cliente escolheu e o servidor precifica com a
 // tabela do banco. Depois que o Pix é confirmado, `aplicarPedido()` liga tudo
 // sozinho: pacote trocado, apps alocados, próxima cobrança e status ativo.
@@ -17,6 +17,15 @@ import {
 } from "../database/schema";
 import { lerParametros } from "./config";
 import { garantirAlocacao } from "../routes/alocacoes";
+import {
+  type Ciclo,
+  DEFINICOES,
+  mesesDoCiclo,
+  normalizarCiclo,
+  periodoDoCiclo,
+  precificarCiclo,
+  somarMeses,
+} from "./ciclos";
 
 export type EntradaPedido = {
   /** slug do pacote da landing (ex.: "combo-total") ou id numérico */
@@ -25,8 +34,8 @@ export type EntradaPedido = {
   comboId?: number | null;
   /** combo montado na calculadora — slugs de `aplicativos` */
   apps?: string[];
-  ciclo?: "mensal" | "anual";
-  /** adicional Sala de Jogos (sozinho ou junto da assinatura) */
+  ciclo?: Ciclo;
+  /** adicional Futebol Ao Vivo (sozinho ou junto da assinatura) */
   jogos?: boolean;
 };
 
@@ -36,7 +45,7 @@ export type Pedido = {
   pacoteId: number | null;
   comboId: number | null;
   apps: string[];
-  ciclo: "mensal" | "anual";
+  ciclo: Ciclo;
   valor: number;
 };
 
@@ -47,7 +56,11 @@ export type PedidoPrecificado = Pedido & {
   precoCheio: number;
   desconto: number;
   /** rótulo do ciclo cobrado */
-  periodo: "mês" | "ano";
+  periodo: string;
+  /** quantos meses estão sendo pagos nesta compra */
+  meses: number;
+  /** valor equivalente por mês, para exibir "R$ X/mês" */
+  mensal: number;
 };
 
 /** faixas de desconto do montador — espelham `builderTiers` da landing */
@@ -66,23 +79,25 @@ const cent = (v: number) => Math.round(v * 100) / 100;
  */
 export async function precificarPedido(entrada: EntradaPedido): Promise<PedidoPrecificado> {
   const params = await lerParametros();
-  const ciclo: "mensal" | "anual" = entrada.ciclo === "anual" ? "anual" : "mensal";
+  const ciclo: Ciclo = normalizarCiclo(entrada.ciclo);
 
-  /* ---------------- adicional Sala de Jogos ---------------- */
+  /* ---------------- adicional Futebol Ao Vivo ---------------- */
   if (entrada.jogos && !entrada.pacoteId && !entrada.comboId && !entrada.apps?.length) {
     const valor = cent(params.precoSalaJogos);
     return {
       tipo: "jogos",
-      titulo: "Adicional Sala de Jogos",
+      titulo: "Adicional Futebol Ao Vivo",
       pacoteId: null,
       comboId: null,
       apps: [],
       ciclo: "mensal",
       valor,
-      itens: [{ rotulo: "Sala de Jogos — acesso liberado na hora", valor }],
+      itens: [{ rotulo: "Futebol Ao Vivo — acesso liberado na hora", valor }],
       precoCheio: valor,
       desconto: 0,
       periodo: "mês",
+      meses: 1,
+      mensal: valor,
     };
   }
 
@@ -94,29 +109,41 @@ export async function precificarPedido(entrada: EntradaPedido): Promise<PedidoPr
       .where(and(eq(pacotes.id, entrada.pacoteId), eq(pacotes.ativo, true)));
     if (!pacote) throw new Error("Pacote indisponível");
 
-    // sem preço anual cadastrado, o site anuncia 20% off (2 meses grátis)
-    const mensal =
-      ciclo === "anual" ? (pacote.precoAnual ?? cent(pacote.preco * 0.8)) : pacote.preco;
-    const valor = cent(ciclo === "anual" ? mensal * 12 : mensal);
-    const cheio = await somaAvulsos(pacote.servicos ?? []);
+    // `precoAnual` cadastrado na mão manda no lugar do percentual da tabela
+    const promocional = ciclo === "anual" ? pacote.precoAnual : null;
+    const preco = precificarCiclo(pacote.preco, ciclo, promocional);
+    const avulso = await somaAvulsos(pacote.servicos ?? []);
+    const cheio = cent(avulso * preco.meses);
 
     return {
       tipo: "assinatura",
-      titulo: `${rotularPacote(pacote.nome)}${ciclo === "anual" ? " · anual" : ""}`,
+      titulo: `${rotularPacote(pacote.nome)}${ciclo === "mensal" ? "" : ` · ${preco.rotulo.toLowerCase()}`}`,
       pacoteId: pacote.id,
       comboId: null,
       apps: pacote.servicos ?? [],
       ciclo,
-      valor,
+      valor: preco.total,
       itens: [
         {
           rotulo: `${pacote.nome} · ${(pacote.servicos ?? []).length} apps`,
-          valor,
+          valor: cent(pacote.preco * preco.meses),
         },
+        ...(preco.economia > 0 && ciclo !== "mensal"
+          ? [
+              {
+                rotulo: `Desconto ${preco.rotulo.toLowerCase()} (${Math.round(
+                  (1 - preco.mensal / pacote.preco) * 100,
+                )}%)`,
+                valor: -cent(pacote.preco * preco.meses - preco.total),
+              },
+            ]
+          : []),
       ],
-      precoCheio: cent(ciclo === "anual" ? cheio * 12 : cheio),
-      desconto: cent(Math.max(0, (ciclo === "anual" ? cheio * 12 : cheio) - valor)),
-      periodo: ciclo === "anual" ? "ano" : "mês",
+      precoCheio: cheio,
+      desconto: cent(Math.max(0, cheio - preco.total)),
+      periodo: preco.periodo,
+      meses: preco.meses,
+      mensal: preco.mensal,
     };
   }
 
@@ -128,7 +155,7 @@ export async function precificarPedido(entrada: EntradaPedido): Promise<PedidoPr
       .where(and(eq(combos.id, entrada.comboId), eq(combos.ativo, true)));
     if (!combo) throw new Error("Combo indisponível");
 
-    const cicloCombo: "mensal" | "anual" = combo.ciclo === "anual" ? "anual" : "mensal";
+    const cicloCombo = normalizarCiclo(combo.ciclo);
     const valor = cent(combo.preco);
     const cheio = cent(combo.precoCheio || (await somaAvulsos(combo.apps ?? [])));
 
@@ -143,7 +170,9 @@ export async function precificarPedido(entrada: EntradaPedido): Promise<PedidoPr
       itens: [{ rotulo: `${combo.nome} · ${(combo.apps ?? []).length} apps`, valor }],
       precoCheio: cheio,
       desconto: cent(Math.max(0, cheio - valor)),
-      periodo: cicloCombo === "anual" ? "ano" : "mês",
+      periodo: periodoDoCiclo(cicloCombo),
+      meses: mesesDoCiclo(cicloCombo),
+      mensal: cent(valor / mesesDoCiclo(cicloCombo)),
     };
   }
 
@@ -160,26 +189,45 @@ export async function precificarPedido(entrada: EntradaPedido): Promise<PedidoPr
   const subtotal = cent(catalogo.reduce((s, a) => s + (a.preco || a.precoAvulso), 0));
   const faixa = FAIXAS.find((f) => catalogo.length >= f.min);
   const desconto = cent(faixa ? subtotal * faixa.off : 0);
-  const valor = cent(subtotal - desconto);
-  const cheio = cent(catalogo.reduce((s, a) => s + (a.precoAvulso || a.preco), 0));
+  /** mensalidade do combo montado, já com o desconto por volume */
+  const mensalMontado = cent(subtotal - desconto);
+  // o ciclo escolhido incide DEPOIS do desconto por volume: os dois se somam
+  const preco = precificarCiclo(mensalMontado, ciclo);
+  const avulso = cent(catalogo.reduce((s, a) => s + (a.precoAvulso || a.preco), 0));
+  const cheio = cent(avulso * preco.meses);
 
   return {
     tipo: "assinatura",
-    titulo: `Combo personalizado · ${catalogo.length} apps`,
+    titulo: `Combo personalizado · ${catalogo.length} apps${
+      ciclo === "mensal" ? "" : ` · ${preco.rotulo.toLowerCase()}`
+    }`,
     pacoteId: null,
     comboId: null,
     apps: catalogo.map((a) => a.slug),
-    ciclo: "mensal",
-    valor,
+    ciclo,
+    valor: preco.total,
     itens: [
       ...catalogo.map((a) => ({ rotulo: a.nome, valor: cent(a.preco || a.precoAvulso) })),
       ...(desconto > 0
         ? [{ rotulo: `Desconto por volume (${Math.round((faixa?.off ?? 0) * 100)}%)`, valor: -desconto }]
         : []),
+      ...(preco.meses > 1
+        ? [
+            { rotulo: `× ${preco.meses} meses`, valor: cent(mensalMontado * preco.meses - mensalMontado) },
+            {
+              rotulo: `Desconto ${preco.rotulo.toLowerCase()} (${Math.round(
+                DEFINICOES[ciclo].desconto * 100,
+              )}%)`,
+              valor: -cent(mensalMontado * preco.meses - preco.total),
+            },
+          ]
+        : []),
     ],
     precoCheio: cheio,
-    desconto: cent(Math.max(0, cheio - valor)),
-    periodo: "mês",
+    desconto: cent(Math.max(0, cheio - preco.total)),
+    periodo: preco.periodo,
+    meses: preco.meses,
+    mensal: preco.mensal,
   };
 }
 
@@ -211,11 +259,10 @@ function iso(d: Date) {
   return d.toISOString().slice(0, 10);
 }
 
-function proximaData(ciclo: "mensal" | "anual") {
-  const d = new Date();
-  if (ciclo === "anual") d.setFullYear(d.getFullYear() + 1);
-  else d.setMonth(d.getMonth() + 1);
-  return iso(d);
+function proximaData(ciclo: Ciclo, base?: string) {
+  // a partir do vencimento atual quando ele existe, para renovação não
+  // "perder" dias já pagos pelo cliente
+  return somarMeses(base || iso(new Date()), mesesDoCiclo(ciclo));
 }
 
 /**
@@ -234,17 +281,39 @@ export async function aplicarPedido(clienteId: number, pedido: Pedido) {
     return;
   }
 
+  const hoje = iso(new Date());
+  /**
+   * Pagar adiantado NÃO pode encurtar o que o cliente já pagou: quando o
+   * vencimento atual ainda está no futuro, o novo período começa a contar dele,
+   * não de hoje. É o que faz o desconto de antecipação ser honesto.
+   */
+  const base =
+    cliente.proximaCobranca && cliente.proximaCobranca > hoje ? cliente.proximaCobranca : hoje;
+
+  /**
+   * Adiantamento de mensalidade não troca o plano nem o ciclo do cliente: ele
+   * só empurra o vencimento. Por isso preserva `pacoteId`/`ciclo`/`valor`.
+   */
+  const soAdiantamento = /^Adiantamento da mensalidade/i.test(pedido.titulo);
+
   await db
     .update(usuarios)
     .set({
-      pacoteId: pedido.pacoteId,
-      ciclo: pedido.ciclo,
-      valor: pedido.ciclo === "anual" ? Math.round((pedido.valor / 12) * 100) / 100 : pedido.valor,
+      ...(soAdiantamento
+        ? {}
+        : {
+            pacoteId: pedido.pacoteId,
+            ciclo: pedido.ciclo,
+            // `valor` no cadastro é sempre a MENSALIDADE equivalente
+            valor: cent(pedido.valor / mesesDoCiclo(pedido.ciclo)),
+          }),
       statusPagamento: "ativo",
-      proximaCobranca: proximaData(pedido.ciclo),
-      clienteDesde: cliente.clienteDesde || iso(new Date()),
+      proximaCobranca: proximaData(soAdiantamento ? "mensal" : pedido.ciclo, base),
+      clienteDesde: cliente.clienteDesde || hoje,
     })
     .where(eq(usuarios.id, clienteId));
+
+  if (soAdiantamento) return;
 
   // libera uma vaga de cada app comprado (silencioso quando o estoque acabou —
   // o admin vê o cliente aguardando vaga na aba Saúde & Estoque)

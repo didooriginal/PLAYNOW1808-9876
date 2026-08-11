@@ -4,7 +4,7 @@ import {
   AlertTriangle,
   BarChart3,
   Boxes,
-  Gamepad2,
+  Goal,
   HeartPulse,
   HeartHandshake,
   Wallet,
@@ -20,11 +20,15 @@ import {
   Receipt,
   Search,
   ShieldCheck,
+  ShieldOff,
+  Pencil,
+  Power,
   Trash2,
   TrendingUp,
   Trophy,
   KeyRound,
   BookOpen,
+  Ticket,
   Tv,
   UserPlus,
   Users,
@@ -44,6 +48,7 @@ import { NetflixTvView } from "../components/admin/netflix-tv-view";
 import { CopilotoAdmin } from "../components/admin/copiloto";
 import { AlertasView } from "../components/admin/alertas-view";
 import { GestaoContasView } from "../components/admin/gestao-contas-view";
+import { EstoqueGiftView } from "../components/admin/estoque-gift-view";
 import { JogosView } from "../components/admin/jogos-view";
 import { SaudeView } from "../components/admin/saude-view";
 import { RecuperacaoView } from "../components/admin/recuperacao-view";
@@ -59,6 +64,7 @@ import {
   ProgressBar,
   accentHex,
 } from "../components/ui/kit";
+import { Ajuda, Campo, Rotulo, TituloSecao, Tooltip } from "../components/ui/tooltip";
 import {
   brl,
   serviceById,
@@ -73,6 +79,7 @@ import { useAplicativos } from "../queries/aplicativos";
 import { useResumoSuporte } from "../queries/suporte";
 import { useResumoRecompensas } from "../queries/recompensas";
 import { useCodigos } from "../queries/codigos";
+import { useResumoEstoqueGift } from "../queries/estoque-gift";
 import { useFilaTvNetflix } from "../queries/netflix";
 import {
   useFaturas,
@@ -81,10 +88,17 @@ import {
   useSerieReceita,
   dataBr,
 } from "../queries/faturas";
-import { usePacotes, useCriarPacote, useRemoverPacote } from "../queries/pacotes";
+import {
+  usePacotes,
+  useCriarPacote,
+  useAtualizarPacote,
+  useRemoverPacote,
+} from "../queries/pacotes";
 import {
   useAlterarVencimento,
   useAtualizarUsuario,
+  useConcederConfianca,
+  useRevogarConfianca,
   useCriarUsuario,
   useEu,
   useHistoricoVencimento,
@@ -263,7 +277,7 @@ function NovaContaForm({ onClose }: { onClose: () => void }) {
   return (
     <GlassCard strong accent="purple" className="p-5">
       <div className="flex items-center justify-between gap-3">
-        <div className="font-display text-sm font-bold text-white">Nova conta matriz</div>
+        <TituloSecao ajuda="secao.estoque">Nova conta matriz</TituloSecao>
         <button
           type="button"
           onClick={onClose}
@@ -274,80 +288,104 @@ function NovaContaForm({ onClose }: { onClose: () => void }) {
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <select
-          value={form.servico}
-          onChange={(e) => set("servico", e.target.value)}
-          className={input}
-        >
-          {(apps.length ? apps : services.map((s) => ({ slug: s.id, nome: s.name }))).map((a) => (
-            <option key={a.slug} value={a.slug} className="bg-[#09090b]">
-              {a.nome}
-            </option>
-          ))}
-        </select>
-        <input
-          className={input}
-          placeholder="Rótulo (ex.: Netflix — Matriz 09)"
-          value={form.rotulo}
-          onChange={(e) => set("rotulo", e.target.value)}
-        />
-        <input
-          className={input}
-          placeholder="E-mail do streaming"
-          value={form.email}
-          onChange={(e) => set("email", e.target.value)}
-        />
-        <input
-          className={input}
-          placeholder="Senha"
-          value={form.senha}
-          onChange={(e) => set("senha", e.target.value)}
-        />
-        <input
-          className={input}
-          type="number"
-          min={1}
-          placeholder="Total de vagas"
-          value={form.totalVagas}
-          onChange={(e) => set("totalVagas", Number(e.target.value))}
-        />
-        <input
-          className={input}
-          placeholder="Renovação (dd/mm/aaaa)"
-          value={form.renovacao}
-          onChange={(e) => set("renovacao", e.target.value)}
-        />
-        <input
-          className={input}
-          type="number"
-          step="0.01"
-          placeholder="Custo mensal"
-          value={form.custo}
-          onChange={(e) => set("custo", Number(e.target.value))}
-        />
-        <input
-          className={input}
-          placeholder="Região"
-          value={form.regiao}
-          onChange={(e) => set("regiao", e.target.value)}
-        />
-        <label className="flex flex-col gap-1">
-          <span className="font-sans text-[10px] uppercase tracking-[0.16em] text-white/30">
-            Data de vencimento
-          </span>
+        <Campo label="Serviço" ajuda="contas.servico" htmlFor="nc-servico">
+          <select
+            id="nc-servico"
+            value={form.servico}
+            onChange={(e) => set("servico", e.target.value)}
+            className={input}
+          >
+            {(apps.length ? apps : services.map((s) => ({ slug: s.id, nome: s.name }))).map((a) => (
+              <option key={a.slug} value={a.slug} className="bg-[#09090b]">
+                {a.nome}
+              </option>
+            ))}
+          </select>
+        </Campo>
+        <Campo label="Rótulo" ajuda="contas.rotulo" htmlFor="nc-rotulo" obrigatorio>
           <input
+            id="nc-rotulo"
+            className={input}
+            placeholder="Ex.: Netflix — Matriz 09"
+            value={form.rotulo}
+            onChange={(e) => set("rotulo", e.target.value)}
+          />
+        </Campo>
+        <Campo label="E-mail do streaming" ajuda="contas.email" htmlFor="nc-email" obrigatorio>
+          <input
+            id="nc-email"
+            className={input}
+            placeholder="matriz@playplusnow.com"
+            value={form.email}
+            onChange={(e) => set("email", e.target.value)}
+          />
+        </Campo>
+        <Campo label="Senha" ajuda="contas.senha" htmlFor="nc-senha" obrigatorio>
+          <input
+            id="nc-senha"
+            className={input}
+            placeholder="Senha da conta"
+            value={form.senha}
+            onChange={(e) => set("senha", e.target.value)}
+          />
+        </Campo>
+        <Campo label="Total de vagas" ajuda="contas.totalVagas" htmlFor="nc-vagas">
+          <input
+            id="nc-vagas"
+            className={input}
+            type="number"
+            min={1}
+            value={form.totalVagas}
+            onChange={(e) => set("totalVagas", Number(e.target.value))}
+          />
+        </Campo>
+        <Campo label="Renovação" ajuda="contas.vencimento" htmlFor="nc-renovacao">
+          <input
+            id="nc-renovacao"
+            className={input}
+            placeholder="dd/mm/aaaa"
+            value={form.renovacao}
+            onChange={(e) => set("renovacao", e.target.value)}
+          />
+        </Campo>
+        <Campo label="Custo mensal" ajuda="contas.custoMensal" htmlFor="nc-custo">
+          <input
+            id="nc-custo"
+            className={input}
+            type="number"
+            step="0.01"
+            placeholder="0,00"
+            value={form.custo}
+            onChange={(e) => set("custo", Number(e.target.value))}
+          />
+        </Campo>
+        <Campo label="Região" ajuda="contas.regiao" htmlFor="nc-regiao">
+          <input
+            id="nc-regiao"
+            className={input}
+            placeholder="BR"
+            value={form.regiao}
+            onChange={(e) => set("regiao", e.target.value)}
+          />
+        </Campo>
+        <Campo label="Data de vencimento" ajuda="contas.vencimento" htmlFor="nc-vencimento">
+          <input
+            id="nc-vencimento"
             className={input}
             type="date"
             value={form.dataVencimento}
             onChange={(e) => set("dataVencimento", e.target.value)}
           />
-        </label>
-        <input
-          className={input}
-          placeholder="Cartão utilizado (ex.: Nubank final 4412)"
-          value={form.cartaoUtilizado}
-          onChange={(e) => set("cartaoUtilizado", e.target.value)}
-        />
+        </Campo>
+        <Campo label="Cartão utilizado" ajuda="contas.cartao" htmlFor="nc-cartao">
+          <input
+            id="nc-cartao"
+            className={input}
+            placeholder="Ex.: Nubank final 4412"
+            value={form.cartaoUtilizado}
+            onChange={(e) => set("cartaoUtilizado", e.target.value)}
+          />
+        </Campo>
       </div>
 
       {criar.isError && (
@@ -459,9 +497,11 @@ function StockView() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            aria-label="Buscar conta matriz ou login"
             placeholder="Buscar conta matriz ou login..."
             className="w-full bg-transparent font-sans text-sm text-white placeholder:text-white/25 focus:outline-none"
           />
+          <Ajuda ajuda="busca.contas" />
         </div>
         <div className="flex gap-1.5">
           {(["todas", "esgotadas", "livres", "vencendo"] as const).map((f) => (
@@ -516,10 +556,245 @@ function StockView() {
 
 /* ------------------------------------------------------------------ */
 
+/**
+ * EDICAO COMPLETA DO PACOTE
+ * ------------------------------------------------------------------
+ * Mesmos campos do formulario de criacao, ja preenchidos. Salva via
+ * `pacotes.atualizar`, que aceita o input parcial — mandamos o objeto
+ * inteiro para o admin conseguir corrigir qualquer campo numa passada.
+ */
+function ModalEditarPacote({ pacote, onClose }: { pacote: Pacote; onClose: () => void }) {
+  const atualizar = useAtualizarPacote();
+  const [form, setForm] = useState({
+    nome: pacote.nome,
+    tagline: pacote.tagline ?? "",
+    preco: pacote.preco,
+    precoAnual: pacote.precoAnual ?? 0,
+    vagasRestantes: pacote.vagasRestantes ?? 0,
+    perks: (pacote.perks ?? []).join(", "),
+    badge: pacote.badge ?? "",
+    accent: (pacote.accent ?? "cyan") as Accent,
+    destaque: pacote.destaque,
+    servicos: [...(pacote.servicos ?? [])] as string[],
+  });
+
+  const toggle = (id: string) =>
+    setForm((f) => ({
+      ...f,
+      servicos: f.servicos.includes(id)
+        ? f.servicos.filter((x) => x !== id)
+        : [...f.servicos, id],
+    }));
+
+  const input =
+    "w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 font-sans text-sm text-white placeholder:text-white/25 focus:border-neon-purple/50 focus:outline-none";
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
+      <div
+        className="max-h-[88vh] w-full max-w-2xl overflow-y-auto rounded-3xl border border-white/12 bg-[#0b0b0f] p-6"
+        data-testid="modal-editar-pacote"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="font-sans text-[10px] uppercase tracking-[0.22em] text-white/35">
+              Editar pacote
+            </div>
+            <h3 className="mt-1 font-display text-xl font-extrabold text-white">{pacote.nome}</h3>
+            <p className="mt-1 font-sans text-[12px] text-white/40">
+              As mudanças valem na hora na landing. Quem já assina mantém os apps liberados.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Fechar"
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg text-white/40 hover:text-white"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-[1.4fr_0.6fr]">
+          <Campo label="Nome do pacote" ajuda="pacote.nome" htmlFor="ep-nome" obrigatorio>
+            <input
+              id="ep-nome"
+              className={input}
+              data-testid="editar-nome-pacote"
+              value={form.nome}
+              onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))}
+            />
+          </Campo>
+          <Campo label="Preço mensal" ajuda="pacote.precoMensal" htmlFor="ep-preco" obrigatorio>
+            <input
+              id="ep-preco"
+              type="number"
+              step="0.01"
+              className={input}
+              value={form.preco}
+              onChange={(e) => setForm((f) => ({ ...f, preco: Number(e.target.value) }))}
+            />
+          </Campo>
+        </div>
+
+        <div className="mt-3 grid gap-3 sm:grid-cols-[1.4fr_0.6fr]">
+          <Campo label="Tagline" ajuda="pacote.tagline" htmlFor="ep-tagline">
+            <input
+              id="ep-tagline"
+              className={input}
+              value={form.tagline}
+              onChange={(e) => setForm((f) => ({ ...f, tagline: e.target.value }))}
+            />
+          </Campo>
+          <Campo label="Preço anual /mês" ajuda="pacote.precoAnual" htmlFor="ep-preco-anual">
+            <input
+              id="ep-preco-anual"
+              type="number"
+              step="0.01"
+              className={input}
+              value={form.precoAnual}
+              onChange={(e) => setForm((f) => ({ ...f, precoAnual: Number(e.target.value) }))}
+            />
+          </Campo>
+        </div>
+
+        <div className="mt-3 grid gap-3 sm:grid-cols-[1.4fr_0.6fr]">
+          <Campo label="Benefícios" ajuda="pacote.beneficios" htmlFor="ep-perks">
+            <input
+              id="ep-perks"
+              className={input}
+              placeholder="Separados por vírgula"
+              value={form.perks}
+              onChange={(e) => setForm((f) => ({ ...f, perks: e.target.value }))}
+            />
+          </Campo>
+          <Campo label="Vagas restantes" ajuda="pacote.vagas" htmlFor="ep-vagas">
+            <input
+              id="ep-vagas"
+              type="number"
+              className={input}
+              value={form.vagasRestantes}
+              onChange={(e) => setForm((f) => ({ ...f, vagasRestantes: Number(e.target.value) }))}
+            />
+          </Campo>
+        </div>
+
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <Campo label="Etiqueta do card" ajuda="pacote.badge" htmlFor="ep-badge">
+            <input
+              id="ep-badge"
+              className={input}
+              placeholder="Ex.: Mais vendido"
+              value={form.badge}
+              onChange={(e) => setForm((f) => ({ ...f, badge: e.target.value }))}
+            />
+          </Campo>
+          <Campo label="Cor de destaque" ajuda="pacote.accent" htmlFor="ep-accent">
+            <select
+              id="ep-accent"
+              className={input}
+              value={form.accent}
+              onChange={(e) => setForm((f) => ({ ...f, accent: e.target.value as Accent }))}
+            >
+              <option value="red" className="bg-[#09090b]">
+                Vermelho
+              </option>
+              <option value="cyan" className="bg-[#09090b]">
+                Ciano
+              </option>
+              <option value="purple" className="bg-[#09090b]">
+                Roxo
+              </option>
+            </select>
+          </Campo>
+        </div>
+
+        <label className="mt-3 flex w-fit cursor-pointer items-center gap-2 font-sans text-xs text-white/50">
+          <input
+            type="checkbox"
+            checked={form.destaque}
+            onChange={(e) => setForm((f) => ({ ...f, destaque: e.target.checked }))}
+            className="size-4 accent-[#ff1f3d]"
+          />
+          Pacote em destaque
+          <Ajuda ajuda="pacote.destaque" />
+        </label>
+
+        <div className="mt-4">
+          <Rotulo ajuda="pacote.apps">Apps do pacote ({form.servicos.length})</Rotulo>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {services.map((sv) => {
+              const on = form.servicos.includes(sv.id);
+              return (
+                <button
+                  key={sv.id}
+                  type="button"
+                  onClick={() => toggle(sv.id)}
+                  className={cn(
+                    "flex items-center gap-2 rounded-full border px-3 py-2 font-sans text-xs transition-all",
+                    on
+                      ? "border-neon-cyan/50 bg-neon-cyan/10 text-neon-cyan"
+                      : "border-white/10 bg-white/[0.03] text-white/45 hover:text-white",
+                  )}
+                >
+                  <AppIcon id={sv.id} size="xs" active={on} />
+                  {sv.name}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {atualizar.isError && (
+          <p className="mt-3 font-sans text-xs text-neon-red">{atualizar.error?.message}</p>
+        )}
+
+        <NeonButton
+          accent="purple"
+          size="sm"
+          className="mt-5"
+          data-testid="salvar-pacote"
+          disabled={atualizar.isPending || !form.nome.trim() || form.servicos.length === 0}
+          onClick={() =>
+            atualizar.mutate(
+              {
+                id: pacote.id,
+                nome: form.nome.trim(),
+                tagline: form.tagline,
+                preco: form.preco,
+                precoAnual: form.precoAnual > 0 ? form.precoAnual : null,
+                servicos: form.servicos,
+                perks: form.perks
+                  .split(",")
+                  .map((x) => x.trim())
+                  .filter(Boolean),
+                accent: form.accent,
+                badge: form.badge.trim() || null,
+                destaque: form.destaque,
+                vagasRestantes: form.vagasRestantes,
+              },
+              { onSuccess: onClose },
+            )
+          }
+        >
+          {atualizar.isPending ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <Pencil className="size-4" />
+          )}
+          Salvar alterações
+        </NeonButton>
+      </div>
+    </div>
+  );
+}
+
 function PackagesView() {
   const { data: pacotes, isPending, isError, error } = usePacotes();
   const criar = useCriarPacote();
   const remover = useRemoverPacote();
+  const atualizar = useAtualizarPacote();
+  const [editando, setEditando] = useState<Pacote | null>(null);
   const [form, setForm] = useState({
     nome: "",
     tagline: "",
@@ -556,55 +831,73 @@ function PackagesView() {
   return (
     <div className="space-y-5">
       <GlassCard strong accent="purple" className="p-5">
-        <div className="font-display text-sm font-bold text-white">Novo pacote</div>
+        <TituloSecao ajuda="secao.pacotes">Novo pacote</TituloSecao>
         <div className="mt-4 grid gap-3 sm:grid-cols-[1.4fr_0.6fr]">
+          <Campo label="Nome do pacote" ajuda="pacote.nome" htmlFor="pk-nome" obrigatorio>
           <input
+            id="pk-nome"
             value={form.nome}
             onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))}
-            placeholder="Nome do combo"
-            className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 font-sans text-sm text-white placeholder:text-white/25 focus:border-neon-purple/50 focus:outline-none"
+            placeholder="Ex.: Turbo 10 em 1"
+            className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 font-sans text-sm text-white placeholder:text-white/25 focus:border-neon-purple/50 focus:outline-none"
           />
+          </Campo>
+          <Campo label="Preço mensal" ajuda="pacote.precoMensal" htmlFor="pk-preco" obrigatorio>
           <input
+            id="pk-preco"
             type="number"
             step="0.01"
             value={form.preco}
             onChange={(e) => setForm((f) => ({ ...f, preco: Number(e.target.value) }))}
-            placeholder="Preço mensal"
-            className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 font-sans text-sm text-white placeholder:text-white/25 focus:border-neon-purple/50 focus:outline-none"
+            placeholder="0,00"
+            className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 font-sans text-sm text-white placeholder:text-white/25 focus:border-neon-purple/50 focus:outline-none"
           />
+          </Campo>
         </div>
 
         <div className="mt-3 grid gap-3 sm:grid-cols-[1.4fr_0.6fr]">
+          <Campo label="Tagline" ajuda="pacote.tagline" htmlFor="pk-tagline">
           <input
+            id="pk-tagline"
             value={form.tagline}
             onChange={(e) => setForm((f) => ({ ...f, tagline: e.target.value }))}
-            placeholder="Tagline (aparece no card da landing)"
-            className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 font-sans text-sm text-white placeholder:text-white/25 focus:border-neon-purple/50 focus:outline-none"
+            placeholder="Aparece no card da landing"
+            className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 font-sans text-sm text-white placeholder:text-white/25 focus:border-neon-purple/50 focus:outline-none"
           />
+          </Campo>
+          <Campo label="Preço anual /mês" ajuda="pacote.precoAnual" htmlFor="pk-preco-anual">
           <input
+            id="pk-preco-anual"
             type="number"
             step="0.01"
             value={form.precoAnual}
             onChange={(e) => setForm((f) => ({ ...f, precoAnual: Number(e.target.value) }))}
-            placeholder="Preço anual /mês"
-            className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 font-sans text-sm text-white placeholder:text-white/25 focus:border-neon-purple/50 focus:outline-none"
+            placeholder="0,00"
+            className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 font-sans text-sm text-white placeholder:text-white/25 focus:border-neon-purple/50 focus:outline-none"
           />
+          </Campo>
         </div>
 
         <div className="mt-3 grid gap-3 sm:grid-cols-[1.4fr_0.6fr]">
+          <Campo label="Benefícios" ajuda="pacote.beneficios" htmlFor="pk-perks">
           <input
+            id="pk-perks"
             value={form.perks}
             onChange={(e) => setForm((f) => ({ ...f, perks: e.target.value }))}
-            placeholder="Benefícios separados por vírgula"
-            className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 font-sans text-sm text-white placeholder:text-white/25 focus:border-neon-purple/50 focus:outline-none"
+            placeholder="Separados por vírgula"
+            className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 font-sans text-sm text-white placeholder:text-white/25 focus:border-neon-purple/50 focus:outline-none"
           />
+          </Campo>
+          <Campo label="Vagas restantes" ajuda="pacote.vagas" htmlFor="pk-vagas">
           <input
+            id="pk-vagas"
             type="number"
             value={form.vagasRestantes}
             onChange={(e) => setForm((f) => ({ ...f, vagasRestantes: Number(e.target.value) }))}
-            placeholder="Vagas restantes"
-            className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 font-sans text-sm text-white placeholder:text-white/25 focus:border-neon-purple/50 focus:outline-none"
+            placeholder="0"
+            className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 font-sans text-sm text-white placeholder:text-white/25 focus:border-neon-purple/50 focus:outline-none"
           />
+          </Campo>
         </div>
 
         <label className="mt-3 flex w-fit cursor-pointer items-center gap-2 font-sans text-xs text-white/50">
@@ -615,6 +908,7 @@ function PackagesView() {
             className="size-4 accent-[#ff1f3d]"
           />
           Pacote em destaque (usado no hero e no comparativo da landing)
+          <Ajuda ajuda="pacote.destaque" />
         </label>
 
         <div className="mt-4 flex flex-wrap gap-2">
@@ -679,7 +973,12 @@ function PackagesView() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {(pacotes ?? []).map((p: Pacote) => (
-            <GlassCard key={p.id} accent={p.accent as Accent} hover className="flex flex-col p-5">
+            <GlassCard
+              key={p.id}
+              accent={p.accent as Accent}
+              hover
+              className={cn("flex flex-col p-5", !p.ativo && "opacity-55 saturate-50")}
+            >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="truncate font-display text-lg font-bold text-white">{p.nome}</div>
@@ -715,20 +1014,63 @@ function PackagesView() {
                 <Pill accent="cyan">{p.servicos.length} apps</Pill>
                 {p.precoAnual ? <Pill accent="purple">anual {brl(p.precoAnual)}</Pill> : null}
                 {p.destaque ? <Pill accent="red">destaque</Pill> : null}
-                <button
-                  type="button"
-                  className="ml-auto flex size-8 items-center justify-center rounded-lg border border-white/10 text-white/35 transition-colors hover:border-neon-red/50 hover:text-neon-red"
-                  aria-label="Excluir pacote"
-                  disabled={remover.isPending}
-                  onClick={() => remover.mutate({ id: p.id })}
-                >
-                  <Trash2 className="size-3.5" />
-                </button>
+                {p.ativo ? null : (
+                  <Pill accent="red" className="!text-white/60" icon={<Power className="size-3" />}>
+                    inativo
+                  </Pill>
+                )}
+
+                <div className="ml-auto flex shrink-0 items-center gap-2">
+                <Tooltip texto="pacote.ativar" titulo={p.ativo ? "Desativar" : "Ativar"}>
+                  <button
+                    type="button"
+                    data-testid={`ativar-pacote-${p.id}`}
+                    aria-label={p.ativo ? "Desativar pacote" : "Ativar pacote"}
+                    disabled={atualizar.isPending}
+                    onClick={() => atualizar.mutate({ id: p.id, ativo: !p.ativo })}
+                    className={cn(
+                      "flex h-8 items-center gap-1.5 rounded-lg border px-2.5 font-sans text-[11px] transition-colors",
+                      p.ativo
+                        ? "border-neon-cyan/45 text-neon-cyan hover:bg-neon-cyan/10"
+                        : "border-white/12 text-white/40 hover:border-white/30 hover:text-white",
+                    )}
+                  >
+                    <Power className="size-3.5" />
+                    {p.ativo ? "Ativo" : "Inativo"}
+                  </button>
+                </Tooltip>
+
+                <Tooltip texto="pacote.editar" titulo="Editar pacote">
+                  <button
+                    type="button"
+                    data-testid={`editar-pacote-${p.id}`}
+                    aria-label="Editar pacote"
+                    onClick={() => setEditando(p)}
+                    className="flex size-8 items-center justify-center rounded-lg border border-white/10 text-white/35 transition-colors hover:border-neon-purple/50 hover:text-neon-purple"
+                  >
+                    <Pencil className="size-3.5" />
+                  </button>
+                </Tooltip>
+
+                <Tooltip texto="pacote.excluir" titulo="Excluir pacote">
+                  <button
+                    type="button"
+                    className="flex size-8 items-center justify-center rounded-lg border border-white/10 text-white/35 transition-colors hover:border-neon-red/50 hover:text-neon-red"
+                    aria-label="Excluir pacote"
+                    disabled={remover.isPending}
+                    onClick={() => remover.mutate({ id: p.id })}
+                  >
+                    <Trash2 className="size-3.5" />
+                  </button>
+                </Tooltip>
+                </div>
               </div>
             </GlassCard>
           ))}
         </div>
       )}
+
+      {editando && <ModalEditarPacote pacote={editando} onClose={() => setEditando(null)} />}
     </div>
   );
 }
@@ -901,6 +1243,9 @@ const STATUS_STYLE: Record<string, string> = {
   suspenso: "border-white/25 bg-white/10 text-white/70",
 };
 
+/** Duração padrão do crédito de confiança, igual ao HORAS_CONFIANCA do servidor. */
+const HORAS_PADRAO_CONFIANCA = 48;
+
 /** Modal da trava de vencimento: exige motivo e mostra o historico. */
 function ModalVencimento({ cliente, onClose }: { cliente: Cliente; onClose: () => void }) {
   const alterar = useAlterarVencimento();
@@ -941,20 +1286,26 @@ function ModalVencimento({ cliente, onClose }: { cliente: Cliente; onClose: () =
         </div>
 
         <div className="mt-5 space-y-3">
-          <input
-            className={input}
-            placeholder="Nova data (dd/mm/aaaa)"
-            data-testid="nova-data-vencimento"
-            value={data}
-            onChange={(e) => setData(e.target.value)}
-          />
-          <textarea
-            className={cn(input, "min-h-[90px] resize-y")}
-            placeholder="Motivo da alteração (mínimo 5 caracteres)"
-            data-testid="motivo-vencimento"
-            value={motivo}
-            onChange={(e) => setMotivo(e.target.value)}
-          />
+          <Campo label="Nova data" ajuda="fatura.novaData" htmlFor="mv-data" obrigatorio>
+            <input
+              id="mv-data"
+              className={input}
+              placeholder="dd/mm/aaaa"
+              data-testid="nova-data-vencimento"
+              value={data}
+              onChange={(e) => setData(e.target.value)}
+            />
+          </Campo>
+          <Campo label="Motivo da alteração" ajuda="fatura.motivo" htmlFor="mv-motivo" obrigatorio>
+            <textarea
+              id="mv-motivo"
+              className={cn(input, "min-h-[90px] resize-y")}
+              placeholder="Mínimo 5 caracteres"
+              data-testid="motivo-vencimento"
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+            />
+          </Campo>
           {alterar.isError && (
             <p className="font-sans text-xs text-neon-red">{alterar.error?.message}</p>
           )}
@@ -1004,12 +1355,148 @@ function ModalVencimento({ cliente, onClose }: { cliente: Cliente; onClose: () =
   );
 }
 
+/**
+ * CREDITO DE CONFIANCA
+ * ------------------------------------------------------------------
+ * Quando o cliente atrasa, o admin pode liberar o acesso por um prazo curto
+ * (padrao 48h). Nao e uma flag de "confiavel": e uma DATA LIMITE gravada no
+ * cliente. Enquanto ela nao vence, o servidor trata o cliente como se
+ * estivesse em dia (logins, senhas, codigos, suporte, jornada). Vencendo,
+ * o bloqueio volta sozinho — sem rotina de limpeza para dar manutencao.
+ *
+ * Conceder de novo com credito ativo ESTENDE a partir de agora (nao soma) e
+ * nao conta como uma nova vez no contador.
+ */
+function ModalConfianca({ cliente, onClose }: { cliente: Cliente; onClose: () => void }) {
+  const conceder = useConcederConfianca();
+  const [horas, setHoras] = useState(HORAS_PADRAO_CONFIANCA);
+  const [motivo, setMotivo] = useState("");
+  const ativa = cliente.confianca?.ativa ?? false;
+
+  const input =
+    "w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 font-sans text-sm text-white placeholder:text-white/25 focus:border-neon-cyan/50 focus:outline-none";
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
+      <div
+        className="max-h-[88vh] w-full max-w-lg overflow-y-auto rounded-3xl border border-white/12 bg-[#0b0b0f] p-6"
+        data-testid="modal-confianca"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="font-sans text-[10px] uppercase tracking-[0.22em] text-neon-cyan/70">
+              Crédito de confiança
+            </div>
+            <h3 className="mt-1 font-display text-xl font-extrabold text-white">
+              Liberar acesso · {cliente.nome}
+            </h3>
+            <p className="mt-1 font-sans text-[12px] text-white/40">
+              O cliente volta a usar tudo normalmente durante o prazo, como se estivesse em dia.
+              Quando o prazo vence, o bloqueio volta automaticamente.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Fechar"
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg text-white/40 hover:text-white"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+
+        {ativa && (
+          <div className="mt-4 rounded-2xl border border-neon-cyan/30 bg-neon-cyan/[0.07] p-3 font-sans text-[12px] text-neon-cyan">
+            Já existe um crédito ativo, restam {cliente.confianca.horasRestantes}h{" "}
+            {cliente.confianca.minutosRestantes}m. Salvar aqui recomeça a contagem a partir de
+            agora.
+          </div>
+        )}
+
+        <div className="mt-5 space-y-3">
+          <div className="flex flex-wrap gap-2">
+            {[24, 48, 72, 168].map((h) => (
+              <button
+                key={h}
+                type="button"
+                onClick={() => setHoras(h)}
+                className={cn(
+                  "rounded-xl border px-3 py-1.5 font-sans text-[11.5px] transition-colors",
+                  horas === h
+                    ? "border-neon-cyan/55 bg-neon-cyan/12 text-white"
+                    : "border-white/10 bg-white/[0.03] text-white/45 hover:border-white/25",
+                )}
+              >
+                {h === 168 ? "7 dias" : `${h}h`}
+              </button>
+            ))}
+          </div>
+
+          <Campo label="Duração (horas)" ajuda="cliente.confiancaHoras" htmlFor="cf-horas" obrigatorio>
+            <input
+              id="cf-horas"
+              type="number"
+              min={1}
+              max={720}
+              className={input}
+              data-testid="horas-confianca"
+              value={horas}
+              onChange={(e) => setHoras(Number(e.target.value))}
+            />
+          </Campo>
+
+          <Campo label="Motivo" ajuda="cliente.confiancaMotivo" htmlFor="cf-motivo">
+            <textarea
+              id="cf-motivo"
+              className={cn(input, "min-h-[80px] resize-y")}
+              placeholder="Ex.: cliente avisou que paga na sexta"
+              data-testid="motivo-confianca"
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+            />
+          </Campo>
+
+          {conceder.isError && (
+            <p className="font-sans text-xs text-neon-red">{conceder.error?.message}</p>
+          )}
+
+          <NeonButton
+            accent="cyan"
+            size="sm"
+            data-testid="salvar-confianca"
+            disabled={conceder.isPending || horas < 1 || horas > 720}
+            onClick={() =>
+              conceder.mutate(
+                { id: cliente.id, horas, motivo: motivo.trim() },
+                { onSuccess: onClose },
+              )
+            }
+          >
+            {conceder.isPending ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <ShieldCheck className="size-4" />
+            )}
+            {ativa ? "Renovar crédito" : `Liberar por ${horas}h`}
+          </NeonButton>
+
+          <p className="font-sans text-[11px] text-white/30">
+            Créditos já concedidos a esse cliente: {cliente.confianca?.vezes ?? 0}.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ClientsTable({ compact = false }: { compact?: boolean }) {
   const { data, isPending, isError, error } = useUsuarios();
   const remover = useRemoverUsuario();
   const atualizar = useAtualizarUsuario();
   const [aba, setAba] = useState<string>("todos");
   const [editandoVencimento, setEditandoVencimento] = useState<Cliente | null>(null);
+  const [dandoConfianca, setDandoConfianca] = useState<Cliente | null>(null);
+  const revogar = useRevogarConfianca();
 
   if (isPending) return <Loading label="Carregando clientes..." />;
   if (isError) return <ErrorBox message={error?.message} />;
@@ -1099,6 +1586,7 @@ function ClientsTable({ compact = false }: { compact?: boolean }) {
                 </td>
                 <td className="px-3 py-3.5">
                   <select
+                    aria-label="Forma de pagamento do cliente"
                     data-testid={`forma-pagamento-${c.id}`}
                     className="rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1.5 font-sans text-[11px] text-white/70 focus:border-neon-purple/50 focus:outline-none"
                     value={c.formaPagamento ?? "pix"}
@@ -1118,15 +1606,17 @@ function ClientsTable({ compact = false }: { compact?: boolean }) {
                     <span className="font-sans text-xs text-white/45">
                       {c.proximaCobranca || "—"}
                     </span>
-                    <button
-                      type="button"
-                      data-testid={`alterar-vencimento-${c.id}`}
-                      onClick={() => setEditandoVencimento(c)}
-                      aria-label="Alterar vencimento"
-                      className="flex size-7 items-center justify-center rounded-lg border border-white/10 text-white/30 transition-colors hover:border-neon-purple/50 hover:text-neon-purple"
-                    >
-                      <CalendarClock className="size-3.5" />
-                    </button>
+                    <Tooltip texto="fatura.novaData" titulo="Alterar vencimento">
+                      <button
+                        type="button"
+                        data-testid={`alterar-vencimento-${c.id}`}
+                        onClick={() => setEditandoVencimento(c)}
+                        aria-label="Alterar vencimento"
+                        className="flex size-7 items-center justify-center rounded-lg border border-white/10 text-white/30 transition-colors hover:border-neon-purple/50 hover:text-neon-purple"
+                      >
+                        <CalendarClock className="size-3.5" />
+                      </button>
+                    </Tooltip>
                   </div>
                 </td>
                 <td className="px-3 py-3.5">
@@ -1138,17 +1628,66 @@ function ClientsTable({ compact = false }: { compact?: boolean }) {
                   >
                     {ROTULO_STATUS_CLIENTE[c.statusPagamento] ?? c.statusPagamento}
                   </span>
+                  {c.confianca?.ativa && (
+                    <div className="mt-1.5" data-testid={`selo-confianca-${c.id}`}>
+                      <Tooltip
+                        texto="cliente.confiancaAtiva"
+                        titulo="Crédito de confiança ativo"
+                        lado="left"
+                      >
+                        <span className="inline-flex items-center gap-1 rounded-full border border-neon-cyan/45 bg-neon-cyan/10 px-2 py-0.5 font-sans text-[10px] text-neon-cyan">
+                          <ShieldCheck className="size-3" />
+                          {c.confianca.horasRestantes}h {c.confianca.minutosRestantes}m
+                        </span>
+                      </Tooltip>
+                    </div>
+                  )}
                 </td>
-                <td className="px-5 py-3.5 text-right">
-                  <button
-                    type="button"
-                    className="flex size-8 items-center justify-center rounded-lg border border-white/10 text-white/30 transition-colors hover:border-neon-red/50 hover:text-neon-red"
-                    aria-label="Excluir cliente"
-                    disabled={remover.isPending}
-                    onClick={() => remover.mutate({ id: c.id })}
-                  >
-                    <Trash2 className="size-3.5" />
-                  </button>
+                <td className="px-5 py-3.5">
+                  <div className="flex items-center justify-end gap-2">
+                  {c.confianca?.ativa ? (
+                    <Tooltip texto="cliente.confiancaRevogar" titulo="Encerrar crédito" lado="left">
+                      <button
+                        type="button"
+                        data-testid={`revogar-confianca-${c.id}`}
+                        aria-label="Encerrar crédito de confiança"
+                        disabled={revogar.isPending}
+                        onClick={() => revogar.mutate({ id: c.id })}
+                        className="flex size-8 items-center justify-center rounded-lg border border-white/10 text-white/30 transition-colors hover:border-amber-400/60 hover:text-amber-300"
+                      >
+                        <ShieldOff className="size-3.5" />
+                      </button>
+                    </Tooltip>
+                  ) : (
+                    <Tooltip texto="cliente.confianca" titulo="Crédito de confiança" lado="left">
+                      <button
+                        type="button"
+                        data-testid={`dar-confianca-${c.id}`}
+                        aria-label="Conceder crédito de confiança"
+                        onClick={() => setDandoConfianca(c)}
+                        className={cn(
+                          "flex size-8 items-center justify-center rounded-lg border transition-colors",
+                          c.statusPagamento === "atrasado" || c.statusPagamento === "suspenso"
+                            ? "border-neon-cyan/45 text-neon-cyan hover:bg-neon-cyan/10"
+                            : "border-white/10 text-white/30 hover:border-neon-cyan/50 hover:text-neon-cyan",
+                        )}
+                      >
+                        <ShieldCheck className="size-3.5" />
+                      </button>
+                    </Tooltip>
+                  )}
+                  <Tooltip texto="cliente.excluir" titulo="Excluir cliente">
+                    <button
+                      type="button"
+                      className="flex size-8 items-center justify-center rounded-lg border border-white/10 text-white/30 transition-colors hover:border-neon-red/50 hover:text-neon-red"
+                      aria-label="Excluir cliente"
+                      disabled={remover.isPending}
+                      onClick={() => remover.mutate({ id: c.id })}
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  </Tooltip>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -1168,6 +1707,10 @@ function ClientsTable({ compact = false }: { compact?: boolean }) {
           cliente={editandoVencimento}
           onClose={() => setEditandoVencimento(null)}
         />
+      )}
+
+      {dandoConfianca && (
+        <ModalConfianca cliente={dandoConfianca} onClose={() => setDandoConfianca(null)} />
       )}
     </GlassCard>
   );
@@ -1191,21 +1734,29 @@ function NovoClienteForm() {
 
   return (
     <GlassCard strong accent="cyan" className="p-5">
-      <div className="font-display text-sm font-bold text-white">Novo cliente</div>
+      <TituloSecao ajuda="secao.clientes">Novo cliente</TituloSecao>
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <Campo label="Nome" ajuda="cliente.nome" htmlFor="ncl-nome" obrigatorio>
         <input
+          id="ncl-nome"
           className={input}
-          placeholder="Nome"
+          placeholder="Nome do cliente"
           value={form.nome}
           onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))}
         />
+        </Campo>
+        <Campo label="E-mail" ajuda="cliente.email" htmlFor="ncl-email" obrigatorio>
         <input
+          id="ncl-email"
           className={input}
-          placeholder="E-mail"
+          placeholder="cliente@email.com"
           value={form.email}
           onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
         />
+        </Campo>
+        <Campo label="Pacote" ajuda="cliente.pacote" htmlFor="ncl-pacote">
         <select
+          id="ncl-pacote"
           className={input}
           value={form.pacoteId}
           onChange={(e) => {
@@ -1223,20 +1774,27 @@ function NovoClienteForm() {
             </option>
           ))}
         </select>
+        </Campo>
+        <Campo label="Valor cobrado" ajuda="cliente.valor" htmlFor="ncl-valor">
         <input
+          id="ncl-valor"
           className={input}
           type="number"
           step="0.01"
-          placeholder="Valor"
+          placeholder="0,00"
           value={form.valor}
           onChange={(e) => setForm((f) => ({ ...f, valor: Number(e.target.value) }))}
         />
+        </Campo>
+        <Campo label="Próxima cobrança" ajuda="cliente.proximaCobranca" htmlFor="ncl-cobranca">
         <input
+          id="ncl-cobranca"
           className={input}
-          placeholder="Próx. cobrança (dd/mm/aaaa)"
+          placeholder="dd/mm/aaaa"
           value={form.proximaCobranca}
           onChange={(e) => setForm((f) => ({ ...f, proximaCobranca: e.target.value }))}
         />
+        </Campo>
       </div>
 
       {criar.isError && (
@@ -1422,7 +1980,7 @@ function InvoicesAdminView() {
                   href={whatsappLink(
                     f.cupom
                       ? `Olá ${f.clienteNome}! Sua fatura ${f.numero} está em aberto. Com o cupom ${f.cupom} (${f.desconto}% OFF) da sua Jornada, o valor fica ${brl(f.valorFinal)} em vez de ${brl(f.valor)}.`
-                      : `Olá ${f.clienteNome}! Passando para lembrar da fatura ${f.numero}, de ${brl(f.valorFinal)}, na PLAPLUSNOW.`,
+                      : `Olá ${f.clienteNome}! Passando para lembrar da fatura ${f.numero}, de ${brl(f.valorFinal)}, na PLAYPLUSNOW.`,
                   )}
                   target="_blank"
                   rel="noreferrer"
@@ -1459,6 +2017,7 @@ export default function AdminPage() {
   const codigos = useCodigos();
   const filaTv = useFilaTvNetflix();
   const alertas = useAlertasAdmin();
+  const estoqueGift = useResumoEstoqueGift();
 
   const esgotadas = (contas.data ?? []).filter((c) => c.vagasOcupadas >= c.totalVagas).length;
   const pendentesSuporte = (suporte.data?.abertos ?? 0) + (suporte.data?.emAndamento ?? 0);
@@ -1487,8 +2046,16 @@ export default function AdminPage() {
     },
     { id: "clientes", label: "Clientes", icon: Users },
     { id: "gestaocontas", label: "Gestão de Contas", icon: Wallet },
+    {
+      id: "estoquegift",
+      label: "Estoque de Gift Cards",
+      icon: Ticket,
+      badge: estoqueGift.data?.totais.disponivelQtd
+        ? String(estoqueGift.data.totais.disponivelQtd)
+        : undefined,
+    },
     { id: "saude", label: "Saúde & Estoque", icon: HeartPulse },
-    { id: "jogos", label: "Sala de Jogos", icon: Gamepad2 },
+    { id: "jogos", label: "Futebol Ao Vivo", icon: Goal },
     { id: "winback", label: "Recuperação", icon: HeartHandshake },
     {
       id: "afiliados",
@@ -1545,12 +2112,16 @@ export default function AdminPage() {
       title: "Gestão de Contas",
       sub: "Saldo de gift card de cada matriz, custo mensal, alerta de saldo crítico e os parâmetros do negócio.",
     },
+    estoquegift: {
+      title: "Estoque de Gift Cards",
+      sub: "Códigos comprados e ainda não resgatados, saldo disponível por provedor e aplicação direta nas contas matrizes.",
+    },
     saude: {
       title: "Saúde & Estoque",
       sub: "Contas que estão falhando, entrada pausada automaticamente, remanejamento para reserva e alerta de estoque no limite.",
     },
     jogos: {
-      title: "Sala de Jogos",
+      title: "Futebol Ao Vivo",
       sub: "Pool de contas do adicional. A liberação para o cliente é automática — você só mantém o pool abastecido.",
     },
     winback: {
@@ -1593,14 +2164,17 @@ export default function AdminPage() {
         onNavigate={setActive}
         accent="purple"
         role="Administrador"
-        user={{ name: "Central PPN", email: "admin@plaplusnow.com", initials: "PN" }}
+        user={{ name: "Central PPN", email: "admin@playplusnow.com", initials: "PN" }}
       >
         <div className="mx-auto max-w-7xl space-y-6">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
-              <h1 className="font-display text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
-                {titles[active].title}
-              </h1>
+              <div className="flex items-center gap-2">
+                <h1 className="font-display text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
+                  {titles[active].title}
+                </h1>
+                <Ajuda ajuda={`secao.${active}`} lado="bottom" className="size-[18px] text-[11px]" />
+              </div>
               <p className="mt-1.5 font-sans text-sm text-white/40">{titles[active].sub}</p>
             </div>
             <Pill accent="purple" icon={<ShieldCheck className="size-3" />}>
@@ -1638,6 +2212,7 @@ export default function AdminPage() {
             </>
           )}
           {active === "gestaocontas" && <GestaoContasView />}
+          {active === "estoquegift" && <EstoqueGiftView />}
           {active === "saude" && <SaudeView />}
           {active === "jogos" && <JogosView />}
           {active === "winback" && <RecuperacaoView />}

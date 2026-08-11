@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { useState } from "react";
-import { Check, Copy, Gamepad2, Loader2, LogOut, Timer, Zap } from "lucide-react";
+import { Check, Copy, Goal, Loader2, LogOut, Timer, Zap } from "lucide-react";
 import { GlassCard, NeonButton, Pill } from "../ui/kit";
 import {
   useCancelarJogos,
@@ -11,7 +11,7 @@ import {
 } from "../../queries/jogos";
 
 /**
- * SALA DE JOGOS (cliente).
+ * FUTEBOL AO VIVO (cliente).
  * Nada de abrir chamado e esperar: quem tem o adicional ativo clica em
  * "Liberar acesso agora" e recebe login e senha na hora, direto do pool.
  */
@@ -67,12 +67,12 @@ export function SalaJogos() {
   if (!data?.contratado) {
     return (
       <GlassCard strong accent="red" className="p-8 text-center">
-        <Gamepad2 className="mx-auto size-8 text-neon-red" />
-        <h3 className="mt-4 font-display text-xl font-extrabold text-white">Sala de Jogos</h3>
+        <Goal className="mx-auto size-8 text-neon-red" />
+        <h3 className="mt-4 font-display text-xl font-extrabold text-white">Futebol Ao Vivo</h3>
         <p className="mx-auto mt-2 max-w-lg font-sans text-sm leading-relaxed text-white/50">
-          Acesso a um pool exclusivo de contas para dia de jogo, com liberação automática pelo
-          painel — sem abrir chamado, sem esperar o suporte. A vaga volta ao pool sozinha depois de{" "}
-          {data?.horas ?? 12} horas.
+          Contas alternativas das plataformas que estão transmitindo a partida, liberadas na hora
+          pelo painel — sem gargalo, sem travar no meio do jogo, sem abrir chamado. A vaga volta ao
+          pool sozinha depois de {data?.horas ?? 12} horas.
         </p>
         <div className="mt-5 font-display text-3xl font-extrabold text-neon-red">
           {brl(data?.preco ?? 9.9)}
@@ -109,7 +109,7 @@ export function SalaJogos() {
       <GlassCard accent="red" className="p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <Gamepad2 className="size-6 text-neon-red" />
+            <Goal className="size-6 text-neon-red" />
             <div>
               <div className="font-display text-base font-bold text-white">Adicional ativo</div>
               <div className="font-sans text-[11px] text-white/35">
@@ -189,7 +189,7 @@ export function SalaJogos() {
         onClick={() => cancelar.mutate({})}
         className="font-sans text-[11px] text-white/30 underline-offset-2 hover:text-white/60 hover:underline"
       >
-        Cancelar o adicional Sala de Jogos
+        Cancelar o adicional Futebol Ao Vivo
       </button>
     </div>
   );

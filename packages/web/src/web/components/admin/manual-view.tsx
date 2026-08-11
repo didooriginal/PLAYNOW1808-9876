@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { GlassCard, Pill, accentHex, accentText } from "../ui/kit";
+import { Ajuda } from "../ui/tooltip";
 import {
   MANUAL,
   MANUAL_VERSAO,
@@ -321,7 +322,7 @@ export function ManualView() {
               Documento interno
             </Pill>
             <h2 className="mt-3 font-display text-xl font-extrabold tracking-tight text-white sm:text-2xl">
-              Manual operacional da PLAPLUSNOW
+              Manual operacional da PLAYPLUSNOW
             </h2>
             <p className="mt-2 max-w-2xl font-sans text-[13.5px] leading-relaxed text-white/50">
               Tudo o que o painel administrativo faz, tópico por tópico: como cadastrar e cobrar
@@ -334,9 +335,14 @@ export function ManualView() {
             <input
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
+              aria-label="Buscar no manual"
               placeholder="Buscar no manual..."
               data-testid="manual-busca"
               className="w-full rounded-xl border border-white/10 bg-white/[0.04] py-2.5 pl-10 pr-3 font-sans text-sm text-white placeholder:text-white/25 focus:border-neon-purple/50 focus:outline-none"
+            />
+            <Ajuda
+              ajuda="busca.manual"
+              className="absolute -right-5 top-1/2 -translate-y-1/2"
             />
           </label>
         </div>

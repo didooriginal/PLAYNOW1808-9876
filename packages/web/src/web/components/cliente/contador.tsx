@@ -1,6 +1,12 @@
 // CONTADOR REGRESSIVO DE VENCIMENTO — relogio ao vivo com alerta visual.
 import { useEffect, useState } from "react";
-import { CalendarClock, CircleAlert, ShieldCheck, TriangleAlert } from "lucide-react";
+import {
+  CalendarClock,
+  CircleAlert,
+  HeartHandshake,
+  ShieldCheck,
+  TriangleAlert,
+} from "lucide-react";
 import { GlassCard, NeonButton } from "../ui/kit";
 import { brl } from "@/lib/mock-data";
 import { irParaPagamento } from "@/lib/navegacao";
@@ -16,7 +22,77 @@ export type Situacao = {
   valor: number;
   ciclo: string;
   formaPagamento: string;
+  /** credito de confianca concedido pelo admin; ativa=false quando nao tem */
+  confianca?: {
+    ativa: boolean;
+    ate: string | null;
+    horasRestantes: number;
+    minutosRestantes: number;
+    motivo: string;
+    vezes: number;
+  };
 };
+
+/**
+ * FAIXA DO CREDITO DE CONFIANCA
+ * ------------------------------------------------------------------
+ * Aparece so quando o admin liberou o acesso de um cliente em atraso. O painel
+ * segue 100% normal — a faixa existe para ele saber que o prazo e temporario
+ * e ter o botao de pagar a um clique. O relogio bate de segundo em segundo a
+ * partir do `ate` (ISO) que o servidor manda.
+ */
+export function FaixaConfianca({ situacao }: { situacao: Situacao }) {
+  const credito = situacao.confianca;
+  const [tick, setTick] = useState(() => restante(credito?.ate ?? null));
+
+  useEffect(() => {
+    const ate = credito?.ate ?? null;
+    setTick(restante(ate));
+    const id = setInterval(() => setTick(restante(ate)), 1000);
+    return () => clearInterval(id);
+  }, [credito?.ate]);
+
+  if (!credito?.ativa || !tick || tick.atrasado) return null;
+
+  const horas = tick.dias * 24 + tick.horas;
+
+  return (
+    <GlassCard
+      accent="cyan"
+      className="relative overflow-hidden p-5"
+      data-testid="faixa-confianca"
+    >
+      <div className="pointer-events-none absolute -right-14 -top-14 size-48 rounded-full bg-neon-cyan/20 blur-3xl" />
+      <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-start gap-4">
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl border border-neon-cyan/50 bg-neon-cyan/10">
+            <HeartHandshake className="size-5 text-neon-cyan" />
+          </span>
+          <div className="min-w-0">
+            <div className="font-sans text-[10px] uppercase tracking-[0.22em] text-neon-cyan/70">
+              Crédito de confiança
+            </div>
+            <div className="mt-1 font-display text-lg font-extrabold text-white">
+              Liberamos seu acesso por mais{" "}
+              <span className="text-neon-cyan tabular-nums">
+                {horas}h {String(tick.minutos).padStart(2, "0")}m{" "}
+                {String(tick.segundos).padStart(2, "0")}s
+              </span>
+            </div>
+            <div className="mt-1 font-sans text-[12px] text-white/45">
+              {credito.motivo
+                ? `${credito.motivo} · pague até lá para não perder o acesso.`
+                : "Tudo segue funcionando normalmente. Pague dentro do prazo para não perder o acesso."}
+            </div>
+          </div>
+        </div>
+        <NeonButton accent="cyan" size="sm" onClick={irParaPagamento}>
+          Pagar {brl(situacao.valor)} agora
+        </NeonButton>
+      </div>
+    </GlassCard>
+  );
+}
 
 function restante(iso: string | null) {
   if (!iso) return null;

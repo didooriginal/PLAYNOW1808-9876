@@ -7,13 +7,13 @@ import { Resend } from "resend";
  * está ausente, `enviarEmail` devolve `{ ok: false, motivo: "sem_provedor" }`
  * e quem chamou decide o plano B (ex.: deixar o link na fila do /admin).
  *
- * Remetente: enquanto o domínio próprio não estiver verificado no Resend,
- * usamos o remetente de teste `onboarding@resend.dev` — ele só entrega para
- * o e-mail da conta dona da API key. Depois de verificar o domínio, basta
- * preencher EMAIL_REMETENTE no .env (ex.: "PLAYPLUSNOW <nao-responda@seudominio.com>").
+ * Remetente: o domínio `playplusnow.com.br` está verificado no Resend, então
+ * enviamos de `nao-responda@playplusnow.com.br` e a entrega vale para QUALQUER
+ * destinatário (sem a restrição 403 do remetente de teste `onboarding@resend.dev`).
+ * `EMAIL_REMETENTE` no .env sobrepõe esse padrão quando for preciso trocar.
  */
 
-const REMETENTE_PADRAO = "PLAYPLUSNOW <onboarding@resend.dev>";
+const REMETENTE_PADRAO = "PLAYPLUSNOW <nao-responda@playplusnow.com.br>";
 
 export type ResultadoEmail =
   | { ok: true; id: string }

@@ -7,7 +7,8 @@
 //  - conteúdo editorial da landing (depoimentos, stats) e as vitrines de
 //    upgrades/novidades do painel do cliente, que ainda não têm tabela.
 
-export const WHATSAPP_NUMBER = "5521964727746";
+/** número oficial de atendimento — sobrescreva com VITE_WHATSAPP_NUMERO no .env */
+export const WHATSAPP_NUMBER = import.meta.env.VITE_WHATSAPP_NUMERO ?? "5521964727746";
 
 export function whatsappLink(message: string) {
   return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
@@ -26,9 +27,10 @@ export type ServiceId =
   | "youtube"
   | "crunchyroll"
   | "globoplay"
-  | "star"
   | "deezer"
   | "canva"
+  | "looke"
+  | "recordplus"
   | "iptv";
 
 export type Service = {
@@ -38,7 +40,7 @@ export type Service = {
   mono: string;
   /** cor da marca (usada em glow/ícone) */
   color: string;
-  /** preço avulso PLAPLUSNOW (tabela oficial) — base do comparativo */
+  /** preço avulso PLAYPLUSNOW (tabela oficial) — base do comparativo */
   retail: number;
   /** preço unitário dentro de um combo (mensal) */
   price: number;
@@ -57,9 +59,10 @@ export const services: Service[] = [
   { id: "youtube", name: "YouTube Premium", mono: "YT", color: "#ff0033", retail: 25.9, price: 25.9, category: "Streaming" },
   { id: "crunchyroll", name: "Crunchyroll", mono: "CR", color: "#f47521", retail: 24.9, price: 24.9, category: "Asiático" },
   { id: "globoplay", name: "Globoplay", mono: "G", color: "#ff5722", retail: 24.9, price: 24.9, category: "Streaming" },
-  { id: "star", name: "Star+", mono: "★+", color: "#e0b04a", retail: 27.9, price: 27.9, category: "Streaming" },
   { id: "deezer", name: "Deezer", mono: "DZ", color: "#a238ff", retail: 20.9, price: 20.9, category: "Música" },
   { id: "canva", name: "Canva Pro", mono: "C", color: "#00c4cc", retail: 34.9, price: 34.9, category: "Produtividade" },
+  { id: "looke", name: "Looke", mono: "LK", color: "#e8112d", retail: 19.9, price: 19.9, category: "Streaming" },
+  { id: "recordplus", name: "Record Plus", mono: "R+", color: "#00a3e0", retail: 14.9, price: 14.9, category: "Streaming" },
   { id: "iptv", name: "IPTV + Canais ao vivo", mono: "IP", color: "#22d3ee", retail: 45, price: 45, category: "IPTV" },
 ];
 
@@ -169,20 +172,22 @@ export const plans: Plan[] = [
     slotsLeft: 12,
   },
   {
-    id: "mega-promo",
-    name: "Mega Promo",
-    tagline: "O mais vendido — vídeo, música e anime",
-    monthly: 59.9,
-    yearlyMonthly: 47.9,
-    items: ["netflix", "disney", "hbomax", "prime", "spotify", "youtube", "crunchyroll"],
+    id: "turbo",
+    name: "Turbo",
+    tagline: "O mais vendido — 10 apps por um preço só",
+    monthly: 49,
+    yearlyMonthly: 39.2,
+    items: ["disney", "hbomax", "paramount", "prime", "looke", "globoplay", "youtube", "recordplus", "crunchyroll", "spotify"],
     accent: "red",
     highlight: true,
     badge: "Mais vendido",
     perks: [
-      "7 apps liberados",
-      "Netflix em 4K",
-      "Suporte prioritário 24/7",
+      "10 apps liberados",
+      "Disney+, HBO Max e Prime inclusos",
+      "Globoplay com os canais Telecine e Looke pra cinema em casa",
+      "Suporte prioritário 24/7 no WhatsApp",
       "Reposição automática de conta",
+      "Sem fidelidade: cancele quando quiser",
     ],
     slotsLeft: 5,
   },
@@ -302,8 +307,8 @@ export const upgrades: Upgrade[] = [
   },
   {
     title: "Subir para o 15 em 1",
-    description: "Libere os 14 apps do catálogo e ganhe 2 telas nos principais. Você já usa 7.",
-    price: "+ R$ 40,00/mês",
+    description: "Libere todos os apps do catálogo e ganhe 2 telas nos principais. Hoje você usa 10.",
+    price: "+ R$ 50,90/mês",
     tag: "Upgrade",
     accent: "red",
     destino: "/#pacotes",
@@ -311,8 +316,8 @@ export const upgrades: Upgrade[] = [
   {
     title: "Trocar para o plano anual",
     description: "Mesmo pacote, 2 meses grátis e preço travado contra reajuste por 12 meses.",
-    price: "R$ 47,90/mês",
-    tag: "Economize R$ 144",
+    price: "R$ 39,20/mês",
+    tag: "Economize R$ 117,60",
     accent: "purple",
     destino: "/#pacotes",
   },

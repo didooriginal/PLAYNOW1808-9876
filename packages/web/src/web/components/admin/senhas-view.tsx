@@ -10,6 +10,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { GlassCard, NeonButton, Pill } from "../ui/kit";
+import { Campo, TituloSecao } from "../ui/tooltip";
 import {
   useDescartarResetSenha,
   useFilaSenha,
@@ -129,27 +130,35 @@ export function SenhasView() {
 
       {/* ------- gerar link manualmente ------- */}
       <GlassCard strong accent="purple" className="p-5">
-        <div className="flex items-center gap-2">
-          <KeyRound className="size-4 text-neon-purple" />
-          <span className="font-display text-sm font-bold text-white">
-            Resetar senha de um cliente
-          </span>
-        </div>
+        <TituloSecao
+          ajuda="senhas.emailCliente"
+          icone={<KeyRound className="size-4 text-neon-purple" />}
+        >
+          Resetar senha de um cliente
+        </TituloSecao>
         <p className="mt-1.5 font-sans text-xs text-white/40">
           Gera um link de uso único (validade de 1 hora) e tenta enviar por
           e-mail. Você nunca vê nem define a senha do cliente — quem escolhe a
           nova senha é ele.
         </p>
 
-        <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="email@docliente.com"
-            className={inputCls}
-            data-testid="admin-reset-email"
-          />
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+          <Campo
+            label="E-mail do cliente"
+            ajuda="senhas.emailCliente"
+            htmlFor="senhas-email"
+            className="flex-1"
+          >
+            <input
+              id="senhas-email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="email@docliente.com"
+              className={inputCls}
+              data-testid="admin-reset-email"
+            />
+          </Campo>
           <NeonButton
             accent="purple"
             disabled={gerar.isPending || !email.trim()}
@@ -199,12 +208,9 @@ export function SenhasView() {
       {/* ------- fila de pedidos ------- */}
       <GlassCard className="overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/8 px-5 py-4">
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="size-4 text-neon-cyan" />
-            <span className="font-display text-sm font-bold text-white">
-              Pedidos de redefinição
-            </span>
-          </div>
+          <TituloSecao ajuda="senhas.titulo" icone={<ShieldCheck className="size-4 text-neon-cyan" />}>
+            Pedidos de redefinição
+          </TituloSecao>
           <div className="flex items-center gap-2">
             <Pill accent="cyan">{fila.data?.pendentes ?? 0} aguardando</Pill>
             {(fila.data?.falhas ?? 0) > 0 && (

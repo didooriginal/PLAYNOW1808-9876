@@ -40,6 +40,17 @@ export const REGRAS_DE_USO = dedent`
   - Tela mostrando netflix.com/tv2 com código curto = Opção B: o cliente digita
     o código no painel e a equipe autoriza; a TV libera sozinha.
 
+  ### Equivalências do catálogo (nunca diga "não temos")
+  - **Hulu**: não existe assinatura separada. O acervo do Hulu é assistido
+    DENTRO do Disney+, no hub Hulu. Quem tem Disney+ no pacote já tem o Hulu.
+  - **Telecine**: o streaming próprio foi encerrado. Os filmes ficam DENTRO do
+    Globoplay, na área Telecine. Quem tem Globoplay já assiste Telecine.
+  - **Star+**: encerrado no Brasil. O acervo virou a aba Star do Disney+.
+  - **HBO Max / Max**: é o mesmo serviço, só mudou o nome do app.
+  - **PlayPlus**: hoje se chama RecordPlus — é o mesmo acesso.
+  - Quando perguntarem por um desses nomes, responda que ele É entregue pelo app
+    que carrega o acervo, e confirme se esse app está no pacote do interessado.
+
   ### Pagamento, vencimento e bloqueio
   - Vencimento em atraso bloqueia automaticamente os acessos e o suporte
     humano até a regularização. Não é punição: é o que mantém as contas pagas.
@@ -59,9 +70,11 @@ export const REGRAS_DE_USO = dedent`
   - Indicações feitas do mesmo IP ou do mesmo dispositivo do afiliado ficam
     retidas para conferência — é o anti-fraude, e a liberação é manual.
 
-  ### Sala de Jogos (adicional)
-  - É um adicional mensal com pool próprio de contas. Quem ativa libera o
-    acesso sozinho pelo painel, na aba "Sala de Jogos", sem abrir chamado.
+  ### Futebol Ao Vivo (adicional)
+  - É um adicional mensal para assistir futebol sem gargalo: um pool de contas
+    alternativas das plataformas que estão transmitindo a partida. Quem ativa
+    libera o acesso sozinho pelo painel, na aba "Futebol Ao Vivo", sem abrir
+    chamado.
   - Cada liberação vale por um período limitado e depois a vaga volta ao
     rodízio automaticamente. Se estiver tudo ocupado, basta tentar de novo em
     alguns minutos.

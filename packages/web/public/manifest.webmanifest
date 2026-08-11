@@ -1,6 +1,6 @@
 {
-  "name": "PLAPLUSNOW — Meus Acessos",
-  "short_name": "PLAPLUSNOW",
+  "name": "PLAYPLUSNOW — Meus Acessos",
+  "short_name": "PLAYPLUSNOW",
   "description": "Todos os seus streamings em um só painel: logins, códigos de acesso, faturas e recompensas.",
   "id": "/dashboard",
   "start_url": "/dashboard",

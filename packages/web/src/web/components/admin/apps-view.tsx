@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { AlertTriangle, Check, Loader2, Plus, Power, Trash2 } from "lucide-react";
 import { AppIcon } from "../app-icon";
+import { Ajuda, Campo, TituloSecao } from "../ui/tooltip";
 import { GlassCard, NeonButton, accentHex } from "../ui/kit";
 import { brl } from "@/lib/mock-data";
 import {
@@ -53,7 +54,9 @@ function NovoAppForm({ onClose }: { onClose: () => void }) {
   return (
     <GlassCard strong accent="purple" className="p-5">
       <div className="flex items-center justify-between gap-3">
-        <div className="font-display text-sm font-bold text-white">Novo aplicativo</div>
+        <TituloSecao ajuda="Cadastre aqui um serviço novo. Ele só aparece na vitrine e pode entrar em pacotes depois de existir neste catálogo.">
+          Novo aplicativo
+        </TituloSecao>
         <button
           type="button"
           onClick={onClose}
@@ -64,35 +67,46 @@ function NovoAppForm({ onClose }: { onClose: () => void }) {
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <input
-          className={inputCls}
-          placeholder="Nome (ex.: Max)"
-          value={form.nome}
-          onChange={(e) => set("nome", e.target.value)}
-        />
-        <input
-          className={inputCls}
-          placeholder="Monograma (ex.: MX)"
-          maxLength={4}
-          value={form.mono}
-          onChange={(e) => set("mono", e.target.value)}
-        />
-        <div className="flex items-center gap-2">
+        <Campo label="Nome" ajuda="app.nome" htmlFor="app-nome" obrigatorio>
           <input
-            type="color"
-            aria-label="Cor da marca"
-            value={form.cor}
-            onChange={(e) => set("cor", e.target.value)}
-            className="size-10 shrink-0 cursor-pointer rounded-xl border border-white/10 bg-transparent"
-          />
-          <input
+            id="app-nome"
             className={inputCls}
-            placeholder="#22d3ee"
-            value={form.cor}
-            onChange={(e) => set("cor", e.target.value)}
+            placeholder="ex.: Max"
+            value={form.nome}
+            onChange={(e) => set("nome", e.target.value)}
           />
-        </div>
+        </Campo>
+        <Campo label="Monograma" ajuda="app.mono" htmlFor="app-mono" sufixo="até 4 letras">
+          <input
+            id="app-mono"
+            className={inputCls}
+            placeholder="ex.: MX"
+            maxLength={4}
+            value={form.mono}
+            onChange={(e) => set("mono", e.target.value)}
+          />
+        </Campo>
+        <Campo label="Cor da marca" ajuda="app.cor" htmlFor="app-cor">
+          <div className="flex items-center gap-2">
+            <input
+              type="color"
+              aria-label="Cor da marca"
+              value={form.cor}
+              onChange={(e) => set("cor", e.target.value)}
+              className="size-10 shrink-0 cursor-pointer rounded-xl border border-white/10 bg-transparent"
+            />
+            <input
+              id="app-cor"
+              className={inputCls}
+              placeholder="#22d3ee"
+              value={form.cor}
+              onChange={(e) => set("cor", e.target.value)}
+            />
+          </div>
+        </Campo>
+        <Campo label="Tipo de mídia" ajuda="app.tipo" htmlFor="app-tipo">
         <select
+          id="app-tipo"
           className={inputCls}
           aria-label="Tipo de mídia"
           value={form.tipo}
@@ -104,31 +118,38 @@ function NovoAppForm({ onClose }: { onClose: () => void }) {
             </option>
           ))}
         </select>
-        <select
-          className={inputCls}
-          aria-label="Categoria"
-          value={form.categoria}
-          onChange={(e) => set("categoria", e.target.value as CategoriaId)}
-        >
-          {CATEGORIAS.map((c) => (
-            <option key={c.id} value={c.id} className="bg-[#09090b]">
-              {c.label}
-            </option>
-          ))}
-        </select>
-        <input
-          className={inputCls}
-          type="number"
-          step="0.01"
-          aria-label="Preço avulso"
-          placeholder="Preço avulso (R$/mês)"
-          value={form.preco}
-          onChange={(e) => {
-            const v = Number(e.target.value);
-            set("preco", v);
-            set("precoAvulso", v);
-          }}
-        />
+        </Campo>
+        <Campo label="Categoria" ajuda="app.categoria" htmlFor="app-categoria">
+          <select
+            id="app-categoria"
+            className={inputCls}
+            aria-label="Categoria"
+            value={form.categoria}
+            onChange={(e) => set("categoria", e.target.value as CategoriaId)}
+          >
+            {CATEGORIAS.map((c) => (
+              <option key={c.id} value={c.id} className="bg-[#09090b]">
+                {c.label}
+              </option>
+            ))}
+          </select>
+        </Campo>
+        <Campo label="Preço avulso" ajuda="app.precoAvulso" htmlFor="app-preco" sufixo="R$ / mês">
+          <input
+            id="app-preco"
+            className={inputCls}
+            type="number"
+            step="0.01"
+            aria-label="Preço avulso"
+            placeholder="0,00"
+            value={form.preco}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              set("preco", v);
+              set("precoAvulso", v);
+            }}
+          />
+        </Campo>
       </div>
 
       {criar.isError && (
@@ -219,18 +240,21 @@ export function AppsView() {
       <div className="grid gap-4 sm:grid-cols-3">
         {[
           {
+            ajuda: "Total de apps no catálogo, ativos e inativos.",
             label: "Aplicativos",
             value: String(apps.length),
             sub: `${CATEGORIAS.length} categorias`,
             accent: "cyan" as const,
           },
           {
+            ajuda: "app.ativo",
             label: "Ativos",
             value: String(ativos),
             sub: "disponíveis para pacotes",
             accent: "purple" as const,
           },
           {
+            ajuda: "app.precoAvulso",
             label: "Valor avulso somado",
             value: brl(apps.reduce((s, a) => s + a.precoAvulso, 0)),
             sub: "referência de economia",
@@ -238,8 +262,9 @@ export function AppsView() {
           },
         ].map((s) => (
           <GlassCard key={s.label} accent={s.accent} className="p-5">
-            <div className="font-sans text-[11px] uppercase tracking-[0.2em] text-white/35">
+            <div className="flex items-center gap-1.5 font-sans text-[11px] uppercase tracking-[0.2em] text-white/35">
               {s.label}
+              <Ajuda ajuda={s.ajuda} lado="bottom" />
             </div>
             <div className="mt-2 font-display text-2xl font-extrabold text-white">{s.value}</div>
             <div className="mt-1 font-sans text-[11px]" style={{ color: accentHex[s.accent] }}>

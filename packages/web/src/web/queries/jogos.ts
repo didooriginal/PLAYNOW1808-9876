@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { orpc } from "../lib/api";
 
-/** SALA DE JOGOS — acesso do cliente e pool do admin. */
+/** FUTEBOL AO VIVO — acesso do cliente e pool do admin. */
 
 export function useMeuAcessoJogos() {
   return useQuery(

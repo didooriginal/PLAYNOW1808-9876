@@ -9,7 +9,7 @@ import { db } from "../database";
 import { contasMatrizes, liberacoesJogos, usuarios } from "../database/schema";
 
 /**
- * SALA DE JOGOS — adicional com liberação automática
+ * FUTEBOL AO VIVO — adicional com liberação automática
  * ------------------------------------------------------------------
  * O gargalo que isso resolve: em dia de jogo, todo mundo pede acesso ao mesmo
  * tempo e o suporte humano vira fila. Aqui o cliente com o adicional ativo
@@ -138,7 +138,7 @@ export const jogos = {
       desde: cliente.salaJogosDesde,
       preco: params.precoSalaJogos,
       horas: params.horasLiberacaoJogos,
-      bloqueado: estaBloqueado(cliente.statusPagamento),
+      bloqueado: estaBloqueado(cliente.statusPagamento, cliente.confiancaAte),
       vagasLivres,
       acesso,
       historico: historico.map((h) => ({
@@ -154,7 +154,7 @@ export const jogos = {
   /** contrata o adicional (self-service) */
   contratar: authed.handler(async ({ context }) => {
     const cliente = await clienteDaSessao(context.user.id);
-    if (estaBloqueado(cliente.statusPagamento)) {
+    if (estaBloqueado(cliente.statusPagamento, cliente.confiancaAte)) {
       throw new ORPCError("FORBIDDEN", { message: MSG_BLOQUEIO });
     }
     if (cliente.salaJogos) return { ok: true, jaTinha: true };
@@ -171,8 +171,8 @@ export const jogos = {
       clienteId: cliente.id,
       tipo: "sistema",
       severidade: "info",
-      titulo: "Sala de Jogos contratada",
-      mensagem: `${cliente.nome} ativou o adicional Sala de Jogos (R$ ${params.precoSalaJogos.toFixed(2).replace(".", ",")}/mês). Some ao próximo faturamento.`,
+      titulo: "Futebol Ao Vivo contratada",
+      mensagem: `${cliente.nome} ativou o adicional Futebol Ao Vivo (R$ ${params.precoSalaJogos.toFixed(2).replace(".", ",")}/mês). Some ao próximo faturamento.`,
       destino: "jogos",
       chave: `jogos:contratou:${cliente.id}:${hoje}`,
     });
@@ -218,10 +218,10 @@ export const jogos = {
 
     if (!cliente.salaJogos) {
       throw new ORPCError("FORBIDDEN", {
-        message: "Adicional Sala de Jogos não está ativo na sua conta.",
+        message: "Adicional Futebol Ao Vivo não está ativo na sua conta.",
       });
     }
-    if (estaBloqueado(cliente.statusPagamento)) {
+    if (estaBloqueado(cliente.statusPagamento, cliente.confiancaAte)) {
       throw new ORPCError("FORBIDDEN", { message: MSG_BLOQUEIO });
     }
 
@@ -248,14 +248,14 @@ export const jogos = {
         escopo: "admin",
         tipo: "sistema",
         severidade: "critico",
-        titulo: "Pool da Sala de Jogos esgotado",
+        titulo: "Pool da Futebol Ao Vivo esgotado",
         mensagem: "Um cliente pediu acesso e não havia vaga livre no pool de jogos.",
         destino: "jogos",
         chave: `jogos:esgotado:${new Date().toISOString().slice(0, 13)}`,
       });
       throw new ORPCError("CONFLICT", {
         message:
-          "Todas as telas da Sala de Jogos estão ocupadas neste momento. Tente de novo em alguns minutos — as vagas giram rápido.",
+          "Todas as telas da Futebol Ao Vivo estão ocupadas neste momento. Tente de novo em alguns minutos — as vagas giram rápido.",
       });
     }
 
@@ -309,7 +309,7 @@ export const jogos = {
   /* ADMIN                                                             */
   /* ---------------------------------------------------------------- */
 
-  /** painel da aba Sala de Jogos: pool, ocupação, liberações e assinantes */
+  /** painel da aba Futebol Ao Vivo: pool, ocupação, liberações e assinantes */
   painel: adminOnly.handler(async () => {
     await expirarVencidas();
     const params = await lerParametros();

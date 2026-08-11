@@ -35,12 +35,51 @@ const aplicativoInput = z.object({
     .default("streaming"),
   precoAvulso: z.number().nonnegative().default(0),
   preco: z.number().nonnegative().default(0),
+  ordem: z.number().int().nonnegative().optional(),
   ativo: z.boolean().default(true),
 });
 
 export const aplicativos = {
-  /** catálogo completo — leitura pública (ícones, landing, formulários) */
-  listar: base.handler(() => db.select().from(tabelaAplicativos).orderBy(asc(tabelaAplicativos.nome))),
+  /**
+   * catálogo completo — leitura pública (ícones, landing, formulários).
+   * Ordena pela posição definida no admin; empate cai no alfabético, então
+   * app novo (ordem 0) nunca "desaparece" no fim da grade sem explicação.
+   */
+  listar: base.handler(() =>
+    db
+      .select()
+      .from(tabelaAplicativos)
+      .orderBy(asc(tabelaAplicativos.ordem), asc(tabelaAplicativos.nome)),
+  ),
+
+  /**
+   * Salva a ordem da grade de aplicativos da landing.
+   * Recebe os ids na ordem desejada e grava a posição de cada um numa única
+   * transação — se algo falhar no meio, a grade não fica meio trocada.
+   */
+  reordenar: adminOnly
+    .input(z.object({ ids: z.array(z.number().int()).min(1) }))
+    .handler(async ({ input }) => {
+      const existentes = await db
+        .select({ id: tabelaAplicativos.id })
+        .from(tabelaAplicativos);
+      const validos = new Set(existentes.map((a) => a.id));
+      const desconhecido = input.ids.find((id) => !validos.has(id));
+      if (desconhecido)
+        throw new ORPCError("BAD_REQUEST", {
+          message: `Aplicativo #${desconhecido} não existe mais — recarregue a página.`,
+        });
+
+      await db.transaction(async (tx) => {
+        for (const [posicao, id] of input.ids.entries()) {
+          await tx
+            .update(tabelaAplicativos)
+            .set({ ordem: posicao + 1 })
+            .where(eq(tabelaAplicativos.id, id));
+        }
+      });
+      return { ok: true, total: input.ids.length };
+    }),
 
   criar: adminOnly.input(aplicativoInput).handler(async ({ input }) => {
     const slug = slugify(input.slug || input.nome);

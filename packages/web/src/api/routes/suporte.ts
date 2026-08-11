@@ -49,7 +49,7 @@ export const suporte = {
       if (!cliente) throw new ORPCError("NOT_FOUND", { message: "Cliente não encontrado" });
 
       // BLOQUEIO POR INADIMPLENCIA — atendimento humano pausado ate regularizar
-      if (estaBloqueado(cliente.statusPagamento)) {
+      if (estaBloqueado(cliente.statusPagamento, cliente.confiancaAte)) {
         throw new ORPCError("FORBIDDEN", { message: MSG_BLOQUEIO });
       }
 

@@ -76,7 +76,7 @@ async function dispararWebhook(alerta: typeof tabelaNotificacoes.$inferSelect) {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        origem: "PLAPLUSNOW",
+        origem: "PLAYPLUSNOW",
         tipo: alerta.tipo,
         severidade: alerta.severidade,
         titulo: alerta.titulo,

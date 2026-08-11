@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { AppIcon } from "../app-icon";
 import { GlassCard, NeonButton, Pill, accentHex } from "../ui/kit";
+import { Ajuda, Campo, TituloSecao, Tooltip } from "../ui/tooltip";
 import {
   useCodigos,
   useRegistrarEmailManual,
@@ -27,7 +28,7 @@ const inputCls =
   "w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 font-sans text-sm text-white placeholder:text-white/25 focus:border-neon-purple/50 focus:outline-none";
 
 const EXEMPLO = `De: info@account.netflix.com
-Para: matriz.ntf01@plaplusnow.com
+Para: matriz.ntf01@playplusnow.com
 Assunto: Seu código de acesso temporário
 
 Olá! Use o código 481920 para completar o login. Ele expira em 15 minutos.`;
@@ -41,12 +42,12 @@ function ColarEmail() {
   return (
     <GlassCard strong accent="purple" className="p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <ClipboardPaste className="size-4 text-neon-purple" />
-          <span className="font-display text-sm font-bold text-white">
-            Colar e-mail recebido
-          </span>
-        </div>
+        <TituloSecao
+          ajuda="codigos.colar"
+          icone={<ClipboardPaste className="size-4 text-neon-purple" />}
+        >
+          Colar e-mail recebido
+        </TituloSecao>
         <button
           type="button"
           onClick={() => setCorpo(EXEMPLO)}
@@ -62,15 +63,23 @@ function ColarEmail() {
         cliente.
       </p>
 
-      <textarea
-        className={`${inputCls} mt-4 min-h-[132px] font-mono text-xs leading-relaxed`}
-        placeholder="Cole aqui o conteúdo do e-mail..."
-        value={corpo}
-        onChange={(e) => {
-          setCorpo(e.target.value);
-          setOk(null);
-        }}
-      />
+      <Campo
+        label="Conteúdo do e-mail"
+        ajuda="codigos.colar"
+        htmlFor="codigos-corpo"
+        className="mt-4"
+      >
+        <textarea
+          id="codigos-corpo"
+          className={`${inputCls} min-h-[132px] font-mono text-xs leading-relaxed`}
+          placeholder="Cole aqui o conteúdo do e-mail..."
+          value={corpo}
+          onChange={(e) => {
+            setCorpo(e.target.value);
+            setOk(null);
+          }}
+        />
+      </Campo>
 
       {registrar.isError && (
         <p className="mt-3 font-sans text-xs text-neon-red">{registrar.error?.message}</p>
@@ -113,10 +122,12 @@ function WebhookCard() {
 
   return (
     <GlassCard accent="cyan" className="p-5">
-      <div className="flex items-center gap-2">
-        <Webhook className="size-4 text-neon-cyan" />
-        <span className="font-display text-sm font-bold text-white">Entrada automática</span>
-      </div>
+      <TituloSecao
+        ajuda="codigos.entradaAutomatica"
+        icone={<Webhook className="size-4 text-neon-cyan" />}
+      >
+        Entrada automática
+      </TituloSecao>
       <p className="mt-1.5 font-sans text-xs text-white/40">
         Aponte o inbound email do seu provedor para esta URL. Aceita JSON com{" "}
         <span className="font-mono text-white/60">from</span>,{" "}
@@ -164,26 +175,30 @@ export function CodigosView() {
         {[
           {
             label: "Códigos na última hora",
+            ajuda: "codigos.expira",
             value: String(codigos.length),
             sub: "apagados automaticamente após 60 min",
             accent: "cyan" as const,
           },
           {
             label: "Sem cliente vinculado",
+            ajuda: "Códigos que chegaram numa conta compartilhada e o sistema não conseguiu atribuir. Escolha o cliente na lista ao lado do código.",
             value: String(semDono),
             sub: "conta compartilhada — vincule na mão",
             accent: "red" as const,
           },
           {
             label: "Vinculados",
+            ajuda: "Códigos já entregues no painel do cliente certo, sem você fazer nada.",
             value: String(codigos.length - semDono),
             sub: "visíveis no painel do cliente",
             accent: "purple" as const,
           },
         ].map((s) => (
           <GlassCard key={s.label} accent={s.accent} className="p-5">
-            <div className="font-sans text-[11px] uppercase tracking-[0.2em] text-white/35">
+            <div className="flex items-center gap-1.5 font-sans text-[11px] uppercase tracking-[0.2em] text-white/35">
               {s.label}
+              <Ajuda ajuda={s.ajuda} />
             </div>
             <div className="mt-2 font-display text-2xl font-extrabold text-white">{s.value}</div>
             <div className="mt-1 font-sans text-[11px]" style={{ color: accentHex[s.accent] }}>
@@ -237,14 +252,15 @@ export function CodigosView() {
                   </div>
                 </div>
 
+                <Tooltip texto="codigos.copiar" titulo="Copiar código">
                 <button
                   type="button"
+                  aria-label={`Copiar código ${c.codigo}`}
                   onClick={() => {
                     void navigator.clipboard?.writeText(c.codigo);
                     setCopiado(c.id);
                     setTimeout(() => setCopiado(null), 1800);
                   }}
-                  title="Copiar código"
                   className="flex items-center gap-2 rounded-xl border border-neon-cyan/30 bg-neon-cyan/[0.07] px-4 py-2 transition-colors hover:border-neon-cyan/60"
                 >
                   <span className="font-display text-xl font-extrabold tracking-[0.22em] text-neon-cyan">
@@ -256,6 +272,7 @@ export function CodigosView() {
                     <Copy className="size-3.5 text-white/40" />
                   )}
                 </button>
+                </Tooltip>
 
                 <div className="min-w-[150px]">
                   <div className="font-sans text-xs text-white/70">{horaBr(c.recebidoEm)}</div>
@@ -264,12 +281,18 @@ export function CodigosView() {
                   </div>
                 </div>
 
-                <Pill accent={minutosRestantes(c.recebidoEm) < 10 ? "red" : "cyan"} icon={<Timer className="size-3" />}>
-                  expira em {minutosRestantes(c.recebidoEm)} min
-                </Pill>
+                <Tooltip texto="codigos.expira" titulo="Validade do código">
+                  <Pill
+                    accent={minutosRestantes(c.recebidoEm) < 10 ? "red" : "cyan"}
+                    icon={<Timer className="size-3" />}
+                  >
+                    expira em {minutosRestantes(c.recebidoEm)} min
+                  </Pill>
+                </Tooltip>
 
                 <select
                   className={`${inputCls} max-w-[200px]`}
+                  aria-label="Vincular o código a um cliente"
                   value={c.clienteId ?? ""}
                   disabled={vincular.isPending}
                   onChange={(e) =>
@@ -289,15 +312,17 @@ export function CodigosView() {
                   ))}
                 </select>
 
-                <button
-                  type="button"
-                  aria-label="Descartar código"
-                  disabled={remover.isPending}
-                  onClick={() => remover.mutate({ id: c.id })}
-                  className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-white/10 text-white/40 transition-colors hover:border-neon-red/50 hover:text-neon-red"
-                >
-                  <Trash2 className="size-3.5" />
-                </button>
+                <Tooltip texto="codigos.descartar" titulo="Descartar código">
+                  <button
+                    type="button"
+                    aria-label="Descartar código"
+                    disabled={remover.isPending}
+                    onClick={() => remover.mutate({ id: c.id })}
+                    className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-white/10 text-white/40 transition-colors hover:border-neon-red/50 hover:text-neon-red"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </button>
+                </Tooltip>
               </div>
 
               {c.assunto && (

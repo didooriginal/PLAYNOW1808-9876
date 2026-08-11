@@ -11,6 +11,7 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { GlassCard, NeonButton, Pill } from "../ui/kit";
+import { Ajuda, Tooltip } from "../ui/tooltip";
 import {
   haQuantoTempo,
   useAlertasAdmin,
@@ -47,13 +48,14 @@ export function AlertasView({ onIr }: { onIr?: (destino: string) => void }) {
     <div className="space-y-5" data-testid="alertas-view">
       <div className="grid gap-3 sm:grid-cols-3">
         {[
-          { rotulo: "Não lidos", valor: naoLidas, cor: "#a855f7" },
-          { rotulo: "Críticos", valor: criticos, cor: "#ff1f3d" },
-          { rotulo: "Na fila", valor: itens.length, cor: "#22d3ee" },
+          { rotulo: "Não lidos", valor: naoLidas, cor: "#a855f7", ajuda: "alertas.filtroNaoLidas" },
+          { rotulo: "Críticos", valor: criticos, cor: "#ff1f3d", ajuda: "alertas.fila" },
+          { rotulo: "Na fila", valor: itens.length, cor: "#22d3ee", ajuda: "alertas.fila" },
         ].map((c) => (
           <GlassCard key={c.rotulo} className="p-4">
-            <div className="font-sans text-[10px] uppercase tracking-[0.2em] text-white/35">
+            <div className="flex items-center gap-1.5 font-sans text-[10px] uppercase tracking-[0.2em] text-white/35">
               {c.rotulo}
+              <Ajuda ajuda={c.ajuda} />
             </div>
             <div
               className="mt-1 font-display text-2xl font-extrabold tabular-nums"
@@ -66,6 +68,7 @@ export function AlertasView({ onIr }: { onIr?: (destino: string) => void }) {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
+        <Tooltip texto="alertas.filtroNaoLidas" titulo="Somente não lidos">
         <button
           type="button"
           data-testid="filtro-nao-lidas"
@@ -78,6 +81,8 @@ export function AlertasView({ onIr }: { onIr?: (destino: string) => void }) {
         >
           Somente não lidos
         </button>
+        </Tooltip>
+        <Tooltip texto="alertas.reavaliar" titulo="Reavaliar vencimentos">
         <NeonButton
           accent="purple"
           size="sm"
@@ -92,7 +97,9 @@ export function AlertasView({ onIr }: { onIr?: (destino: string) => void }) {
           )}
           Reavaliar vencimentos
         </NeonButton>
+        </Tooltip>
         {naoLidas > 0 && (
+          <Tooltip texto="alertas.marcarTodas" titulo="Marcar todas como lidas">
           <NeonButton
             accent="cyan"
             size="sm"
@@ -103,6 +110,7 @@ export function AlertasView({ onIr }: { onIr?: (destino: string) => void }) {
             <CheckCheck className="size-4" />
             Marcar todas como lidas
           </NeonButton>
+          </Tooltip>
         )}
       </div>
 
@@ -171,6 +179,7 @@ export function AlertasView({ onIr }: { onIr?: (destino: string) => void }) {
                   </div>
 
                   {!n.lida && (
+                    <Tooltip texto="alertas.marcarLida" titulo="Marcar como lido">
                     <button
                       type="button"
                       onClick={() => marcarLida.mutate({ ids: [n.id] })}
@@ -179,6 +188,7 @@ export function AlertasView({ onIr }: { onIr?: (destino: string) => void }) {
                     >
                       <Check className="size-3.5" />
                     </button>
+                    </Tooltip>
                   )}
                 </GlassCard>
               </li>

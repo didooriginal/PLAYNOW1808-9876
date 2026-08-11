@@ -7,10 +7,14 @@ import {
   Plus,
   RefreshCw,
   Settings2,
+  Ticket,
   Wallet,
 } from "lucide-react";
 import { AppIcon } from "../app-icon";
 import { GlassCard, NeonButton, Pill } from "../ui/kit";
+import { Ajuda, Campo, TituloSecao } from "../ui/tooltip";
+import { LinhaCodigo } from "./estoque-gift-view";
+import { useCodigosGift } from "../../queries/estoque-gift";
 import {
   useAtualizarConta,
   useExtratoGift,
@@ -32,6 +36,60 @@ const inputCls =
   "w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 font-sans text-sm text-white placeholder:text-white/25 focus:border-neon-purple/50 focus:outline-none";
 
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+/* ------------------------------------------------------------------ */
+
+/**
+ * APLICAR GIFT CARD — lista os códigos disponíveis do provedor DESTA conta.
+ * O admin copia (o código já entra em "em uso"), resgata no site do serviço e
+ * confirma; a confirmação credita o valor no saldo da matriz com extrato.
+ */
+function AplicarGiftCard({
+  contaId,
+  servico,
+  onFechar,
+}: {
+  contaId: number;
+  servico: string;
+  onFechar: () => void;
+}) {
+  const codigos = useCodigosGift({ provider: servico, status: "disponivel" });
+  const emUso = useCodigosGift({ provider: servico, status: "em_uso" });
+  const lista = [...(emUso.data ?? []), ...(codigos.data ?? [])];
+
+  return (
+    <div className="mt-4 rounded-2xl border border-white/8 bg-white/[0.02] p-4">
+      <div className="flex items-center gap-2">
+        <Ticket className="size-4 text-neon-cyan" />
+        <span className="font-display text-xs font-bold uppercase tracking-wider text-white/70">
+          Aplicar gift card
+        </span>
+        <Ajuda ajuda="contas.aplicarGift" lado="bottom" />
+        <span className="ml-auto font-sans text-[11px] text-white/35">
+          {lista.length} código(s) no estoque
+        </span>
+      </div>
+      <p className="mt-1.5 font-sans text-[11px] text-white/35">
+        Copie o código (nunca digite), resgate na conta e confirme aqui — o saldo é creditado
+        automaticamente.
+      </p>
+
+      <div className="mt-3 grid gap-2">
+        {(codigos.isPending || emUso.isPending) && (
+          <Loader2 className="mx-auto my-4 size-4 animate-spin text-white/40" />
+        )}
+        {!codigos.isPending && lista.length === 0 && (
+          <p className="py-4 text-center font-sans text-xs text-white/35">
+            Nenhum código disponível para este provedor. Cadastre um lote em Estoque de gift cards.
+          </p>
+        )}
+        {lista.map((c) => (
+          <LinhaCodigo key={c.id} card={c} contaId={contaId} compacto onAplicado={onFechar} />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 /* ------------------------------------------------------------------ */
 
@@ -57,36 +115,46 @@ function Lancamento({ contaId, nome }: { contaId: number; nome: string }) {
         <span className="font-display text-xs font-bold uppercase tracking-wider text-white/70">
           Lançar saldo
         </span>
+        <Ajuda ajuda="contas.lancamentoValor" lado="bottom" />
       </div>
 
-      <div className="mt-3 grid gap-2 sm:grid-cols-[110px_1fr_auto]">
-        <select
-          className={inputCls}
-          value={tipo}
-          onChange={(e) => setTipo(e.target.value as typeof tipo)}
-        >
-          <option value="credito">+ Crédito</option>
-          <option value="debito">− Consumo</option>
-          <option value="ajuste">= Ajuste</option>
-        </select>
-        <input
-          className={inputCls}
-          placeholder="70,00"
-          inputMode="decimal"
-          value={valor}
-          onChange={(e) => setValor(e.target.value)}
-        />
+      <div className="mt-3 grid items-end gap-2 sm:grid-cols-[130px_1fr_auto]">
+        <Campo label="Tipo" ajuda="contas.lancamentoTipo" htmlFor={`tipo-${contaId}`}>
+          <select
+            id={`tipo-${contaId}`}
+            className={inputCls}
+            value={tipo}
+            onChange={(e) => setTipo(e.target.value as typeof tipo)}
+          >
+            <option value="credito">+ Crédito</option>
+            <option value="debito">− Consumo</option>
+            <option value="ajuste">= Ajuste</option>
+          </select>
+        </Campo>
+        <Campo label="Valor movimentado" ajuda="contas.lancamentoValor" htmlFor={`valor-${contaId}`}>
+          <input
+            id={`valor-${contaId}`}
+            className={inputCls}
+            placeholder="70,00"
+            inputMode="decimal"
+            value={valor}
+            onChange={(e) => setValor(e.target.value)}
+          />
+        </Campo>
         <NeonButton accent="cyan" onClick={enviar} disabled={lancar.isPending}>
           {lancar.isPending ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
           Lançar
         </NeonButton>
       </div>
-      <input
-        className={`${inputCls} mt-2`}
-        placeholder="Observação (ex.: gift card comprado no mercado)"
-        value={obs}
-        onChange={(e) => setObs(e.target.value)}
-      />
+      <Campo className="mt-2" label="Observação" ajuda="contas.lancamentoObs" htmlFor={`obs-${contaId}`}>
+        <input
+          id={`obs-${contaId}`}
+          className={inputCls}
+          placeholder="ex.: gift card comprado no mercado"
+          value={obs}
+          onChange={(e) => setObs(e.target.value)}
+        />
+      </Campo>
       {lancar.isError && (
         <p className="mt-2 font-sans text-xs text-neon-red">{lancar.error?.message}</p>
       )}
@@ -142,6 +210,7 @@ function ContaCard({
   const atualizar = useAtualizarConta();
   const [aberto, setAberto] = useState(false);
   const [editando, setEditando] = useState(false);
+  const [aplicando, setAplicando] = useState(false);
   const [nome, setNome] = useState(conta.nomeConta);
   const [custo, setCusto] = useState(String(conta.custoMensal));
   const [limite, setLimite] = useState(String(conta.alertaSaldoCritico));
@@ -169,7 +238,9 @@ function ContaCard({
 
       <div className="mt-4 grid grid-cols-3 gap-2 text-center">
         <div className="rounded-xl bg-white/[0.03] px-2 py-3">
-          <div className="font-sans text-[10px] uppercase tracking-wider text-white/35">Saldo</div>
+          <div className="flex items-center justify-center gap-1 font-sans text-[10px] uppercase tracking-wider text-white/35">
+            Saldo <Ajuda ajuda="contas.saldo" />
+          </div>
           <div
             className={
               conta.critico
@@ -181,15 +252,17 @@ function ContaCard({
           </div>
         </div>
         <div className="rounded-xl bg-white/[0.03] px-2 py-3">
-          <div className="font-sans text-[10px] uppercase tracking-wider text-white/35">
-            Custo/mês
+          <div className="flex items-center justify-center gap-1 font-sans text-[10px] uppercase tracking-wider text-white/35">
+            Custo/mês <Ajuda ajuda="contas.custoMensal" />
           </div>
           <div className="mt-1 font-display text-lg font-extrabold text-white/70">
             {brl(conta.custoMensal)}
           </div>
         </div>
         <div className="rounded-xl bg-white/[0.03] px-2 py-3">
-          <div className="font-sans text-[10px] uppercase tracking-wider text-white/35">Folga</div>
+          <div className="flex items-center justify-center gap-1 font-sans text-[10px] uppercase tracking-wider text-white/35">
+            Folga <Ajuda ajuda="contas.folga" />
+          </div>
           <div className="mt-1 font-display text-lg font-extrabold text-neon-cyan">
             {conta.mesesDeFolga === null ? "—" : `${conta.mesesDeFolga} m`}
           </div>
@@ -216,14 +289,36 @@ function ContaCard({
         >
           Editar dados
         </button>
+        <button
+          type="button"
+          onClick={() => setAplicando((v) => !v)}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-neon-cyan/40 bg-neon-cyan/10 px-3 py-1.5 font-sans text-[11px] text-neon-cyan hover:bg-neon-cyan/15"
+        >
+          <Ticket className="size-3.5" />
+          Aplicar Gift Card
+        </button>
       </div>
+
+      {aplicando && (
+        <AplicarGiftCard
+          contaId={conta.id}
+          servico={conta.servico}
+          onFechar={() => setAplicando(false)}
+        />
+      )}
 
       {editando && (
         <div className="mt-3 grid gap-2 rounded-2xl border border-white/8 bg-white/[0.02] p-4">
-          <input className={inputCls} value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome da conta" />
+          <Campo label="Nome da conta" ajuda="contas.rotulo" htmlFor={`nome-${conta.id}`}>
+            <input id={`nome-${conta.id}`} className={inputCls} value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Netflix — Matriz 09" />
+          </Campo>
           <div className="grid gap-2 sm:grid-cols-2">
-            <input className={inputCls} value={custo} onChange={(e) => setCusto(e.target.value)} placeholder="Custo mensal" inputMode="decimal" />
-            <input className={inputCls} value={limite} onChange={(e) => setLimite(e.target.value)} placeholder="Alerta manual (0 = automático)" inputMode="decimal" />
+            <Campo label="Custo mensal" ajuda="contas.custoMensal" htmlFor={`custo-${conta.id}`}>
+              <input id={`custo-${conta.id}`} className={inputCls} value={custo} onChange={(e) => setCusto(e.target.value)} placeholder="0,00" inputMode="decimal" />
+            </Campo>
+            <Campo label="Alerta manual" ajuda="contas.limiteAlerta" htmlFor={`limite-${conta.id}`} dica="0 = automático">
+              <input id={`limite-${conta.id}`} className={inputCls} value={limite} onChange={(e) => setLimite(e.target.value)} placeholder="0" inputMode="decimal" />
+            </Campo>
           </div>
           <NeonButton
             accent="purple"
@@ -270,8 +365,8 @@ const CAMPOS_PARAMETRO: { chave: string; label: string; sufixo: string; ajuda: s
   { chave: "falhasParaPausar", label: "Falhas p/ pausar conta", sufixo: "un", ajuda: "falhas em 30 dias que travam entrada de novos" },
   { chave: "winbackDias", label: "Win-back a partir de", sufixo: "dias", ajuda: "inatividade para a 1ª oferta de retorno" },
   { chave: "winbackDesconto", label: "Desconto do win-back", sufixo: "%", ajuda: "cupom base da régua de recuperação" },
-  { chave: "precoSalaJogos", label: "Preço Sala de Jogos", sufixo: "R$", ajuda: "mensalidade do adicional" },
-  { chave: "horasLiberacaoJogos", label: "Validade da liberação", sufixo: "h", ajuda: "duração do acesso da Sala de Jogos" },
+  { chave: "precoSalaJogos", label: "Preço Futebol Ao Vivo", sufixo: "R$", ajuda: "mensalidade do adicional" },
+  { chave: "horasLiberacaoJogos", label: "Validade da liberação", sufixo: "h", ajuda: "duração do acesso da Futebol Ao Vivo" },
 ];
 
 function Parametros() {
@@ -284,10 +379,9 @@ function Parametros() {
 
   return (
     <GlassCard strong accent="purple" className="p-5">
-      <div className="flex items-center gap-2">
-        <Settings2 className="size-4 text-neon-purple" />
-        <span className="font-display text-sm font-bold text-white">Parâmetros do negócio</span>
-      </div>
+      <TituloSecao icone={<Settings2 className="size-4 text-neon-purple" />} ajuda="Regras que o sistema aplica sozinho: comissão, bônus, taxas, margens e a régua de recuperação. Salvar vale na hora, sem deploy, e afeta apenas o que acontecer daqui para frente.">
+        Parâmetros do negócio
+      </TituloSecao>
       <p className="mt-1.5 font-sans text-xs text-white/40">
         Muda aqui e vale na hora, sem deploy. Comissão, bônus, taxas, margens e a régua de
         recuperação saem todos deste painel.
@@ -300,10 +394,14 @@ function Parametros() {
           const sujo = valor !== atual;
           return (
             <div key={campo.chave} className="rounded-2xl border border-white/8 bg-white/[0.02] p-3">
-              <div className="font-sans text-[11px] font-semibold text-white/70">{campo.label}</div>
+              <div className="flex items-center gap-1.5">
+                <div className="font-sans text-[11px] font-semibold text-white/70">{campo.label}</div>
+                <Ajuda ajuda={`param.${campo.chave}`} />
+              </div>
               <div className="mt-0.5 font-sans text-[10px] leading-snug text-white/30">{campo.ajuda}</div>
               <div className="mt-2 flex items-center gap-2">
                 <input
+                  aria-label={campo.label}
                   className={inputCls}
                   inputMode="decimal"
                   value={valor}
@@ -350,17 +448,23 @@ export function GestaoContasView() {
         <GlassCard className="p-5">
           <Wallet className="size-5 text-neon-cyan" />
           <div className="mt-3 font-display text-2xl font-extrabold text-white">{brl(saldoTotal)}</div>
-          <div className="font-sans text-xs text-white/40">saldo total em gift cards</div>
+          <div className="flex items-center gap-1.5 font-sans text-xs text-white/40">
+            saldo total em gift cards <Ajuda ajuda="contas.saldo" />
+          </div>
         </GlassCard>
         <GlassCard className="p-5">
           <CreditCard className="size-5 text-neon-purple" />
           <div className="mt-3 font-display text-2xl font-extrabold text-white">{brl(custoTotal)}</div>
-          <div className="font-sans text-xs text-white/40">custo mensal das matrizes</div>
+          <div className="flex items-center gap-1.5 font-sans text-xs text-white/40">
+            custo mensal das matrizes <Ajuda ajuda="contas.custoMensal" />
+          </div>
         </GlassCard>
         <GlassCard accent={criticas.length ? "red" : undefined} className="p-5">
           <AlertTriangle className={criticas.length ? "size-5 text-neon-red" : "size-5 text-white/30"} />
           <div className="mt-3 font-display text-2xl font-extrabold text-white">{criticas.length}</div>
-          <div className="font-sans text-xs text-white/40">contas em saldo crítico</div>
+          <div className="flex items-center gap-1.5 font-sans text-xs text-white/40">
+            contas em saldo crítico <Ajuda ajuda="contas.limiteAlerta" />
+          </div>
         </GlassCard>
       </div>
 
@@ -370,10 +474,13 @@ export function GestaoContasView() {
           <span className="text-white/60">{data?.margem ?? 20}%</span> de margem. Rode a varredura
           para jogar os avisos na Central de Alertas e no webhook.
         </p>
-        <NeonButton accent="cyan" onClick={() => varrer.mutate({})} disabled={varrer.isPending}>
-          {varrer.isPending ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
-          Varrer saldos
-        </NeonButton>
+        <div className="flex items-center gap-2">
+          <NeonButton accent="cyan" onClick={() => varrer.mutate({})} disabled={varrer.isPending}>
+            {varrer.isPending ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+            Varrer saldos
+          </NeonButton>
+          <Ajuda ajuda="contas.varrer" />
+        </div>
       </div>
 
       {isLoading && <p className="font-sans text-sm text-white/40">Carregando contas…</p>}

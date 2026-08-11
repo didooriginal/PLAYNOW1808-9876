@@ -97,9 +97,52 @@ export function statusEsperado(
   return (atual as StatusCliente) || "ativo";
 }
 
-/** Cliente atrasado/suspenso perde acesso aos dados sensiveis e ao suporte humano. */
-export function estaBloqueado(status: string) {
-  return status === "atrasado" || status === "suspenso";
+/** Duração padrão do crédito de confiança concedido pelo admin. */
+export const HORAS_CONFIANCA = 48;
+
+/**
+ * CRÉDITO DE CONFIANÇA — o admin dá um prazo extra para o cliente inadimplente
+ * continuar usando tudo normalmente. Enquanto o prazo está de pé, o bloqueio é
+ * ignorado em toda a aplicação; quando expira, o bloqueio volta sozinho, sem
+ * precisar de nenhuma rotina limpando campo.
+ */
+export function confiancaAtiva(confiancaAte?: Date | number | null) {
+  if (!confiancaAte) return false;
+  const ate = confiancaAte instanceof Date ? confiancaAte.getTime() : Number(confiancaAte);
+  return Number.isFinite(ate) && ate > Date.now();
+}
+
+/** Detalhe do crédito para a UI: quanto falta, em horas e minutos. */
+export function detalheConfianca(cliente: {
+  confiancaAte?: Date | number | null;
+  confiancaMotivo?: string | null;
+  confiancaTotal?: number | null;
+}) {
+  const ativa = confiancaAtiva(cliente.confiancaAte);
+  const ate = cliente.confiancaAte
+    ? cliente.confiancaAte instanceof Date
+      ? cliente.confiancaAte
+      : new Date(Number(cliente.confiancaAte))
+    : null;
+  const restanteMs = ativa && ate ? ate.getTime() - Date.now() : 0;
+  return {
+    ativa,
+    /** ISO para o contador do front */
+    ate: ate ? ate.toISOString() : null,
+    horasRestantes: Math.floor(restanteMs / 3_600_000),
+    minutosRestantes: Math.floor((restanteMs % 3_600_000) / 60_000),
+    motivo: cliente.confiancaMotivo ?? "",
+    vezes: cliente.confiancaTotal ?? 0,
+  };
+}
+
+/**
+ * Cliente atrasado/suspenso perde acesso aos dados sensiveis e ao suporte humano
+ * — a menos que esteja com crédito de confiança dentro do prazo.
+ */
+export function estaBloqueado(status: string, confiancaAte?: Date | number | null) {
+  if (status !== "atrasado" && status !== "suspenso") return false;
+  return !confiancaAtiva(confiancaAte);
 }
 
 /** Resumo pronto para a UI do cliente (contador regressivo + estado do bloqueio). */
@@ -109,9 +152,13 @@ export function situacaoCobranca(cliente: {
   valor: number;
   ciclo: string;
   formaPagamento?: string | null;
+  confiancaAte?: Date | number | null;
+  confiancaMotivo?: string | null;
+  confiancaTotal?: number | null;
 }) {
   const dias = diasAteVencimento(cliente.proximaCobranca);
-  const bloqueado = estaBloqueado(cliente.statusPagamento);
+  const confianca = detalheConfianca(cliente);
+  const bloqueado = estaBloqueado(cliente.statusPagamento, cliente.confiancaAte);
   const vencimento = parseDataBr(cliente.proximaCobranca);
   return {
     status: cliente.statusPagamento as StatusCliente,
@@ -125,6 +172,8 @@ export function situacaoCobranca(cliente: {
     valor: cliente.valor,
     ciclo: cliente.ciclo,
     formaPagamento: (cliente.formaPagamento ?? "pix") as FormaPagamento,
+    /** crédito de confiança concedido pelo admin, se estiver valendo agora */
+    confianca,
   };
 }
 

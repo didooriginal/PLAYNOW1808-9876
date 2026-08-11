@@ -20,8 +20,8 @@ export function CtaBand() {
           <div className="relative flex flex-col items-center gap-8 text-center lg:flex-row lg:justify-between lg:text-left">
             <div>
               <h2 className="font-display text-3xl font-extrabold leading-tight tracking-tight text-white sm:text-4xl">
-                Sua próxima fatura pode ser{" "}
-                <span className="text-neon-red glow-red">72% menor</span>
+                Sua fatura mais barata{" "}
+                <span className="text-neon-red glow-red">que uma pizza</span>
               </h2>
               <p className="mt-3 max-w-xl font-sans text-white/50">
                 Fale com um atendente agora, escolha seus apps e receba os acessos em minutos. Sem
@@ -29,7 +29,7 @@ export function CtaBand() {
               </p>
             </div>
             <a
-              href={whatsappLink("Olá! Vi o site da PLAPLUSNOW e quero assinar um combo de streamings.")}
+              href={whatsappLink("Olá! Vi o site da PLAYPLUSNOW e quero assinar um combo de streamings.")}
               target="_blank"
               rel="noreferrer"
               className="shrink-0"
@@ -53,7 +53,7 @@ export function Footer() {
         <div>
           <Logo size="sm" />
           <p className="mt-5 max-w-xs font-sans text-xs leading-relaxed text-white/35">
-            PLAPLUSNOW é uma plataforma de gestão de pacotes de streaming compartilhados. Interface
+            PLAYPLUSNOW é uma plataforma de gestão de pacotes de streaming compartilhados. Interface
             de demonstração com dados fictícios.
           </p>
           <div className="mt-5 flex gap-2">
@@ -126,7 +126,7 @@ export function Footer() {
 
       <div className="mx-auto mt-12 flex max-w-7xl flex-col items-center justify-between gap-3 border-t border-white/8 pt-6 sm:flex-row">
         <span className="font-sans text-[11px] text-white/25">
-          © 2026 PLAPLUSNOW · Todos os dados exibidos são fictícios
+          © 2026 PLAYPLUSNOW · Todos os dados exibidos são fictícios
         </span>
         <span className="inline-flex items-center gap-1.5 font-sans text-[11px] text-white/25">
           <ShieldCheck className="size-3.5 text-neon-cyan" />

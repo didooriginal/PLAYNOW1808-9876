@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { GlassCard, NeonButton, Pill, accentHex } from "../ui/kit";
+import { Ajuda } from "../ui/tooltip";
 import {
   rotuloPremio,
   useAfiliados,
@@ -323,9 +324,11 @@ export function AfiliadosView() {
             <input
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
+              aria-label="Buscar cliente ou código de indicação"
               placeholder="Buscar cliente ou código"
               className="h-9 w-56 rounded-full border border-white/10 bg-white/[0.04] pl-9 pr-3 font-sans text-xs text-white outline-none placeholder:text-white/25 focus:border-neon-purple/50"
             />
+            <Ajuda ajuda="busca.afiliados" className="absolute -right-5 top-1/2 -translate-y-1/2" />
           </div>
         </div>
 

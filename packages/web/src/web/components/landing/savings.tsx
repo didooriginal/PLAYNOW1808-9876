@@ -25,7 +25,7 @@ export function Savings() {
               entretenimento
             </>
           }
-          subtitle="Compare o que sai da sua conta hoje com o que sairia dentro de um combo compartilhado da PLAPLUSNOW. Mesmos apps, mesma qualidade de imagem, uma fração do valor."
+          subtitle="Compare o que sai da sua conta hoje com o que sairia dentro de um combo compartilhado da PLAYPLUSNOW. Mesmos apps, mesma qualidade de imagem, uma fração do valor."
         />
 
         <div className="mt-14 grid items-stretch gap-5 lg:grid-cols-[1fr_auto_1fr]">
@@ -106,7 +106,7 @@ export function Savings() {
             <div className="relative flex items-center justify-between gap-3">
               <div>
                 <div className="font-sans text-[11px] uppercase tracking-[0.24em] text-neon-red">
-                  No combo PLAPLUSNOW
+                  No combo PLAYPLUSNOW
                 </div>
                 <h3 className="mt-1 font-display text-xl font-bold text-white">
                   Pacote {mega.name}
@@ -123,7 +123,7 @@ export function Savings() {
 
             <ul className="relative mt-7 space-y-2.5">
               {[
-                "Os mesmos 7 apps, uma cobrança só",
+                `Os mesmos ${mega.items.length} apps, uma cobrança só`,
                 "Netflix em 4K e Spotify sem anúncio",
                 "Painel com login e senha de cada app",
                 "Suporte humano no WhatsApp 24/7",
@@ -174,6 +174,10 @@ function ServiceName({ id }: { id: (typeof mega.items)[number] }) {
     spotify: "Spotify Premium",
     youtube: "YouTube Premium",
     crunchyroll: "Crunchyroll Mega Fan",
+    paramount: "Paramount+ Padrão",
+    looke: "Looke Premium",
+    globoplay: "Globoplay Premium",
+    recordplus: "Record+ Plus",
   };
   return <>{names[id] ?? id}</>;
 }

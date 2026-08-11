@@ -10,6 +10,7 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { Loader2, Send, Sparkles, Terminal, Wand2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useArrastavel } from "../../lib/arrastavel";
 import { NeonButton } from "../ui/kit";
 
 const SUGESTOES = [
@@ -96,18 +97,27 @@ export function CopilotoAdmin({ nome }: { nome?: string }) {
   }
 
   const primeiroNome = (nome ?? "").split(" ")[0] ?? "";
+  const arrasto = useArrastavel("ppn:copiloto:pos");
 
   return (
     <>
-      {/* gatilho — canto esquerdo, longe do badge Runable */}
+      {/* gatilho — arrastável; parte do canto esquerdo inferior */}
       {!aberto && (
         <button
           type="button"
+          {...arrasto.props}
           onClick={() => setAberto(true)}
+          onDoubleClick={arrasto.resetar}
           data-testid="abrir-copiloto"
-          aria-label="Abrir Copiloto Admin"
-          className="group fixed bottom-5 left-4 z-[70] flex items-center gap-2 rounded-full border border-neon-purple/45 bg-black/75 py-3 pl-3 pr-4 backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-neon-purple lg:left-6"
-          style={{ boxShadow: "0 18px 50px -18px rgba(168,85,247,0.85)" }}
+          aria-label="Abrir Copiloto Admin (arraste para mover)"
+          title="Arraste para mover · duplo clique volta ao canto"
+          className={cn(
+            "group fixed bottom-5 left-4 z-[70] flex touch-none select-none items-center gap-2 rounded-full border border-neon-purple/45 bg-black/75 py-3 pl-3 pr-4 backdrop-blur-xl hover:border-neon-purple lg:left-6",
+            arrasto.arrastando
+              ? "scale-105 cursor-grabbing border-neon-purple"
+              : "cursor-grab transition-all hover:-translate-y-0.5",
+          )}
+          style={{ boxShadow: "0 18px 50px -18px rgba(168,85,247,0.85)", ...arrasto.style }}
         >
           <span className="relative flex size-8 items-center justify-center rounded-full bg-neon-purple/15">
             <Wand2 className="size-4 text-neon-purple" />

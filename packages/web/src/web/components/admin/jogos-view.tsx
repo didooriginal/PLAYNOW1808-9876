@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Gamepad2, Loader2, Plus, Power, Timer, Users, X } from "lucide-react";
+import { Goal, Loader2, Plus, Power, Timer, Users, X } from "lucide-react";
 import { GlassCard, NeonButton, Pill, ProgressBar } from "../ui/kit";
+import { Ajuda, Campo, TituloSecao } from "../ui/tooltip";
 import {
   useAlternarClienteJogos,
   useCadastrarContaJogos,
@@ -10,7 +11,7 @@ import {
 } from "../../queries/jogos";
 
 /**
- * SALA DE JOGOS (admin) — o admin só abastece o pool.
+ * FUTEBOL AO VIVO (admin) — o admin só abastece o pool.
  * A liberação para o cliente é automática: quem tem o adicional ativo pega
  * o acesso sozinho no painel e a vaga volta sozinha quando expira.
  */
@@ -41,22 +42,71 @@ function NovaConta() {
 
   return (
     <GlassCard strong accent="red" className="p-5">
-      <div className="flex items-center gap-2">
-        <Plus className="size-4 text-neon-red" />
-        <span className="font-display text-sm font-bold text-white">Nova conta no pool</span>
-      </div>
+      <TituloSecao ajuda="jogos.poolTitulo" icone={<Plus className="size-4 text-neon-red" />}>
+        Nova conta no pool
+      </TituloSecao>
       <p className="mt-1.5 font-sans text-xs text-white/40">
-        Contas exclusivas da Sala de Jogos. Quanto mais vagas, mais clientes simultâneos em dia de
+        Contas alternativas usadas no Futebol Ao Vivo. Quanto mais vagas, mais clientes simultâneos em dia de
         pico — o rodízio é automático.
       </p>
 
-      <div className="mt-4 grid gap-2 sm:grid-cols-2">
-        <input className={inputCls} placeholder="Rótulo (Sala de Jogos — Conta 01)" value={form.rotulo} onChange={set("rotulo")} />
-        <input className={inputCls} placeholder="Serviço (jogos)" value={form.servico} onChange={set("servico")} />
-        <input className={inputCls} placeholder="E-mail de login" value={form.email} onChange={set("email")} />
-        <input className={inputCls} placeholder="Senha" value={form.senha} onChange={set("senha")} />
-        <input className={inputCls} placeholder="Vagas" inputMode="numeric" value={form.totalVagas} onChange={set("totalVagas")} />
-        <input className={inputCls} placeholder="Custo mensal" inputMode="decimal" value={form.custoMensal} onChange={set("custoMensal")} />
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <Campo label="Rótulo" ajuda="jogos.rotulo" htmlFor="jogos-rotulo" obrigatorio>
+          <input
+            id="jogos-rotulo"
+            className={inputCls}
+            placeholder="Futebol Ao Vivo — Conta 01"
+            value={form.rotulo}
+            onChange={set("rotulo")}
+          />
+        </Campo>
+        <Campo label="Serviço" ajuda="jogos.servico" htmlFor="jogos-servico">
+          <input
+            id="jogos-servico"
+            className={inputCls}
+            placeholder="jogos"
+            value={form.servico}
+            onChange={set("servico")}
+          />
+        </Campo>
+        <Campo label="E-mail de login" ajuda="jogos.email" htmlFor="jogos-email" obrigatorio>
+          <input
+            id="jogos-email"
+            className={inputCls}
+            placeholder="login@provedor.com"
+            value={form.email}
+            onChange={set("email")}
+          />
+        </Campo>
+        <Campo label="Senha" ajuda="jogos.senha" htmlFor="jogos-senha" obrigatorio>
+          <input
+            id="jogos-senha"
+            className={inputCls}
+            placeholder="Senha da conta"
+            value={form.senha}
+            onChange={set("senha")}
+          />
+        </Campo>
+        <Campo label="Vagas" ajuda="jogos.vagas" htmlFor="jogos-vagas">
+          <input
+            id="jogos-vagas"
+            className={inputCls}
+            placeholder="4"
+            inputMode="numeric"
+            value={form.totalVagas}
+            onChange={set("totalVagas")}
+          />
+        </Campo>
+        <Campo label="Custo mensal" ajuda="jogos.custoMensal" htmlFor="jogos-custo">
+          <input
+            id="jogos-custo"
+            className={inputCls}
+            placeholder="0,00"
+            inputMode="decimal"
+            value={form.custoMensal}
+            onChange={set("custoMensal")}
+          />
+        </Campo>
       </div>
 
       {criar.isError && <p className="mt-3 font-sans text-xs text-neon-red">{criar.error?.message}</p>}
@@ -92,7 +142,7 @@ export function JogosView() {
   const revogar = useRevogarJogos();
   const alternarCliente = useAlternarClienteJogos();
 
-  if (isLoading) return <p className="font-sans text-sm text-white/40">Carregando Sala de Jogos…</p>;
+  if (isLoading) return <p className="font-sans text-sm text-white/40">Carregando Futebol Ao Vivo…</p>;
 
   const p = data;
 
@@ -100,25 +150,37 @@ export function JogosView() {
     <div className="space-y-5">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <GlassCard className="p-5">
-          <Gamepad2 className="size-5 text-neon-red" />
+          <Goal className="size-5 text-neon-red" />
           <div className="mt-3 font-display text-2xl font-extrabold text-white">{p?.assinantes.length ?? 0}</div>
-          <div className="font-sans text-xs text-white/40">clientes com o adicional</div>
+          <div className="flex items-center gap-1.5 font-sans text-xs text-white/40">
+            clientes com o adicional
+            <Ajuda ajuda="jogos.assinantes" />
+          </div>
         </GlassCard>
         <GlassCard className="p-5">
           <Users className="size-5 text-neon-cyan" />
           <div className="mt-3 font-display text-2xl font-extrabold text-white">
             {p?.ocupadas ?? 0}/{p?.totalVagas ?? 0}
           </div>
-          <div className="font-sans text-xs text-white/40">telas em uso agora</div>
+          <div className="flex items-center gap-1.5 font-sans text-xs text-white/40">
+            telas em uso agora
+            <Ajuda ajuda="jogos.liberacoesAtivas" />
+          </div>
           <ProgressBar value={p?.ocupadas ?? 0} max={p?.totalVagas || 1} className="mt-3" />
         </GlassCard>
         <GlassCard className="p-5">
           <Timer className="size-5 text-neon-purple" />
           <div className="mt-3 font-display text-2xl font-extrabold text-white">{p?.horas ?? 12}h</div>
-          <div className="font-sans text-xs text-white/40">validade de cada liberação</div>
+          <div className="flex items-center gap-1.5 font-sans text-xs text-white/40">
+            validade de cada liberação
+            <Ajuda ajuda="param.horasLiberacaoJogos" />
+          </div>
         </GlassCard>
         <GlassCard accent="red" className="p-5">
-          <div className="font-sans text-[11px] uppercase tracking-wider text-white/35">Receita do adicional</div>
+          <div className="flex items-center gap-1.5 font-sans text-[11px] uppercase tracking-wider text-white/35">
+            Receita do adicional
+            <Ajuda ajuda="param.precoSalaJogos" />
+          </div>
           <div className="mt-2 font-display text-2xl font-extrabold text-neon-red">
             {brl(p?.receitaMensal ?? 0)}
           </div>
@@ -129,7 +191,7 @@ export function JogosView() {
       <NovaConta />
 
       <GlassCard className="p-5">
-        <span className="font-display text-sm font-bold text-white">Pool de contas</span>
+        <TituloSecao ajuda="jogos.poolTitulo">Pool de contas</TituloSecao>
         <p className="mt-1.5 font-sans text-xs text-white/40">
           Ligue ou desligue uma conta do rodízio sem apagar nada. Conta desligada continua no
           estoque geral.
@@ -167,7 +229,7 @@ export function JogosView() {
       </GlassCard>
 
       <GlassCard className="p-5">
-        <span className="font-display text-sm font-bold text-white">Liberações ativas</span>
+        <TituloSecao ajuda="jogos.liberacoesAtivas">Liberações ativas</TituloSecao>
         <div className="mt-4 space-y-2">
           {(p?.liberacoes ?? []).map((l) => (
             <div key={l.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white/[0.03] px-4 py-3">
@@ -194,7 +256,7 @@ export function JogosView() {
       </GlassCard>
 
       <GlassCard className="p-5">
-        <span className="font-display text-sm font-bold text-white">Assinantes do adicional</span>
+        <TituloSecao ajuda="jogos.assinantes">Assinantes do adicional</TituloSecao>
         <div className="mt-4 space-y-2">
           {(p?.assinantes ?? []).map((a) => (
             <div key={a.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white/[0.03] px-4 py-3">

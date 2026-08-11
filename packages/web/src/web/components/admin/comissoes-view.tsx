@@ -1,5 +1,6 @@
 import { Loader2, RefreshCw, ShieldAlert, Unlock, Wallet } from "lucide-react";
 import { GlassCard, NeonButton, Pill } from "../ui/kit";
+import { Ajuda } from "../ui/tooltip";
 import {
   brlCarteira as brl,
   useLiberarComissao,
@@ -72,6 +73,7 @@ export function ComissoesView() {
         <div className="flex items-center gap-2">
           <Wallet className="size-4 text-neon-cyan" />
           <span className="font-display text-sm font-bold text-white">Resgates</span>
+          <Ajuda ajuda="comissoes.resgates" lado="bottom" />
         </div>
         <div className="mt-4 space-y-2">
           {(data?.fila ?? []).map((s) => (
@@ -124,6 +126,7 @@ export function ComissoesView() {
           <span className="font-display text-sm font-bold text-white">
             Anti-fraude de rede
           </span>
+          <Ajuda ajuda="comissoes.antifraude" lado="bottom" />
         </div>
         <p className="mt-1.5 font-sans text-xs text-white/40">
           Indicações feitas do mesmo IP ou dispositivo do afiliado ficam retidas. Libere só quando

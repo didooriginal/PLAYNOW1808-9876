@@ -1,7 +1,7 @@
 import { sqliteTable, text, integer, real, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 /**
- * Banco real da PLAPLUSNOW (Turso/SQLite via Drizzle).
+ * Banco real da PLAYPLUSNOW (Turso/SQLite via Drizzle).
  * Aplique alterações com `bun run db:push` dentro de packages/web.
  *
  * 3 tabelas principais:
@@ -106,7 +106,7 @@ export const contasMatrizes = sqliteTable("contas_matrizes", {
   /** conta de reserva: só recebe clientes remanejados de contas problemáticas */
   reserva: integer("reserva", { mode: "boolean" }).notNull().default(false),
 
-  /* ---- SALA DE JOGOS ---- */
+  /* ---- FUTEBOL AO VIVO ---- */
   /** conta do pool exclusivo de dias de jogo (descartável//alta rotatividade) */
   poolJogos: integer("pool_jogos", { mode: "boolean" }).notNull().default(false),
   criadoEm: integer("criado_em", { mode: "timestamp" })
@@ -140,7 +140,7 @@ export const usuarios = sqliteTable("usuarios", {
   pacoteId: integer("pacote_id").references(() => pacotes.id, {
     onDelete: "set null",
   }),
-  /** mensal | anual */
+  /** mensal | trimestral | semestral | anual */
   ciclo: text("ciclo").notNull().default("mensal"),
   /** valor efetivamente cobrado (pode divergir do preço de tabela) */
   valor: real("valor").notNull().default(0),
@@ -155,10 +155,22 @@ export const usuarios = sqliteTable("usuarios", {
   ipCadastro: text("ip_cadastro").notNull().default(""),
   /** impressão digital do dispositivo no cadastro — anti-fraude de rede */
   dispositivoHash: text("dispositivo_hash").notNull().default(""),
-  /** adicional Sala de Jogos contratado */
+  /** adicional Futebol Ao Vivo contratado */
   salaJogos: integer("sala_jogos", { mode: "boolean" }).notNull().default(false),
-  /** ISO YYYY-MM-DD de quando o adicional Sala de Jogos foi ativado */
+  /** ISO YYYY-MM-DD de quando o adicional Futebol Ao Vivo foi ativado */
   salaJogosDesde: text("sala_jogos_desde").notNull().default(""),
+  /**
+   * CRÉDITO DE CONFIANÇA — timestamp até quando o cliente inadimplente segue
+   * com acesso liberado como se estivesse em dia. Só o admin concede, pelo
+   * card do cliente. Nulo ou no passado = sem crédito ativo.
+   */
+  confiancaAte: integer("confianca_ate", { mode: "timestamp" }),
+  /** motivo anotado pelo admin ao conceder o crédito */
+  confiancaMotivo: text("confianca_motivo").notNull().default(""),
+  /** quando o crédito atual foi concedido */
+  confiancaConcedidaEm: integer("confianca_concedida_em", { mode: "timestamp" }),
+  /** quantas vezes esse cliente já recebeu crédito de confiança */
+  confiancaTotal: integer("confianca_total").notNull().default(0),
   /** vínculo com a conta de login (tabela `user` do Better Auth) */
   authUserId: text("auth_user_id").unique(),
   criadoEm: integer("criado_em", { mode: "timestamp" })
@@ -188,8 +200,13 @@ export const aplicativos = sqliteTable("aplicativos", {
   categoria: text("categoria").notNull().default("streaming"),
   /** preço avulso de mercado — usado no comparativo de economia */
   precoAvulso: real("preco_avulso").notNull().default(0),
-  /** preço de venda PLAPLUSNOW (tabela oficial) */
+  /** preço de venda PLAYPLUSNOW (tabela oficial) */
   preco: real("preco").notNull().default(0),
+  /**
+   * posição na grade de aplicativos da landing — menor aparece primeiro.
+   * O admin reordena na aba Catálogo; empate cai na ordem alfabética.
+   */
+  ordem: integer("ordem").notNull().default(0),
   ativo: integer("ativo", { mode: "boolean" }).notNull().default(true),
   criadoEm: integer("criado_em", { mode: "timestamp" })
     .notNull()
@@ -358,7 +375,7 @@ export const combos = sqliteTable("combos", {
   preco: real("preco").notNull().default(0),
   /** soma dos avulsos no momento do cadastro — congela a comparacao */
   precoCheio: real("preco_cheio").notNull().default(0),
-  /** mensal | anual */
+  /** mensal | trimestral | semestral | anual */
   ciclo: text("ciclo").notNull().default("mensal"),
   /** aparece na landing para visitantes */
   visivelLanding: integer("visivel_landing", { mode: "boolean" }).notNull().default(true),
@@ -737,7 +754,7 @@ export const cobrancasPix = sqliteTable("cobrancas_pix", {
   /**
    * Pedido do checkout serializado em JSON. Quando o pagamento é confirmado,
    * este pedido é APLICADO automaticamente (troca de pacote, apps liberados,
-   * adicional Sala de Jogos). Fica `null` em cobranças de fatura simples.
+   * adicional Futebol Ao Vivo). Fica `null` em cobranças de fatura simples.
    */
   pedido: text("pedido", { mode: "json" }).$type<{
     tipo: "assinatura" | "jogos";
@@ -745,11 +762,17 @@ export const cobrancasPix = sqliteTable("cobrancas_pix", {
     pacoteId: number | null;
     comboId: number | null;
     apps: string[];
-    ciclo: "mensal" | "anual";
+    ciclo: "mensal" | "trimestral" | "semestral" | "anual";
     valor: number;
   } | null>(),
   /** payload copia-e-cola do Pix */
   copiaECola: text("copia_e_cola").notNull().default(""),
+  /** id do pagamento no provedor (ex.: payment.id do Mercado Pago) */
+  provedorId: text("provedor_id").notNull().default(""),
+  /** QR Code do Pix em PNG base64, devolvido pelo provedor */
+  qrBase64: text("qr_base64").notNull().default(""),
+  /** página de pagamento hospedada pelo provedor (fallback do QR) */
+  linkPagamento: text("link_pagamento").notNull().default(""),
   /** aguardando | pago | expirado | cancelado */
   status: text("status").notNull().default("aguardando"),
   expiraEm: integer("expira_em", { mode: "timestamp" }),
@@ -762,7 +785,7 @@ export const cobrancasPix = sqliteTable("cobrancas_pix", {
 export type CobrancaPix = typeof cobrancasPix.$inferSelect;
 
 /* ------------------------------------------------------------------ */
-/* SALA DE JOGOS — pool de acesso de alta disponibilidade              */
+/* FUTEBOL AO VIVO — pool de acesso de alta disponibilidade              */
 /* ------------------------------------------------------------------ */
 
 /**
@@ -858,3 +881,95 @@ export const resetsSenha = sqliteTable("resets_senha", {
 });
 
 export type ResetSenha = typeof resetsSenha.$inferSelect;
+
+/* ------------------------------------------------------------------ */
+/* ESTOQUE DE GIFT CARDS — códigos comprados, ainda não aplicados      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Cada linha é UM código físico/digital de gift card comprado pela operação.
+ * Fluxo do código: `disponivel` → `em_uso` (admin copiou e está aplicando na
+ * conta matriz) → `utilizado` (aplicação confirmada, crédito lançado em
+ * `movimentacoes_gift`). O campo `code` nunca aparece na lista sem que o admin
+ * peça para revelar — a UI mostra mascarado e oferece "copiar".
+ */
+export const giftCards = sqliteTable("gift_cards", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  /** slug do provedor — casa com `aplicativos.slug` / `contas_matrizes.servico` */
+  provider: text("provider").notNull(),
+  /** valor de face do cartão em reais */
+  value: real("value").notNull().default(0),
+  /** código resgatável — visibilidade restrita na interface */
+  code: text("code").notNull().unique(),
+  /** disponivel | em_uso | utilizado */
+  status: text("status").notNull().default("disponivel"),
+  /** conta matriz onde o código foi aplicado, quando já utilizado */
+  contaId: integer("conta_id").references(() => contasMatrizes.id, {
+    onDelete: "set null",
+  }),
+  /** e-mail do admin que cadastrou o código */
+  autor: text("autor").notNull().default(""),
+  /** observação livre (lote, nota fiscal, fornecedor) */
+  observacao: text("observacao").notNull().default(""),
+  aplicadoEm: integer("aplicado_em", { mode: "timestamp" }),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+export type GiftCard = typeof giftCards.$inferSelect;
+export type NovoGiftCard = typeof giftCards.$inferInsert;
+
+/* ------------------------------------------------------------------ */
+/* ASSINATURAS — cartão de crédito com cobrança recorrente automática  */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Uma linha por assinatura criada no gateway (Mercado Pago Preapproval).
+ * O cliente autoriza o cartão uma vez e o provedor cobra sozinho a cada
+ * ciclo; cada cobrança chega pelo webhook e passa pela mesma baixa do Pix.
+ */
+export const assinaturas = sqliteTable("assinaturas", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  clienteId: integer("cliente_id")
+    .notNull()
+    .references(() => usuarios.id, { onDelete: "cascade" }),
+  /** mercadopago | (futuros provedores) */
+  provedor: text("provedor").notNull().default("mercadopago"),
+  /** id do preapproval no provedor */
+  provedorId: text("provedor_id").notNull().default(""),
+  /** nossa referência enviada como external_reference */
+  referencia: text("referencia").notNull().unique(),
+  /** pending | authorized | paused | cancelled */
+  status: text("status").notNull().default("pending"),
+  /** mensal | trimestral | semestral | anual */
+  ciclo: text("ciclo").notNull().default("mensal"),
+  valor: real("valor").notNull().default(0),
+  titulo: text("titulo").notNull().default(""),
+  /** pedido do checkout aplicado quando a 1ª cobrança é aprovada */
+  pedido: text("pedido", { mode: "json" }).$type<{
+    tipo: "assinatura" | "jogos";
+    titulo: string;
+    pacoteId: number | null;
+    comboId: number | null;
+    apps: string[];
+    ciclo: "mensal" | "trimestral" | "semestral" | "anual";
+    valor: number;
+  } | null>(),
+  /** URL do provedor onde o cliente informa o cartão */
+  initPoint: text("init_point").notNull().default(""),
+  /** quantas cobranças recorrentes já foram aprovadas */
+  cobrancasPagas: integer("cobrancas_pagas").notNull().default(0),
+  ultimoPagamentoEm: integer("ultimo_pagamento_em", { mode: "timestamp" }),
+  proximaCobranca: text("proxima_cobranca").notNull().default(""),
+  canceladaEm: integer("cancelada_em", { mode: "timestamp" }),
+  criadoEm: integer("criado_em", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  atualizadoEm: integer("atualizado_em", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+export type Assinatura = typeof assinaturas.$inferSelect;
+export type NovaAssinatura = typeof assinaturas.$inferInsert;

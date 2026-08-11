@@ -4,6 +4,7 @@ import { ping } from "./routes/ping";
 import { pacotes } from "./routes/pacotes";
 import { contas } from "./routes/contas";
 import { usuarios } from "./routes/usuarios";
+import { renovacao } from "./routes/renovacao";
 import { seed } from "./routes/seed";
 import { aplicativos } from "./routes/aplicativos";
 import { alocacoes } from "./routes/alocacoes";
@@ -16,15 +17,20 @@ import { netflix } from "./routes/netflix";
 import { notificacoes } from "./routes/notificacoes";
 import { afiliados } from "./routes/afiliados";
 import { giftcards } from "./routes/giftcards";
+import { estoqueGift } from "./routes/estoque-gift";
 import { jogos } from "./routes/jogos";
 import { saude } from "./routes/saude";
 import { winback } from "./routes/winback";
 import { pix, confirmarPagamento } from "./routes/pix";
+import { assinaturasRota } from "./routes/assinaturas";
+import { processarNotificacaoMP } from "./lib/webhook-mercadopago";
+import { validarAssinaturaWebhook } from "./lib/mercadopago";
 import { checkout } from "./routes/checkout";
 import { senha } from "./routes/senha";
 import { auth } from "./auth";
 import { criarAssistente } from "./agent";
 import { criarCopiloto } from "./agent/admin";
+import { criarVendedor } from "./agent/vitrine";
 import { createAgentUIStreamResponse } from "ai";
 import { eq } from "drizzle-orm";
 import { db } from "./database";
@@ -50,12 +56,15 @@ export const router = {
   notificacoes,
   afiliados,
   giftcards,
+  estoqueGift,
   jogos,
   saude,
   winback,
   pix,
+  assinaturas: assinaturasRota,
   checkout,
   senha,
+  renovacao,
   seed,
 };
 
@@ -153,6 +162,69 @@ app.post("/api/agent/messages", async (c) => {
 });
 
 /**
+ * VENDEDOR DA LANDING — chat PÚBLICO, sem sessão (visitante anônimo).
+ *
+ * Como qualquer pessoa alcança esta rota, ela tem dois freios:
+ *  1) tamanho: no máximo 20 mensagens por conversa e 1.200 caracteres na última.
+ *  2) volume: 30 requisições por IP a cada 10 minutos (janela em memória).
+ * As tools do agente são somente de catálogo público — nada de dados de cliente.
+ */
+const JANELA_VITRINE = 10 * 60 * 1000;
+const TETO_VITRINE = 30;
+const usoVitrine = new Map<string, { desde: number; total: number }>();
+
+function liberarVitrine(ip: string) {
+  const agora = Date.now();
+  const atual = usoVitrine.get(ip);
+  if (!atual || agora - atual.desde > JANELA_VITRINE) {
+    usoVitrine.set(ip, { desde: agora, total: 1 });
+    if (usoVitrine.size > 5_000) {
+      for (const [chave, valor] of usoVitrine) {
+        if (agora - valor.desde > JANELA_VITRINE) usoVitrine.delete(chave);
+      }
+    }
+    return true;
+  }
+  atual.total += 1;
+  return atual.total <= TETO_VITRINE;
+}
+
+app.post("/api/agent/vitrine", async (c) => {
+  const ip =
+    c.req.header("cf-connecting-ip") ??
+    c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ??
+    "desconhecido";
+  if (!liberarVitrine(ip)) {
+    return c.json({ erro: "muitas perguntas seguidas — tente de novo em alguns minutos" }, 429);
+  }
+
+  let messages: unknown = [];
+  try {
+    ({ messages } = (await c.req.json()) as { messages: unknown });
+  } catch {
+    return c.json({ erro: "corpo inválido" }, 400);
+  }
+
+  if (!Array.isArray(messages) || messages.length === 0 || messages.length > 20) {
+    return c.json({ erro: "conversa fora do limite" }, 422);
+  }
+
+  const ultima = messages[messages.length - 1] as {
+    parts?: Array<{ type?: string; text?: string }>;
+  };
+  const tamanho = (ultima?.parts ?? [])
+    .filter((p) => p?.type === "text")
+    .reduce((soma, p) => soma + (p.text?.length ?? 0), 0);
+  if (tamanho > 1_200) return c.json({ erro: "pergunta muito longa" }, 422);
+
+  const agent = criarVendedor({ whatsapp: process.env.WHATSAPP_NUMERO ?? "5521964727746" });
+  return createAgentUIStreamResponse({
+    agent,
+    uiMessages: messages as Parameters<typeof createAgentUIStreamResponse>[0]["uiMessages"],
+  });
+});
+
+/**
  * COPILOTO ADMIN — streaming de chat exclusivo do painel administrativo.
  * Exige sessão E `usuarios.admin = true`; qualquer outro caso recebe 401/403/404
  * antes de o agente ser montado.
@@ -222,6 +294,58 @@ app.post("/api/webhooks/pix", async (c) => {
 
   const resultado = await confirmarPagamento(txid, "webhook");
   return resultado.ok ? c.json({ ok: true }, 200) : c.json(resultado, 404);
+});
+
+/**
+ * WEBHOOK DO MERCADO PAGO — PRODUÇÃO.
+ * ------------------------------------------------------------------
+ * Cadastre esta URL em Mercado Pago → Suas integrações → Webhooks:
+ *
+ *   https://SEU-DOMINIO/api/webhooks/mercadopago
+ *
+ * Eventos: "Pagamentos" e "Planos e assinaturas".
+ *
+ * Segurança em duas camadas:
+ *  1. assinatura HMAC do header `x-signature` conferida contra
+ *     MERCADOPAGO_WEBHOOK_SECRET (quando configurado);
+ *  2. o status do pagamento é SEMPRE reconsultado na API do Mercado Pago —
+ *     o corpo do POST nunca libera acesso por si só.
+ *
+ * Responde 200 em qualquer caso tratável para o Mercado Pago não ficar
+ * reenviando a notificação eternamente; o que não deu certo fica registrado
+ * na resposta e na Central de Alertas.
+ */
+app.post("/api/webhooks/mercadopago", async (c) => {
+  let payload: Record<string, unknown> = {};
+  try {
+    payload = (await c.req.json()) as Record<string, unknown>;
+  } catch {
+    payload = {};
+  }
+
+  const dados = (payload.data ?? {}) as Record<string, unknown>;
+  const query = c.req.query();
+  const dataId = String(
+    dados.id ?? query["data.id"] ?? query.id ?? payload.id ?? "",
+  );
+  const tipo = String(payload.type ?? payload.topic ?? query.type ?? query.topic ?? "");
+
+  const assinaturaOk = validarAssinaturaWebhook({
+    assinatura: c.req.header("x-signature"),
+    requestId: c.req.header("x-request-id"),
+    dataId,
+  });
+  if (assinaturaOk === "invalida") {
+    return c.json({ ok: false, erro: "assinatura inválida" }, 401);
+  }
+
+  try {
+    const resultado = await processarNotificacaoMP({ tipo, dataId });
+    return c.json({ ...resultado, assinatura: assinaturaOk }, 200);
+  } catch (e) {
+    // erro nosso ou do gateway: devolve 500 para o MP tentar de novo
+    return c.json({ ok: false, erro: e instanceof Error ? e.message : String(e) }, 500);
+  }
 });
 
 export default app;

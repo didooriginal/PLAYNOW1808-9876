@@ -8,8 +8,11 @@ import { contasMatrizes, historicoVencimento, pacotes, usuarios as tabelaUsuario
 import { garantirAlocacao } from "./alocacoes";
 import {
   FORMAS_PAGAMENTO,
+  HORAS_CONFIANCA,
   MSG_BLOQUEIO,
   STATUS_CLIENTE,
+  confiancaAtiva,
+  detalheConfianca,
   estaBloqueado,
   situacaoCobranca,
   statusEsperado,
@@ -67,6 +70,9 @@ const listarComPacote = () =>
       proximaCobranca: tabelaUsuarios.proximaCobranca,
       clienteDesde: tabelaUsuarios.clienteDesde,
       admin: tabelaUsuarios.admin,
+      confiancaAte: tabelaUsuarios.confiancaAte,
+      confiancaMotivo: tabelaUsuarios.confiancaMotivo,
+      confiancaTotal: tabelaUsuarios.confiancaTotal,
       pacoteNome: pacotes.nome,
       pacoteServicos: pacotes.servicos,
     })
@@ -79,7 +85,9 @@ export const usuarios = {
   listar: adminOnly.handler(async () => {
     // mantem os status coerentes com a data de vencimento antes de listar
     await varrerVencimentos();
-    return listarComPacote();
+    const linhas = await listarComPacote();
+    /* o crédito de confiança viaja resolvido, então a UI não recalcula prazo */
+    return linhas.map((c) => ({ ...c, confianca: detalheConfianca(c) }));
   }),
 
   obter: adminOnly.input(z.object({ id: z.number().int() })).handler(async ({ input }) => {
@@ -198,6 +206,74 @@ export const usuarios = {
     return { ok: true, termosAceitosEm: row?.termosAceitosEm ?? null };
   }),
 
+  /**
+   * CRÉDITO DE CONFIANÇA — libera o cliente inadimplente por um prazo (48h por
+   * padrão) como se ele estivesse em dia: logins, senhas, códigos, suporte e
+   * jornada voltam na hora. Só o admin concede. Quando o prazo vence, o bloqueio
+   * volta sozinho — nenhuma rotina precisa limpar o campo.
+   *
+   * Concedido de novo enquanto ainda vale: o prazo é ESTENDIDO a partir de agora
+   * (não soma em cima do antigo), então "48h" sempre significa 48h reais.
+   */
+  concederConfianca: adminOnly
+    .input(
+      z.object({
+        id: z.number().int(),
+        horas: z.number().int().min(1).max(720).default(HORAS_CONFIANCA),
+        motivo: z.string().max(280).default(""),
+      }),
+    )
+    .handler(async ({ input }) => {
+      const [cliente] = await db
+        .select()
+        .from(tabelaUsuarios)
+        .where(eq(tabelaUsuarios.id, input.id));
+      if (!cliente) throw new ORPCError("NOT_FOUND", { message: "Cliente não encontrado" });
+
+      const agora = new Date();
+      const ate = new Date(agora.getTime() + input.horas * 3_600_000);
+      /** renovar um crédito ainda ativo não conta como uma nova concessão */
+      const renovando = confiancaAtiva(cliente.confiancaAte);
+
+      const [row] = await db
+        .update(tabelaUsuarios)
+        .set({
+          confiancaAte: ate,
+          confiancaMotivo: input.motivo,
+          confiancaConcedidaEm: agora,
+          confiancaTotal: renovando ? cliente.confiancaTotal : cliente.confiancaTotal + 1,
+        })
+        .where(eq(tabelaUsuarios.id, input.id))
+        .returning();
+
+      await notificar({
+        escopo: "cliente",
+        clienteId: cliente.id,
+        tipo: "pagamento",
+        severidade: "info",
+        titulo: `Liberamos seu acesso por ${input.horas}h`,
+        mensagem:
+          "Confiamos em você: seu acesso está normal enquanto o pagamento não cai. Regularize dentro do prazo para não bloquear de novo.",
+        destino: "pagamento",
+        chave: `confianca:${cliente.id}:${ate.getTime()}`,
+      });
+
+      return { ok: true, confianca: detalheConfianca(row ?? cliente) };
+    }),
+
+  /** Encerra o crédito de confiança agora — o bloqueio volta imediatamente. */
+  revogarConfianca: adminOnly
+    .input(z.object({ id: z.number().int() }))
+    .handler(async ({ input }) => {
+      const [row] = await db
+        .update(tabelaUsuarios)
+        .set({ confiancaAte: null, confiancaMotivo: "" })
+        .where(eq(tabelaUsuarios.id, input.id))
+        .returning();
+      if (!row) throw new ORPCError("NOT_FOUND", { message: "Cliente não encontrado" });
+      return { ok: true, confianca: detalheConfianca(row) };
+    }),
+
   remover: adminOnly.input(z.object({ id: z.number().int() })).handler(async ({ input }) => {
     await db.delete(tabelaUsuarios).where(eq(tabelaUsuarios.id, input.id));
     return { ok: true };
@@ -261,7 +337,7 @@ export const usuarios = {
 
       // BLOQUEIO POR INADIMPLENCIA: cliente atrasado/suspenso nao ve senha
       // nem e-mail das contas matrizes — so a tela de regularizacao.
-      const bloqueado = estaBloqueado(cliente.statusPagamento);
+      const bloqueado = estaBloqueado(cliente.statusPagamento, cliente.confiancaAte);
 
       for (const servico of servicos) {
         const alocacao = await garantirAlocacao(cliente.id, servico);

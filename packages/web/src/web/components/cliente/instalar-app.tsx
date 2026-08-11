@@ -73,7 +73,7 @@ export function InstalarApp() {
           <div className="min-w-0">
             <Pill accent="purple">App instalável</Pill>
             <h3 className="mt-2 font-display text-lg font-bold text-white">
-              Instale o PLAPLUSNOW no seu celular
+              Instale o PLAYPLUSNOW no seu celular
             </h3>
             <p className="mt-1.5 max-w-xl font-sans text-[13px] leading-relaxed text-white/50">
               Atalho na tela inicial, abre em tela cheia e você chega nos seus logins em 1 toque —

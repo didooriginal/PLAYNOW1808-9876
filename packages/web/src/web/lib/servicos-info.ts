@@ -98,9 +98,7 @@ export const SERVICOS_INFO: Record<string, ServicoInfo> = {
   ]),
   disney: web("https://www.disneyplus.com/pt-br/login", "Disney+", "Smart TV, celular, navegador, console", [
     "O acervo do Star+ está dentro do Disney+, na aba Star.",
-  ], "perfil"),
-  star: web("https://www.starplus.com", "Star+", "Smart TV, celular, navegador", [
-    "O conteúdo do Star+ migrou para o Disney+ — se pedir, faça login pelo Disney+.",
+    "O catálogo do Hulu também é assistido aqui, no hub Hulu do Disney+.",
   ], "perfil"),
   prime: web("https://www.primevideo.com", "Prime Video", "Smart TV, celular, navegador, Fire Stick", [
     "Entre em Prime Video e não na loja da Amazon — o acesso é só do streaming.",
@@ -116,12 +114,10 @@ export const SERVICOS_INFO: Record<string, ServicoInfo> = {
   ]),
   globoplay: web("https://globoplay.globo.com", "Globoplay", "Smart TV, celular, navegador", [
     "Login pela Conta Globo. Não vincule seu CPF nem altere os dados do titular.",
+    "Os filmes do Telecine ficam aqui dentro, na área Telecine.",
   ], "perfil"),
   "globoplay-premium": web("https://globoplay.globo.com", "Globoplay Premium", "Smart TV, celular, navegador", [
     "No Premium você também tem os canais ao vivo dentro do Globoplay.",
-  ], "perfil"),
-  telecine: web("https://globoplay.globo.com/telecine/", "Telecine", "Smart TV, celular, navegador", [
-    "O Telecine é assistido dentro do Globoplay, na área Telecine.",
   ], "perfil"),
   looke: web("https://www.looke.com.br", "Looke", "Smart TV, celular, navegador", []),
   recordplus: web("https://www.recordplus.com", "RecordPlus", "Smart TV, celular, navegador", [
