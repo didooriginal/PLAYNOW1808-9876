@@ -1,5 +1,18 @@
-import { useMemo, useState } from "react";
-import { AlertTriangle, Check, Loader2, Plus, Power, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  AlertTriangle,
+  ArrowDown,
+  ArrowUp,
+  Check,
+  ChevronsDown,
+  ChevronsUp,
+  Loader2,
+  ListOrdered,
+  Plus,
+  Power,
+  RotateCcw,
+  Trash2,
+} from "lucide-react";
 import { AppIcon } from "../app-icon";
 import { Ajuda, Campo, TituloSecao } from "../ui/tooltip";
 import { GlassCard, NeonButton, accentHex } from "../ui/kit";
@@ -9,9 +22,15 @@ import {
   useAtualizarAplicativo,
   useCriarAplicativo,
   useRemoverAplicativo,
+  useReordenarAplicativos,
 } from "../../queries/aplicativos";
 import { ComboBuilder } from "./combo-builder";
-
+import {
+  BarraSalvamento,
+  SeloSalvo,
+  useAutoSalvar,
+  type EstadoSalvamento,
+} from "./salvamento";
 
 const TIPOS = [
   { id: "video", label: "Vídeo" },
@@ -76,7 +95,12 @@ function NovoAppForm({ onClose }: { onClose: () => void }) {
             onChange={(e) => set("nome", e.target.value)}
           />
         </Campo>
-        <Campo label="Monograma" ajuda="app.mono" htmlFor="app-mono" sufixo="até 4 letras">
+        <Campo
+          label="Monograma"
+          ajuda="app.mono"
+          htmlFor="app-mono"
+          sufixo="até 4 letras"
+        >
           <input
             id="app-mono"
             className={inputCls}
@@ -105,19 +129,19 @@ function NovoAppForm({ onClose }: { onClose: () => void }) {
           </div>
         </Campo>
         <Campo label="Tipo de mídia" ajuda="app.tipo" htmlFor="app-tipo">
-        <select
-          id="app-tipo"
-          className={inputCls}
-          aria-label="Tipo de mídia"
-          value={form.tipo}
-          onChange={(e) => set("tipo", e.target.value as typeof form.tipo)}
-        >
-          {TIPOS.map((t) => (
-            <option key={t.id} value={t.id} className="bg-[#09090b]">
-              {t.label}
-            </option>
-          ))}
-        </select>
+          <select
+            id="app-tipo"
+            className={inputCls}
+            aria-label="Tipo de mídia"
+            value={form.tipo}
+            onChange={(e) => set("tipo", e.target.value as typeof form.tipo)}
+          >
+            {TIPOS.map((t) => (
+              <option key={t.id} value={t.id} className="bg-[#09090b]">
+                {t.label}
+              </option>
+            ))}
+          </select>
         </Campo>
         <Campo label="Categoria" ajuda="app.categoria" htmlFor="app-categoria">
           <select
@@ -134,7 +158,12 @@ function NovoAppForm({ onClose }: { onClose: () => void }) {
             ))}
           </select>
         </Campo>
-        <Campo label="Preço avulso" ajuda="app.precoAvulso" htmlFor="app-preco" sufixo="R$ / mês">
+        <Campo
+          label="Preço avulso"
+          ajuda="app.precoAvulso"
+          htmlFor="app-preco"
+          sufixo="R$ / mês"
+        >
           <input
             id="app-preco"
             className={inputCls}
@@ -153,7 +182,9 @@ function NovoAppForm({ onClose }: { onClose: () => void }) {
       </div>
 
       {criar.isError && (
-        <p className="mt-3 font-sans text-xs text-neon-red">{criar.error?.message}</p>
+        <p className="mt-3 font-sans text-xs text-neon-red">
+          {criar.error?.message}
+        </p>
       )}
 
       <NeonButton
@@ -163,25 +194,61 @@ function NovoAppForm({ onClose }: { onClose: () => void }) {
         disabled={criar.isPending || !form.nome}
         onClick={() => criar.mutate(form, { onSuccess: onClose })}
       >
-        {criar.isPending ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+        {criar.isPending ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : (
+          <Plus className="size-4" />
+        )}
         Cadastrar aplicativo
       </NeonButton>
     </GlassCard>
   );
 }
 
-/** edicao rapida do preco avulso direto no card (salva no Enter ou ao sair) */
-function PrecoInline({ app }: { app: { id: number; nome: string; preco: number } }) {
+/**
+ * Edição rápida do preço avulso direto no card.
+ *
+ * Grava sozinha (Enter, ao sair do campo ou 1,5s depois da última tecla) e
+ * mostra o selo do estado ao lado — sem o selo o admin não tem como saber se o
+ * número novo pegou, já que o card não recarrega visivelmente.
+ */
+function PrecoInline({
+  app,
+}: {
+  app: { id: number; nome: string; preco: number };
+}) {
   const atualizar = useAtualizarAplicativo();
   const [valor, setValor] = useState(String(app.preco));
 
-  const salvar = () => {
-    const preco = Number(valor);
-    if (!Number.isFinite(preco) || preco < 0 || preco === app.preco) {
+  const preco = Number(valor);
+  const valido = Number.isFinite(preco) && preco >= 0;
+  const mudou = valido && preco !== app.preco;
+
+  const { estado, confirmar } = useAutoSalvar({
+    mudou,
+    salvando: atualizar.isPending,
+    erro: atualizar.isError
+      ? (atualizar.error?.message ?? "Falha ao salvar")
+      : null,
+    salvar: () => atualizar.mutate({ id: app.id, preco, precoAvulso: preco }),
+  });
+
+  /** o "Salvo" fica visível alguns segundos e sai: 20 cards com selo fixo viram ruído */
+  const [recemSalvo, setRecemSalvo] = useState(false);
+  useEffect(() => {
+    if (!atualizar.isSuccess) return;
+    setRecemSalvo(true);
+    const t = setTimeout(() => setRecemSalvo(false), 2600);
+    return () => clearTimeout(t);
+  }, [atualizar.isSuccess, atualizar.data]);
+
+  const salvarAgora = () => {
+    if (!valido) {
       setValor(String(app.preco));
+      atualizar.reset();
       return;
     }
-    atualizar.mutate({ id: app.id, preco, precoAvulso: preco });
+    if (mudou) confirmar();
   };
 
   return (
@@ -193,13 +260,202 @@ function PrecoInline({ app }: { app: { id: number; nome: string; preco: number }
         min="0"
         aria-label={`Preço avulso de ${app.nome}`}
         value={valor}
-        onChange={(e) => setValor(e.target.value)}
-        onBlur={salvar}
+        onChange={(e) => {
+          atualizar.reset();
+          setValor(e.target.value);
+        }}
+        onBlur={salvarAgora}
         onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
         className="w-14 rounded border border-white/10 bg-white/[0.04] px-1 py-0.5 text-right font-mono text-[10px] text-white outline-none transition-colors focus:border-neon-cyan/50"
       />
       <span className="text-white/20">/mês</span>
+      {(estado !== "salvo" || recemSalvo) && (
+        <SeloSalvo estado={estado} className="ml-1 px-1.5 py-0.5 text-[9px]" />
+      )}
+      {estado === "erro" && (
+        <span className="font-sans text-[9px] text-neon-red">
+          {atualizar.error?.message}
+        </span>
+      )}
     </span>
+  );
+}
+
+/**
+ * ORDEM DA GRADE DA LANDING.
+ *
+ * A vitrine (`Monte seu próprio Combo`) exibe os apps exatamente na ordem
+ * gravada aqui — `aplicativos.listar` ordena por `ordem` e a landing respeita a
+ * lista como veio. Usamos setas em vez de arrastar porque no celular o
+ * drag-and-drop erra a mira, e essa tela é usada muito do celular.
+ *
+ * A ordem só vai para o banco quando o admin clica em Confirmar: mexer em 20
+ * apps salvando a cada clique geraria 20 gravações e um estado intermediário
+ * visível na landing.
+ */
+function OrdemDaGrade({
+  apps,
+  onFechar,
+}: {
+  apps: { id: number; nome: string; slug: string; ativo: boolean }[];
+  onFechar: () => void;
+}) {
+  const reordenar = useReordenarAplicativos();
+  const original = useMemo(() => apps.map((a) => a.id), [apps]);
+  const [ordem, setOrdem] = useState<number[]>(original);
+
+  const porId = useMemo(() => new Map(apps.map((a) => [a.id, a])), [apps]);
+  const mudou =
+    ordem.length !== original.length ||
+    ordem.some((id, i) => id !== original[i]);
+
+  const estado: EstadoSalvamento = reordenar.isPending
+    ? "salvando"
+    : reordenar.isError
+      ? "erro"
+      : mudou
+        ? "pendente"
+        : "salvo";
+
+  /** move um app `delta` posições (ou para a ponta, com `extremo`) */
+  function mover(id: number, delta: number, extremo = false) {
+    setOrdem((atual) => {
+      const de = atual.indexOf(id);
+      if (de < 0) return atual;
+      const para = extremo ? (delta < 0 ? 0 : atual.length - 1) : de + delta;
+      if (para < 0 || para >= atual.length) return atual;
+      const copia = [...atual];
+      copia.splice(de, 1);
+      copia.splice(para, 0, id);
+      return copia;
+    });
+  }
+
+  return (
+    <GlassCard strong accent="cyan" className="p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <TituloSecao ajuda="ordem.grade">Ordem da grade na landing</TituloSecao>
+        <button
+          type="button"
+          onClick={onFechar}
+          className="font-sans text-xs text-white/40 hover:text-white"
+        >
+          fechar
+        </button>
+      </div>
+
+      <p className="mt-1.5 font-sans text-xs text-white/40">
+        O primeiro da lista é o primeiro card que o visitante vê no montador de
+        combos. Suba os apps que mais vendem — nada muda na vitrine até você
+        confirmar.
+      </p>
+
+      <ol className="mt-4 space-y-2">
+        {ordem.map((id, i) => {
+          const app = porId.get(id);
+          if (!app) return null;
+          return (
+            <li
+              key={id}
+              className="flex items-center gap-3 rounded-xl border border-white/8 bg-white/[0.025] px-3 py-2"
+            >
+              <span className="w-7 shrink-0 text-center font-mono text-[11px] text-white/30">
+                {i + 1}
+              </span>
+              <AppIcon id={app.slug} size="sm" active={app.ativo} />
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-display text-sm font-semibold text-white">
+                  {app.nome}
+                </div>
+                <div className="font-mono text-[10px] text-white/25">
+                  {app.ativo
+                    ? app.slug
+                    : `${app.slug} · inativo (fora da vitrine)`}
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                <BotaoMover
+                  rotulo={`Mandar ${app.nome} para o topo`}
+                  desabilitado={i === 0}
+                  onClick={() => mover(id, -1, true)}
+                >
+                  <ChevronsUp className="size-3.5" />
+                </BotaoMover>
+                <BotaoMover
+                  rotulo={`Subir ${app.nome}`}
+                  desabilitado={i === 0}
+                  onClick={() => mover(id, -1)}
+                >
+                  <ArrowUp className="size-3.5" />
+                </BotaoMover>
+                <BotaoMover
+                  rotulo={`Descer ${app.nome}`}
+                  desabilitado={i === ordem.length - 1}
+                  onClick={() => mover(id, 1)}
+                >
+                  <ArrowDown className="size-3.5" />
+                </BotaoMover>
+                <BotaoMover
+                  rotulo={`Mandar ${app.nome} para o fim`}
+                  desabilitado={i === ordem.length - 1}
+                  onClick={() => mover(id, 1, true)}
+                >
+                  <ChevronsDown className="size-3.5" />
+                </BotaoMover>
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={() => {
+            reordenar.reset();
+            setOrdem(original);
+          }}
+          disabled={!mudou}
+          className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 px-3 py-2 font-sans text-xs text-white/45 transition-colors enabled:hover:border-white/25 enabled:hover:text-white disabled:opacity-40"
+        >
+          <RotateCcw className="size-3.5" />
+          Desfazer alterações
+        </button>
+        <BarraSalvamento
+          className="min-w-[280px] flex-1"
+          estado={estado}
+          erro={reordenar.error?.message}
+          ajuda="ordem.confirmar"
+          rotulo="Confirmar ordem"
+          onConfirmar={() => reordenar.mutate({ ids: ordem })}
+        />
+      </div>
+    </GlassCard>
+  );
+}
+
+function BotaoMover({
+  rotulo,
+  desabilitado,
+  onClick,
+  children,
+}: {
+  rotulo: string;
+  desabilitado: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={rotulo}
+      title={rotulo}
+      disabled={desabilitado}
+      onClick={onClick}
+      className="flex size-8 items-center justify-center rounded-lg border border-white/10 text-white/40 transition-colors enabled:hover:border-neon-cyan/50 enabled:hover:text-neon-cyan disabled:opacity-25"
+    >
+      {children}
+    </button>
   );
 }
 
@@ -208,6 +464,7 @@ export function AppsView() {
   const atualizar = useAtualizarAplicativo();
   const remover = useRemoverAplicativo();
   const [criando, setCriando] = useState(false);
+  const [ordenando, setOrdenando] = useState(false);
   const [filtro, setFiltro] = useState<"todas" | CategoriaId>("todas");
 
   const apps = data ?? [];
@@ -215,7 +472,8 @@ export function AppsView() {
 
   /** apps agrupados por categoria, respeitando a ordem comercial de CATEGORIAS */
   const grupos = useMemo(() => {
-    const visiveis = filtro === "todas" ? apps : apps.filter((a) => a.categoria === filtro);
+    const visiveis =
+      filtro === "todas" ? apps : apps.filter((a) => a.categoria === filtro);
     return CATEGORIAS.map((cat) => ({
       ...cat,
       itens: visiveis
@@ -231,7 +489,9 @@ export function AppsView() {
         <p className="mt-3 font-display text-sm font-bold text-white">
           Erro ao carregar o catálogo
         </p>
-        <p className="mt-1.5 font-sans text-xs text-white/45">{error?.message}</p>
+        <p className="mt-1.5 font-sans text-xs text-white/45">
+          {error?.message}
+        </p>
       </GlassCard>
     );
 
@@ -266,8 +526,13 @@ export function AppsView() {
               {s.label}
               <Ajuda ajuda={s.ajuda} lado="bottom" />
             </div>
-            <div className="mt-2 font-display text-2xl font-extrabold text-white">{s.value}</div>
-            <div className="mt-1 font-sans text-[11px]" style={{ color: accentHex[s.accent] }}>
+            <div className="mt-2 font-display text-2xl font-extrabold text-white">
+              {s.value}
+            </div>
+            <div
+              className="mt-1 font-sans text-[11px]"
+              style={{ color: accentHex[s.accent] }}
+            >
               {s.sub}
             </div>
           </GlassCard>
@@ -278,41 +543,67 @@ export function AppsView() {
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-2">
-          {[{ id: "todas" as const, label: "Todas" }, ...CATEGORIAS].map((c) => {
-            const total =
-              c.id === "todas" ? apps.length : apps.filter((a) => a.categoria === c.id).length;
-            const on = filtro === c.id;
-            return (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => setFiltro(c.id)}
-                className={
-                  on
-                    ? "rounded-full border border-neon-purple/60 bg-neon-purple/[0.12] px-3.5 py-1.5 font-sans text-xs font-semibold text-white"
-                    : "rounded-full border border-white/10 px-3.5 py-1.5 font-sans text-xs text-white/45 transition-colors hover:border-white/25 hover:text-white"
-                }
-              >
-                {c.label} <span className="text-white/30">{total}</span>
-              </button>
-            );
-          })}
+          {[{ id: "todas" as const, label: "Todas" }, ...CATEGORIAS].map(
+            (c) => {
+              const total =
+                c.id === "todas"
+                  ? apps.length
+                  : apps.filter((a) => a.categoria === c.id).length;
+              const on = filtro === c.id;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setFiltro(c.id)}
+                  className={
+                    on
+                      ? "rounded-full border border-neon-purple/60 bg-neon-purple/[0.12] px-3.5 py-1.5 font-sans text-xs font-semibold text-white"
+                      : "rounded-full border border-white/10 px-3.5 py-1.5 font-sans text-xs text-white/45 transition-colors hover:border-white/25 hover:text-white"
+                  }
+                >
+                  {c.label} <span className="text-white/30">{total}</span>
+                </button>
+              );
+            },
+          )}
         </div>
 
-        {!criando && (
-          <NeonButton accent="purple" size="sm" onClick={() => setCriando(true)}>
-            <Plus className="size-4" />
-            Novo aplicativo
-          </NeonButton>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {!ordenando && apps.length > 1 && (
+            <NeonButton
+              accent="cyan"
+              size="sm"
+              onClick={() => setOrdenando(true)}
+            >
+              <ListOrdered className="size-4" />
+              Ordenar grade da landing
+            </NeonButton>
+          )}
+          {!criando && (
+            <NeonButton
+              accent="purple"
+              size="sm"
+              onClick={() => setCriando(true)}
+            >
+              <Plus className="size-4" />
+              Novo aplicativo
+            </NeonButton>
+          )}
+        </div>
       </div>
 
       {criando && <NovoAppForm onClose={() => setCriando(false)} />}
 
+      {ordenando && (
+        <OrdemDaGrade apps={apps} onFechar={() => setOrdenando(false)} />
+      )}
+
       {isPending ? (
         <GlassCard className="flex items-center justify-center gap-3 p-12">
           <Loader2 className="size-5 animate-spin text-neon-cyan" />
-          <span className="font-sans text-sm text-white/45">Carregando catálogo...</span>
+          <span className="font-sans text-sm text-white/45">
+            Carregando catálogo...
+          </span>
         </GlassCard>
       ) : (
         grupos.map((grupo) => (
@@ -335,7 +626,11 @@ export function AppsView() {
 
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {grupo.itens.map((app) => (
-                <GlassCard key={app.id} hover className="flex items-center gap-3 p-4">
+                <GlassCard
+                  key={app.id}
+                  hover
+                  className="flex items-center gap-3 p-4"
+                >
                   <AppIcon id={app.slug} size="sm" active={app.ativo} />
                   <div className="min-w-0 flex-1">
                     <div className="truncate font-display text-sm font-bold text-white">
@@ -352,11 +647,21 @@ export function AppsView() {
                     aria-label={app.ativo ? "Desativar app" : "Ativar app"}
                     title={app.ativo ? "Desativar" : "Ativar"}
                     disabled={atualizar.isPending}
-                    onClick={() => atualizar.mutate({ id: app.id, ativo: !app.ativo })}
+                    onClick={() =>
+                      atualizar.mutate({ id: app.id, ativo: !app.ativo })
+                    }
                     className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-white/10 text-white/40 transition-colors hover:text-white"
-                    style={app.ativo ? { color: "#34d399", borderColor: "#34d39955" } : undefined}
+                    style={
+                      app.ativo
+                        ? { color: "#34d399", borderColor: "#34d39955" }
+                        : undefined
+                    }
                   >
-                    {app.ativo ? <Check className="size-3.5" /> : <Power className="size-3.5" />}
+                    {app.ativo ? (
+                      <Check className="size-3.5" />
+                    ) : (
+                      <Power className="size-3.5" />
+                    )}
                   </button>
                   <button
                     type="button"
@@ -375,7 +680,9 @@ export function AppsView() {
       )}
 
       {remover.isError && (
-        <p className="font-sans text-xs text-neon-red">{remover.error?.message}</p>
+        <p className="font-sans text-xs text-neon-red">
+          {remover.error?.message}
+        </p>
       )}
     </div>
   );

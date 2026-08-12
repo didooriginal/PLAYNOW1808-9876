@@ -18,6 +18,7 @@ import {
 import { cn } from "@/lib/utils";
 import { AppIcon } from "../app-icon";
 import { GlassCard, NeonButton, ProgressBar } from "../ui/kit";
+import { SeloSalvo, useSeloTransitorio } from "./salvamento";
 import { Rotulo, Tooltip } from "../ui/tooltip";
 import { brl, serviceById } from "@/lib/mock-data";
 import {
@@ -34,7 +35,9 @@ import {
 } from "../../queries/alocacoes";
 
 type Conta = NonNullable<ReturnType<typeof useContas>["data"]>[number];
-type Vinculo = NonNullable<ReturnType<typeof useMapaAlocacoes>["data"]>[number][number];
+type Vinculo = NonNullable<
+  ReturnType<typeof useMapaAlocacoes>["data"]
+>[number][number];
 
 /** dias até o vencimento da matriz — null quando não há data cadastrada */
 export function diasParaVencer(iso: string) {
@@ -68,7 +71,9 @@ function VencimentoAlerta({ conta }: { conta: Conta }) {
       style={{ borderColor: `${hex}55`, background: `${hex}14`, color: hex }}
     >
       <AlertTriangle className="size-3.5 shrink-0" />
-      <span className="font-display text-[11px] font-bold uppercase tracking-wide">{texto}</span>
+      <span className="font-display text-[11px] font-bold uppercase tracking-wide">
+        {texto}
+      </span>
       <span className="ml-auto font-sans text-[10px] text-white/45">
         {dataBR(conta.dataVencimento)}
       </span>
@@ -120,7 +125,9 @@ function ClientesVinculados({
               <div className="truncate font-display text-[11px] font-bold text-white">
                 {v.clienteNome}
               </div>
-              <div className="truncate font-mono text-[9px] text-white/30">{v.clienteEmail}</div>
+              <div className="truncate font-mono text-[9px] text-white/30">
+                {v.clienteEmail}
+              </div>
             </div>
             <Tooltip texto="conta.liberarVaga" titulo="Liberar vaga">
               <button
@@ -136,7 +143,9 @@ function ClientesVinculados({
           </div>
         ))}
         {vinculos.length === 0 && (
-          <p className="font-sans text-[11px] text-white/30">Nenhum cliente vinculado ainda.</p>
+          <p className="font-sans text-[11px] text-white/30">
+            Nenhum cliente vinculado ainda.
+          </p>
         )}
       </div>
 
@@ -145,7 +154,9 @@ function ClientesVinculados({
           <select
             aria-label="Cliente que vai ocupar a vaga"
             value={escolhido}
-            onChange={(e) => setEscolhido(e.target.value ? Number(e.target.value) : "")}
+            onChange={(e) =>
+              setEscolhido(e.target.value ? Number(e.target.value) : "")
+            }
             className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 font-sans text-xs text-white focus:border-neon-cyan/50 focus:outline-none"
           >
             <option value="" className="bg-[#09090b]">
@@ -158,7 +169,9 @@ function ClientesVinculados({
             ))}
           </select>
           {alocar.isError && (
-            <p className="font-sans text-[11px] text-neon-red">{alocar.error?.message}</p>
+            <p className="font-sans text-[11px] text-neon-red">
+              {alocar.error?.message}
+            </p>
           )}
           <div className="flex gap-2">
             <NeonButton
@@ -214,7 +227,16 @@ function ClientesVinculados({
 }
 
 /** editor inline do total de vagas */
-function EditorVagas({ conta, onClose }: { conta: Conta; onClose: () => void }) {
+function EditorVagas({
+  conta,
+  onClose,
+  onSalvo,
+}: {
+  conta: Conta;
+  onClose: () => void;
+  /** avisa o card para acender o selo "Salvo" depois que o editor fecha */
+  onSalvo: () => void;
+}) {
   const [valor, setValor] = useState(conta.totalVagas);
   const editar = useEditarVagas();
 
@@ -232,7 +254,11 @@ function EditorVagas({ conta, onClose }: { conta: Conta; onClose: () => void }) 
           cancelar
         </button>
       </div>
-      <Rotulo ajuda="contas.totalVagas" htmlFor="conta-vagas" className="mt-2.5">
+      <Rotulo
+        ajuda="contas.totalVagas"
+        htmlFor="conta-vagas"
+        className="mt-2.5"
+      >
         Total de vagas
       </Rotulo>
       <div className="mt-1.5 flex items-center gap-2">
@@ -264,7 +290,9 @@ function EditorVagas({ conta, onClose }: { conta: Conta; onClose: () => void }) 
         </button>
       </div>
       {editar.isError && (
-        <p className="mt-2 font-sans text-[11px] text-neon-red">{editar.error?.message}</p>
+        <p className="mt-2 font-sans text-[11px] text-neon-red">
+          {editar.error?.message}
+        </p>
       )}
       <NeonButton
         accent="purple"
@@ -272,7 +300,15 @@ function EditorVagas({ conta, onClose }: { conta: Conta; onClose: () => void }) 
         className="mt-2.5 w-full"
         disabled={editar.isPending || valor === conta.totalVagas}
         onClick={() =>
-          editar.mutate({ id: conta.id, totalVagas: valor }, { onSuccess: onClose })
+          editar.mutate(
+            { id: conta.id, totalVagas: valor },
+            {
+              onSuccess: () => {
+                onSalvo();
+                onClose();
+              },
+            },
+          )
         }
       >
         {editar.isPending ? (
@@ -286,7 +322,13 @@ function EditorVagas({ conta, onClose }: { conta: Conta; onClose: () => void }) 
   );
 }
 
-export function ContaMatrizCard({ acc, vinculos }: { acc: Conta; vinculos: Vinculo[] }) {
+export function ContaMatrizCard({
+  acc,
+  vinculos,
+}: {
+  acc: Conta;
+  vinculos: Vinculo[];
+}) {
   const service = serviceById(acc.servico);
   const ocupadas = vinculos.length;
   const pct = Math.round((ocupadas / Math.max(acc.totalVagas, 1)) * 100);
@@ -299,6 +341,17 @@ export function ContaMatrizCard({ acc, vinculos }: { acc: Conta; vinculos: Vincu
   const repor = useReporConta();
   const remover = useRemoverConta();
   const busy = repor.isPending || remover.isPending;
+
+  /** selo "Salvo" do card: vagas editadas ou vagas repostas */
+  const [salvos, setSalvos] = useState(0);
+  const marcarSalvo = () => setSalvos((n) => n + 1);
+  const selo = useSeloTransitorio({
+    salvando: repor.isPending,
+    erro: repor.isError
+      ? (repor.error?.message ?? "Falha ao repor vagas")
+      : null,
+    sucessos: salvos,
+  });
 
   const dias = diasParaVencer(acc.dataVencimento);
   const alerta = dias !== null && dias <= 5;
@@ -334,8 +387,12 @@ export function ContaMatrizCard({ acc, vinculos }: { acc: Conta; vinculos: Vincu
         <div className="flex min-w-0 items-center gap-3">
           <AppIcon id={acc.servico} size="sm" active={!full} />
           <div className="min-w-0">
-            <div className="truncate font-display text-sm font-bold text-white">{acc.rotulo}</div>
-            <div className="truncate font-mono text-[10px] text-white/30">{acc.email}</div>
+            <div className="truncate font-display text-sm font-bold text-white">
+              {acc.rotulo}
+            </div>
+            <div className="truncate font-mono text-[10px] text-white/30">
+              {acc.email}
+            </div>
           </div>
         </div>
         {full ? (
@@ -361,8 +418,9 @@ export function ContaMatrizCard({ acc, vinculos }: { acc: Conta; vinculos: Vincu
       {/* lotação */}
       <div className="relative mt-5">
         <div className="flex items-end justify-between">
-          <span className="font-sans text-[11px] uppercase tracking-[0.18em] text-white/35">
+          <span className="flex items-center gap-2 font-sans text-[11px] uppercase tracking-[0.18em] text-white/35">
             Lotação
+            {selo && <SeloSalvo estado={selo} />}
           </span>
           <span
             className="font-display text-lg font-extrabold"
@@ -377,15 +435,27 @@ export function ContaMatrizCard({ acc, vinculos }: { acc: Conta; vinculos: Vincu
         <ProgressBar value={ocupadas} max={acc.totalVagas} className="mt-2.5" />
         <div className="mt-2 flex items-center justify-between font-sans text-[11px] text-white/30">
           <span>{pct}% de ocupação</span>
-          <span>{full ? "0 vagas livres" : `${acc.totalVagas - ocupadas} vaga(s) livre(s)`}</span>
+          <span>
+            {full
+              ? "0 vagas livres"
+              : `${acc.totalVagas - ocupadas} vaga(s) livre(s)`}
+          </span>
         </div>
       </div>
 
       {/* meta */}
       <div className="relative mt-5 grid grid-cols-2 gap-3 border-t border-white/8 pt-4 sm:grid-cols-4">
         {[
-          { label: "Vencimento", value: dataBR(acc.dataVencimento), Icon: CalendarClock },
-          { label: "Cartão", value: acc.cartaoUtilizado || "—", Icon: CreditCard },
+          {
+            label: "Vencimento",
+            value: dataBR(acc.dataVencimento),
+            Icon: CalendarClock,
+          },
+          {
+            label: "Cartão",
+            value: acc.cartaoUtilizado || "—",
+            Icon: CreditCard,
+          },
           { label: "Custo", value: brl(acc.custo), Icon: null },
           { label: "Região", value: acc.regiao, Icon: null },
         ].map((m) => (
@@ -400,7 +470,13 @@ export function ContaMatrizCard({ acc, vinculos }: { acc: Conta; vinculos: Vincu
         ))}
       </div>
 
-      {editando && <EditorVagas conta={acc} onClose={() => setEditando(false)} />}
+      {editando && (
+        <EditorVagas
+          conta={acc}
+          onClose={() => setEditando(false)}
+          onSalvo={marcarSalvo}
+        />
+      )}
 
       <button
         type="button"
@@ -411,7 +487,12 @@ export function ContaMatrizCard({ acc, vinculos }: { acc: Conta; vinculos: Vincu
           <Users className="size-3.5" />
           {ocupadas} cliente(s) vinculado(s)
         </span>
-        <ChevronDown className={cn("size-3.5 transition-transform", aberto && "rotate-180")} />
+        <ChevronDown
+          className={cn(
+            "size-3.5 transition-transform",
+            aberto && "rotate-180",
+          )}
+        />
       </button>
 
       {aberto && <ClientesVinculados conta={acc} vinculos={vinculos} />}
@@ -428,45 +509,53 @@ export function ContaMatrizCard({ acc, vinculos }: { acc: Conta; vinculos: Vincu
           <SlidersHorizontal className="size-3.5 shrink-0" />
           Editar vagas
         </NeonButton>
-        <Tooltip texto="conta.liberarTodas" titulo="Repor vagas" className="flex-1">
-        <NeonButton
-          accent="red"
-          variant="outline"
-          size="sm"
-          className="w-full whitespace-nowrap px-2"
-          disabled={busy || ocupadas === 0}
-          onClick={() => repor.mutate({ id: acc.id })}
+        <Tooltip
+          texto="conta.liberarTodas"
+          titulo="Repor vagas"
+          className="flex-1"
         >
-          {repor.isPending ? (
-            <Loader2 className="size-3.5 animate-spin" />
-          ) : (
-            <RefreshCw className="size-3.5" />
-          )}
-          Repor
-        </NeonButton>
+          <NeonButton
+            accent="red"
+            variant="outline"
+            size="sm"
+            className="w-full whitespace-nowrap px-2"
+            disabled={busy || ocupadas === 0}
+            onClick={() =>
+              repor.mutate({ id: acc.id }, { onSuccess: marcarSalvo })
+            }
+          >
+            {repor.isPending ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <RefreshCw className="size-3.5" />
+            )}
+            Repor
+          </NeonButton>
         </Tooltip>
         <Tooltip texto="conta.copiarLogin" titulo="Copiar login">
-        <button
-          type="button"
-          className="flex size-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/40 transition-colors hover:border-white/25 hover:text-white"
-          aria-label="Copiar login"
-          onClick={() =>
-            navigator.clipboard?.writeText(`${acc.email} · ${acc.senha}`).catch(() => {})
-          }
-        >
-          <Copy className="size-3.5" />
-        </button>
+          <button
+            type="button"
+            className="flex size-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/40 transition-colors hover:border-white/25 hover:text-white"
+            aria-label="Copiar login"
+            onClick={() =>
+              navigator.clipboard
+                ?.writeText(`${acc.email} · ${acc.senha}`)
+                .catch(() => {})
+            }
+          >
+            <Copy className="size-3.5" />
+          </button>
         </Tooltip>
         <Tooltip texto="conta.excluir" titulo="Excluir conta matriz">
-        <button
-          type="button"
-          className="flex size-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/40 transition-colors hover:border-neon-red/50 hover:text-neon-red"
-          aria-label="Excluir conta matriz"
-          disabled={busy}
-          onClick={() => remover.mutate({ id: acc.id })}
-        >
-          <Trash2 className="size-3.5" />
-        </button>
+          <button
+            type="button"
+            className="flex size-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/40 transition-colors hover:border-neon-red/50 hover:text-neon-red"
+            aria-label="Excluir conta matriz"
+            disabled={busy}
+            onClick={() => remover.mutate({ id: acc.id })}
+          >
+            <Trash2 className="size-3.5" />
+          </button>
         </Tooltip>
       </div>
     </GlassCard>

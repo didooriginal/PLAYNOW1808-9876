@@ -19,7 +19,19 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 
 const BASE = "https://api.mercadopago.com";
 
-export type CicloMP = "mensal" | "anual";
+/**
+ * Periodicidades aceitas na assinatura recorrente do cartão. Espelha `CICLOS`
+ * de `lib/ciclos.ts` — o Mercado Pago cobra a cada N meses, então trimestral e
+ * semestral são frequência 3 e 6 em `months` (ver `recorrenciaMP`).
+ */
+export type CicloMP = "mensal" | "trimestral" | "semestral" | "anual";
+
+/** traduz nosso ciclo para o par frequency/frequency_type do Mercado Pago */
+function recorrenciaMP(ciclo: CicloMP) {
+  if (ciclo === "anual") return { frequency: 1, frequency_type: "years" };
+  const meses = ciclo === "semestral" ? 6 : ciclo === "trimestral" ? 3 : 1;
+  return { frequency: meses, frequency_type: "months" };
+}
 
 /* ------------------------------------------------------------------ */
 /* CONFIGURAÇÃO                                                        */
@@ -297,8 +309,7 @@ export async function criarAssinaturaMP(entrada: {
       notification_url: urlWebhookSegura(),
       status: "pending",
       auto_recurring: {
-        frequency: 1,
-        frequency_type: entrada.ciclo === "anual" ? "years" : "months",
+        ...recorrenciaMP(entrada.ciclo),
         transaction_amount: Math.round(entrada.valor * 100) / 100,
         currency_id: "BRL",
       },

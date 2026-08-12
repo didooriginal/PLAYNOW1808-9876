@@ -63,10 +63,18 @@ export const DEFINICOES: Record<Ciclo, DefinicaoCiclo> = {
 
 /** desconto por antecipação, só no Pix */
 export const ANTECIPACAO = {
-  /** fatura do mês corrente, ainda dentro do prazo */
-  vigente: { desconto: 0.05, rotulo: "Antecipar este mês", chamada: "5% de desconto no Pix" },
+  /** fatura já emitida e ainda dentro do prazo */
+  vigente: {
+    desconto: 0.05,
+    rotulo: "Antecipar a fatura em aberto",
+    chamada: "5% de desconto no Pix",
+  },
   /** mês que ainda nem foi faturado */
-  proximo: { desconto: 0.1, rotulo: "Adiantar o próximo mês", chamada: "10% de desconto no Pix" },
+  proximo: {
+    desconto: 0.1,
+    rotulo: "Adiantar o próximo mês",
+    chamada: "10% de desconto no Pix",
+  },
 } as const;
 
 export type TipoAntecipacao = keyof typeof ANTECIPACAO;
@@ -134,13 +142,46 @@ export function precificarAntecipacao(valor: number, tipo: TipoAntecipacao) {
 
 /** Soma meses a uma data ISO `YYYY-MM-DD` preservando o fim do mês. */
 export function somarMeses(iso: string, meses: number) {
-  const base = iso && /^\d{4}-\d{2}-\d{2}$/.test(iso) ? new Date(`${iso}T12:00:00Z`) : new Date();
+  const base =
+    iso && /^\d{4}-\d{2}-\d{2}$/.test(iso)
+      ? new Date(`${iso}T12:00:00Z`)
+      : new Date();
   const dia = base.getUTCDate();
   const d = new Date(base);
   d.setUTCDate(1);
   d.setUTCMonth(d.getUTCMonth() + meses);
   // 31/01 + 1 mês = 28/02, não 03/03
-  const ultimoDia = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+  const ultimoDia = new Date(
+    Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0),
+  ).getUTCDate();
   d.setUTCDate(Math.min(dia, ultimoDia));
   return d.toISOString().slice(0, 10);
+}
+
+/**
+ * DATAS EM DOIS FORMATOS.
+ *
+ * `usuarios.proxima_cobranca` nasceu no painel antigo em `DD/MM/AAAA`, e as
+ * faturas usam ISO `AAAA-MM-DD`. Em vez de migrar a coluna (e quebrar as telas
+ * que mostram o texto cru), toda conta de data passa por aqui: converte para
+ * ISO, calcula, e devolve no formato em que a data estava.
+ */
+export function paraIso(valor: string | null | undefined): string {
+  if (!valor) return "";
+  const v = valor.trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(v)) return v.slice(0, 10);
+  const br = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(v);
+  return br ? `${br[3]}-${br[2]}-${br[1]}` : "";
+}
+
+/** Devolve `dataIso` no mesmo formato de `original` (ISO ou `DD/MM/AAAA`). */
+export function comoOrigem(
+  dataIso: string,
+  original: string | null | undefined,
+): string {
+  if (!dataIso) return "";
+  if (!original || !/^\d{2}\/\d{2}\/\d{4}$/.test(original.trim()))
+    return dataIso;
+  const [a, m, d] = dataIso.split("-");
+  return `${d}/${m}/${a}`;
 }

@@ -25,6 +25,8 @@ import {
   type ServiceId,
 } from "@/lib/mock-data";
 import { useAplicativos } from "@/queries/aplicativos";
+import { useTabelaCiclos, type Ciclo } from "@/queries/ciclos";
+import { SeletorCiclo } from "../seletor-ciclo";
 
 /** ordem em que as categorias do catalogo aparecem nos filtros */
 const ORDEM_CATEGORIAS = ["streaming", "esportes", "musica", "produtividade", "iptv", "asiatico"];
@@ -33,27 +35,24 @@ export function Builder() {
   const [selected, setSelected] = useState<ServiceId[]>(["netflix", "spotify"]);
   const [category, setCategory] = useState("Todos");
   const [openMobile, setOpenMobile] = useState(false);
+  /** periodicidade escolhida no fechamento — vai como ?ciclo= para o checkout */
+  const [ciclo, setCiclo] = useState<Ciclo>("mensal");
+
+  // tabela de ciclos do servidor: nenhum percentual escrito na mão aqui
+  const { data: tabelaCiclos } = useTabelaCiclos();
 
   // catalogo real do banco (tabela oficial de precos avulsos)
   const { data: catalogo } = useAplicativos();
 
-  /** apps ativos do catalogo, na ordem das categorias, com fallback estatico */
+  /**
+   * Apps ativos do catálogo, na ORDEM DEFINIDA NO ADMIN.
+   * `aplicativos.listar` já devolve ordenado por `ordem` (e nome no empate), então
+   * aqui a lista é respeitada como veio: arrastar um app para o topo no painel
+   * muda a vitrine na hora. Sem catálogo (offline), cai no fallback estático.
+   */
   const disponiveis = useMemo(() => {
     if (!catalogo?.length) return services;
-    return catalogo
-      .filter((a) => a.ativo)
-      .map((a) => serviceById(a.slug))
-      .sort(
-        (a, b) =>
-          ORDEM_CATEGORIAS.indexOf(
-            Object.keys(CATEGORIAS).find((k) => CATEGORIAS[k] === a.category) ?? "",
-          ) -
-            ORDEM_CATEGORIAS.indexOf(
-              Object.keys(CATEGORIAS).find((k) => CATEGORIAS[k] === b.category) ?? "",
-            ) ||
-          a.retail - b.retail ||
-          a.name.localeCompare(b.name),
-      );
+    return catalogo.filter((a) => a.ativo).map((a) => serviceById(a.slug));
   }, [catalogo]);
 
   const categories = useMemo(() => {
@@ -77,6 +76,13 @@ export function Builder() {
   const total = subtotal - discount;
   const retail = retailOf(selected);
   const saving = retail - total;
+
+  /** o ciclo incide DEPOIS do desconto por volume — os dois se somam */
+  const defCiclo = tabelaCiclos?.ciclos.find((c) => c.ciclo === ciclo);
+  const meses = defCiclo?.meses ?? 1;
+  const mensalComCiclo = total * (1 - (defCiclo?.desconto ?? 0));
+  const totalCiclo = mensalComCiclo * meses;
+  const economiaCiclo = total * meses - totalCiclo;
 
   function toggle(id: ServiceId) {
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -187,35 +193,65 @@ export function Builder() {
         );
       })()}
 
+      {/* periodicidade: pagar mês a mês ou fechar 3/6/12 meses com desconto */}
+      {selected.length > 0 && (
+        <div className="mt-5">
+          <div className="font-sans text-[10px] uppercase tracking-[0.2em] text-white/35">
+            Como você quer pagar
+          </div>
+          <SeletorCiclo
+            valor={ciclo}
+            onChange={setCiclo}
+            accent="red"
+            compacto
+            className="mt-2.5"
+          />
+        </div>
+      )}
+
       {/* total */}
-      <div className="mt-5 rounded-2xl border border-neon-red/30 bg-neon-red/[0.07] p-4">
+      <div className="mt-4 rounded-2xl border border-neon-red/30 bg-neon-red/[0.07] p-4">
         <div className="flex items-end justify-between">
           <span className="font-sans text-[11px] uppercase tracking-[0.2em] text-white/45">
-            Total mensal
+            {meses > 1 ? `Total do ${defCiclo?.periodo}` : "Total mensal"}
           </span>
           <div className="flex items-baseline gap-1">
             <span className="font-sans text-xs text-white/40">R$</span>
             <span className="font-display text-4xl font-extrabold leading-none text-white glow-red">
-              {total.toFixed(2).replace(".", ",")}
+              {totalCiclo.toFixed(2).replace(".", ",")}
             </span>
           </div>
         </div>
+
+        {meses > 1 && (
+          <div className="mt-2 flex items-center justify-between font-sans text-[11px] text-white/45">
+            <span>equivale a</span>
+            <span className="font-semibold text-white/70">{brl(mensalComCiclo)} / mês</span>
+          </div>
+        )}
+
         {saving > 0 && (
           <div className="mt-3 flex items-center gap-1.5 font-sans text-[11px] text-neon-cyan">
             <TrendingDown className="size-3.5" />
-            você economiza {brl(saving)} por mês
+            você economiza {brl(saving)} por mês em relação ao avulso
+          </div>
+        )}
+        {economiaCiclo > 0 && (
+          <div className="mt-1.5 flex items-center gap-1.5 font-sans text-[11px] text-neon-cyan">
+            <TrendingDown className="size-3.5" />
+            + {brl(economiaCiclo)} de desconto por fechar {meses} meses
           </div>
         )}
       </div>
 
       {/* checkout na plataforma: o servidor refaz a conta e gera o Pix */}
       <Link
-        to={`/checkout?apps=${selected.join(",")}`}
+        to={`/checkout?apps=${selected.join(",")}${ciclo === "mensal" ? "" : `&ciclo=${ciclo}`}`}
         className="mt-4 block"
       >
         <NeonButton accent="red" size="lg" className="w-full" disabled={selected.length === 0}>
           <UserPlus className="size-4" />
-          Assinar e pagar por Pix
+          {meses > 1 ? `Assinar ${defCiclo?.rotulo.toLowerCase()} por Pix` : "Assinar e pagar por Pix"}
         </NeonButton>
       </Link>
       <p className="mt-2.5 text-center font-sans text-[10px] leading-relaxed text-white/25">
@@ -365,7 +401,10 @@ export function Builder() {
             </span>
           </span>
           <span className="flex items-center gap-2">
-            <span className="font-display text-lg font-extrabold text-white">{brl(total)}</span>
+            <span className="font-display text-lg font-extrabold text-white">
+              {brl(mensalComCiclo)}
+            </span>
+            <span className="font-sans text-[10px] text-white/35">/mês</span>
             <ChevronDown
               className={cn("size-4 text-white/40 transition-transform", openMobile && "rotate-180")}
             />

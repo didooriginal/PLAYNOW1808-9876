@@ -1,16 +1,18 @@
 import { z } from "zod";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq, ne } from "drizzle-orm";
 import { ORPCError } from "@orpc/server";
 import { authed } from "../middleware/auth";
 import { db } from "../database";
 import { cobrancasPix, faturas, pacotes, usuarios } from "../database/schema";
 import { abrirCobranca } from "./pix";
+import { gerarFaturas } from "./faturas";
 import {
   ANTECIPACAO,
   CICLOS,
   DEFINICOES,
   type Ciclo,
   normalizarCiclo,
+  paraIso,
   precificarAntecipacao,
   precificarCiclo,
   somarMeses,
@@ -36,29 +38,73 @@ const iso = (d: Date) => d.toISOString().slice(0, 10);
 const competenciaDe = (data: string) => data.slice(0, 7);
 
 async function clienteDaSessao(authUserId: string) {
-  const [cliente] = await db.select().from(usuarios).where(eq(usuarios.authUserId, authUserId));
-  if (!cliente) throw new ORPCError("NOT_FOUND", { message: "Cliente não encontrado" });
+  const [cliente] = await db
+    .select()
+    .from(usuarios)
+    .where(eq(usuarios.authUserId, authUserId));
+  if (!cliente)
+    throw new ORPCError("NOT_FOUND", { message: "Cliente não encontrado" });
   return cliente;
 }
 
 /** mensalidade de referência: o que o cliente paga hoje, ou o preço do pacote */
-async function mensalidadeBase(cliente: { valor: number; pacoteId: number | null }) {
+async function mensalidadeBase(cliente: {
+  valor: number;
+  pacoteId: number | null;
+}) {
   if (cliente.valor > 0) return cent(cliente.valor);
   if (cliente.pacoteId) {
-    const [pacote] = await db.select().from(pacotes).where(eq(pacotes.id, cliente.pacoteId));
+    const [pacote] = await db
+      .select()
+      .from(pacotes)
+      .where(eq(pacotes.id, cliente.pacoteId));
     if (pacote) return cent(pacote.preco);
   }
   return 0;
 }
 
-/** fatura em aberto da competência atual, se existir */
-async function faturaAberta(clienteId: number) {
-  const competencia = competenciaDe(iso(new Date()));
-  const [fatura] = await db
+/**
+ * Fatura em aberto do cliente — a que está por vencer.
+ *
+ * As faturas são derivadas do histórico e materializadas por `gerarFaturas`
+ * (idempotente). Chamamos aqui porque o cliente pode abrir a área de pagamento
+ * sem nunca ter passado pela tela de Faturas — sem isso o cartão de antecipação
+ * ficaria vazio mesmo com mês a vencer.
+ *
+ * Pegamos a NÃO PAGA de menor vencimento em vez de casar com a competência do
+ * mês corrente: a série pode estar quitada até o mês atual e a próxima em
+ * aberto ser a do mês seguinte, e é essa que o cliente antecipa.
+ */
+async function faturaAberta(cliente: {
+  id: number;
+  nome: string;
+  valor: number;
+  ciclo: string;
+  clienteDesde: string;
+  statusPagamento: string;
+}) {
+  await gerarFaturas(cliente);
+  const abertas = await db
     .select()
     .from(faturas)
-    .where(and(eq(faturas.clienteId, clienteId), eq(faturas.competencia, competencia)));
-  return fatura && fatura.status !== "pago" ? fatura : null;
+    .where(and(eq(faturas.clienteId, cliente.id), ne(faturas.status, "pago")))
+    .orderBy(asc(faturas.vencimento));
+  return abertas[0] ?? null;
+}
+
+/**
+ * Base do "próximo mês": o mês seguinte ao da fatura em aberto — ou ao de hoje
+ * quando não há nenhuma. Sem isso os dois cartões (vigente 5% e próximo 10%)
+ * poderiam apontar para a mesma competência quando a série já está quitada até
+ * o mês corrente.
+ */
+function baseDoProximo(
+  cliente: { proximaCobranca: string },
+  aberta: { vencimento: string } | null,
+) {
+  return (
+    aberta?.vencimento || paraIso(cliente.proximaCobranca) || iso(new Date())
+  );
 }
 
 export const renovacao = {
@@ -69,7 +115,7 @@ export const renovacao = {
   opcoes: authed.handler(async ({ context }) => {
     const cliente = await clienteDaSessao(context.user.id);
     const mensal = await mensalidadeBase(cliente);
-    const aberta = await faturaAberta(cliente.id);
+    const aberta = await faturaAberta(cliente);
 
     const ciclos = CICLOS.map((ciclo) => {
       const preco = precificarCiclo(mensal, ciclo);
@@ -89,7 +135,10 @@ export const renovacao = {
     // antecipar o mês vigente só existe se houver fatura aberta
     const vigente = aberta
       ? {
-          ...precificarAntecipacao(aberta.valorFinal || aberta.valor, "vigente"),
+          ...precificarAntecipacao(
+            aberta.valorFinal || aberta.valor,
+            "vigente",
+          ),
           chamada: ANTECIPACAO.vigente.chamada,
           competencia: aberta.competencia,
           vencimento: aberta.vencimento,
@@ -97,21 +146,27 @@ export const renovacao = {
         }
       : null;
 
-    // adiantar o próximo mês está sempre disponível para quem tem mensalidade
+    /**
+     * Adiantar o próximo mês: sempre disponível para quem tem mensalidade.
+     * A competência é a seguinte à da fatura em aberto (ou ao mês corrente
+     * quando não há nenhuma), senão os dois cartões venderiam o mesmo mês.
+     */
+    const baseProximo = baseDoProximo(cliente, aberta);
     const proximo =
       mensal > 0
         ? {
             ...precificarAntecipacao(mensal, "proximo"),
             chamada: ANTECIPACAO.proximo.chamada,
-            competencia: competenciaDe(somarMeses(iso(new Date()), 1)),
-            novoVencimento: somarMeses(cliente.proximaCobranca || iso(new Date()), 1),
+            competencia: competenciaDe(somarMeses(baseProximo, 1)),
+            novoVencimento: somarMeses(baseProximo, 1),
           }
         : null;
 
     return {
       mensalidade: mensal,
       cicloAtual: normalizarCiclo(cliente.ciclo),
-      proximaCobranca: cliente.proximaCobranca,
+      /** sempre ISO para o front: a coluna pode estar em DD/MM/AAAA */
+      proximaCobranca: paraIso(cliente.proximaCobranca),
       ciclos,
       antecipacao: { vigente, proximo },
     };
@@ -129,7 +184,8 @@ export const renovacao = {
       const mensal = await mensalidadeBase(cliente);
       if (mensal <= 0)
         throw new ORPCError("BAD_REQUEST", {
-          message: "Você ainda não tem um plano ativo para renovar. Escolha um pacote primeiro.",
+          message:
+            "Você ainda não tem um plano ativo para renovar. Escolha um pacote primeiro.",
         });
 
       const ciclo: Ciclo = input.ciclo;
@@ -171,13 +227,16 @@ export const renovacao = {
       const cliente = await clienteDaSessao(context.user.id);
 
       if (input.tipo === "vigente") {
-        const aberta = await faturaAberta(cliente.id);
+        const aberta = await faturaAberta(cliente);
         if (!aberta)
           throw new ORPCError("BAD_REQUEST", {
             message: "Você não tem fatura aberta neste mês — nada a antecipar.",
           });
 
-        const preco = precificarAntecipacao(aberta.valorFinal || aberta.valor, "vigente");
+        const preco = precificarAntecipacao(
+          aberta.valorFinal || aberta.valor,
+          "vigente",
+        );
         const titulo = `Antecipação da fatura ${aberta.competencia} (${Math.round(
           preco.percentual * 100,
         )}% off no Pix)`;
@@ -200,7 +259,9 @@ export const renovacao = {
           message: "Você ainda não tem uma mensalidade definida para adiantar.",
         });
 
-      const competencia = competenciaDe(somarMeses(iso(new Date()), 1));
+      const competencia = competenciaDe(
+        somarMeses(baseDoProximo(cliente, await faturaAberta(cliente)), 1),
+      );
       const preco = precificarAntecipacao(mensal, "proximo");
       const titulo = `Adiantamento da mensalidade ${competencia} (${Math.round(
         preco.percentual * 100,
@@ -213,7 +274,12 @@ export const renovacao = {
       const [jaPaga] = await db
         .select()
         .from(faturas)
-        .where(and(eq(faturas.clienteId, cliente.id), eq(faturas.competencia, competencia)));
+        .where(
+          and(
+            eq(faturas.clienteId, cliente.id),
+            eq(faturas.competencia, competencia),
+          ),
+        );
       if (jaPaga?.status === "pago")
         throw new ORPCError("CONFLICT", {
           message: `A mensalidade de ${competencia} já está paga. Nada a adiantar.`,
@@ -237,7 +303,11 @@ export const renovacao = {
     }),
 };
 
-/** cobrança de antecipação ainda válida para o mesmo título */
+/**
+ * Cobrança de antecipação ainda válida para o mesmo título.
+ * Devolve no MESMO formato de `abrirCobranca` para o front tratar cobrança nova
+ * e cobrança reaproveitada com um único componente.
+ */
 async function antecipacaoViva(clienteId: number, titulo: string) {
   const linhas = await db
     .select()
@@ -250,5 +320,18 @@ async function antecipacaoViva(clienteId: number, titulo: string) {
       ),
     );
   const agora = Date.now();
-  return linhas.find((c) => !c.expiraEm || c.expiraEm.getTime() > agora) ?? null;
+  const viva = linhas.find((c) => !c.expiraEm || c.expiraEm.getTime() > agora);
+  if (!viva) return null;
+
+  return {
+    txid: viva.txid,
+    valor: viva.valor,
+    descricao: viva.descricao,
+    copiaECola: viva.copiaECola,
+    qrBase64: viva.qrBase64,
+    linkPagamento: viva.linkPagamento,
+    provedor: viva.provedor,
+    expiraEm: (viva.expiraEm ?? new Date()).toISOString(),
+    status: "aguardando" as const,
+  };
 }

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ArrowUpRight,
   BadgeCheck,
+  BadgePercent,
   CalendarClock,
   Check,
   Copy,
@@ -60,6 +61,7 @@ import { SalaJogos } from "../components/cliente/sala-jogos";
 import { CarteiraAfiliado } from "../components/cliente/carteira";
 import { ContadorEconomia } from "../components/cliente/economia";
 import { PagarPix } from "../components/cliente/pagar-pix";
+import { AreaPagamento } from "../components/cliente/pagamento";
 
 /** dados vindos do banco (usuarios.painel) */
 type PainelCliente = NonNullable<ReturnType<typeof usePainelCliente>["data"]>;
@@ -629,6 +631,7 @@ export default function DashboardPage() {
       { id: "jogos", label: "Futebol Ao Vivo", icon: Goal },
       { id: "carteira", label: "Indique e Ganhe", icon: Wallet },
       { id: "novidades", label: "Novidades/Upgrades", icon: Sparkles, badge: String(upgrades.length) },
+      { id: "pagamento", label: "Pagar / Renovar", icon: BadgePercent },
       { id: "faturas", label: "Faturas", icon: Receipt },
       {
         id: "suporte",
@@ -719,6 +722,7 @@ export default function DashboardPage() {
               {active === "jogos" && "Futebol Ao Vivo"}
               {active === "carteira" && "Indique e Ganhe"}
               {active === "novidades" && "Novidades e Upgrades"}
+              {active === "pagamento" && "Pagar e Renovar"}
               {active === "faturas" && "Minhas Faturas"}
               {active === "suporte" && "Suporte"}
             </h1>
@@ -734,6 +738,8 @@ export default function DashboardPage() {
               {active === "carteira" &&
                 "Seu link, sua rede e o que fazer com a comissão: sacar em Pix ou virar desconto na mensalidade."}
               {active === "novidades" && "Novos apps, telas extras e formas de pagar menos."}
+              {active === "pagamento" &&
+                "Escolha a periodicidade que mais te economiza ou antecipe o pagamento com desconto no Pix."}
               {active === "faturas" && "Acompanhe pagamentos, vencimentos e recibos."}
               {active === "suporte" && "Relate um problema e acompanhe o andamento do chamado."}
             </p>
@@ -779,6 +785,7 @@ export default function DashboardPage() {
           {active === "novidades" && <UpgradesView />}
           {active === "jogos" && <SalaJogos />}
           {active === "carteira" && <CarteiraAfiliado />}
+          {active === "pagamento" && <AreaPagamento />}
           {active === "faturas" && (
             <>
               <PagarPix key={faturaPix ?? "aberta"} faturaId={faturaPix ?? undefined} />

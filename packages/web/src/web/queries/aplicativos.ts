@@ -34,6 +34,15 @@ export function useAtualizarAplicativo() {
   return useMutation(orpc.aplicativos.atualizar.mutationOptions({ onSuccess: invalidar }));
 }
 
+/**
+ * Salva a ordem da grade de aplicativos (a mesma que a landing exibe).
+ * Manda só os ids na ordem desejada; o servidor grava a posição de cada um.
+ */
+export function useReordenarAplicativos() {
+  const invalidar = useInvalidarAplicativos();
+  return useMutation(orpc.aplicativos.reordenar.mutationOptions({ onSuccess: invalidar }));
+}
+
 export function useRemoverAplicativo() {
   const invalidar = useInvalidarAplicativos();
   return useMutation(orpc.aplicativos.remover.mutationOptions({ onSuccess: invalidar }));

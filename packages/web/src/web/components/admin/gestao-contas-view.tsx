@@ -14,6 +14,7 @@ import { AppIcon } from "../app-icon";
 import { GlassCard, NeonButton, Pill } from "../ui/kit";
 import { Ajuda, Campo, TituloSecao } from "../ui/tooltip";
 import { LinhaCodigo } from "./estoque-gift-view";
+import { BackupCard } from "./backup-card";
 import { useCodigosGift } from "../../queries/estoque-gift";
 import {
   useAtualizarConta,
@@ -492,6 +493,8 @@ export function GestaoContasView() {
       </div>
 
       <Parametros />
+
+      <BackupCard />
     </div>
   );
 }

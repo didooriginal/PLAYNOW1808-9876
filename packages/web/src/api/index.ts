@@ -26,7 +26,9 @@ import { assinaturasRota } from "./routes/assinaturas";
 import { processarNotificacaoMP } from "./lib/webhook-mercadopago";
 import { validarAssinaturaWebhook } from "./lib/mercadopago";
 import { checkout } from "./routes/checkout";
+import { ciclos } from "./routes/ciclos";
 import { senha } from "./routes/senha";
+import { gerarBackupExcel } from "./lib/backup";
 import { auth } from "./auth";
 import { criarAssistente } from "./agent";
 import { criarCopiloto } from "./agent/admin";
@@ -63,6 +65,7 @@ export const router = {
   pix,
   assinaturas: assinaturasRota,
   checkout,
+  ciclos,
   senha,
   renovacao,
   seed,
@@ -121,6 +124,39 @@ app.post("/api/webhooks/email", async (c) => {
   return resultado.ok
     ? c.json({ ok: true, codigo: resultado.registro.codigo }, 200)
     : c.json({ ok: false, erro: resultado.motivo }, 422);
+});
+
+/**
+ * BACKUP DO BANCO EM EXCEL — rota HTTP pura porque devolve um arquivo binário
+ * para download direto (oRPC serializa JSON, não .xlsx).
+ *
+ * Só administrador baixa: exige sessão E `usuarios.admin`. As senhas das contas
+ * matrizes só entram com `?senhas=1` — sem isso a coluna sai como "(oculta)",
+ * porque planilha vazada com senha de matriz derruba a operação inteira.
+ */
+app.get("/api/admin/backup.xlsx", async (c) => {
+  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+  if (!session) return c.json({ erro: "sessão obrigatória" }, 401);
+
+  const [registro] = await db
+    .select({ admin: tabelaUsuarios.admin })
+    .from(tabelaUsuarios)
+    .where(eq(tabelaUsuarios.authUserId, session.user.id));
+  if (!registro?.admin) return c.json({ erro: "acesso restrito ao administrador" }, 403);
+
+  const senhas = c.req.query("senhas");
+  const incluirSenhas = senhas === "1" || senhas === "true";
+
+  try {
+    const { buffer, nomeArquivo } = await gerarBackupExcel({ incluirSenhas });
+    return c.body(new Uint8Array(buffer), 200, {
+      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Content-Disposition": `attachment; filename="${nomeArquivo}"`,
+      "Cache-Control": "no-store",
+    });
+  } catch (e) {
+    return c.json({ erro: e instanceof Error ? e.message : String(e) }, 500);
+  }
 });
 
 /**

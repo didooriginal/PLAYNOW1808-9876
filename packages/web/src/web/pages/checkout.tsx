@@ -14,8 +14,10 @@ import {
 import { AuthShell } from "../components/auth-shell";
 import { AppIcon } from "../components/app-icon";
 import { NeonButton, Pill } from "../components/ui/kit";
+import { SeletorCiclo } from "../components/seletor-ciclo";
 import { authClient } from "../lib/auth";
 import { usePacotes } from "../queries/pacotes";
+import type { Ciclo } from "../queries/ciclos";
 import {
   usePagarCheckout,
   useResumoCheckout,
@@ -32,6 +34,11 @@ import { useCriarAssinatura } from "../queries/assinaturas";
  */
 
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+/** ciclos aceitos na URL — qualquer coisa fora da lista cai em mensal */
+const CICLOS_URL: Ciclo[] = ["mensal", "trimestral", "semestral", "anual"];
+const normalizarCiclo = (valor: string | null): Ciclo =>
+  CICLOS_URL.find((c) => c === valor) ?? "mensal";
 
 const slug = (nome: string) =>
   nome
@@ -50,7 +57,7 @@ export default function CheckoutPage() {
 
   const planoSlug = params.get("plano");
   const comboId = Number(params.get("combo") ?? 0) || null;
-  const ciclo = params.get("ciclo") === "anual" ? "anual" : "mensal";
+  const ciclo = normalizarCiclo(params.get("ciclo"));
   const jogos = params.get("jogos") === "1";
   const apps = (params.get("apps") ?? "")
     .split(",")
@@ -92,6 +99,21 @@ export default function CheckoutPage() {
 
   const semSessao = !sessaoCarregando && !session;
   const destinoCadastro = `/signup?${params.toString()}&next=checkout`;
+
+  /**
+   * Troca a periodicidade sem perder o resto do pedido: o ciclo mora na URL, o
+   * servidor refaz o preço e o resumo acima atualiza sozinho.
+   */
+  const trocarCiclo = (novo: Ciclo) => {
+    const proximos = new URLSearchParams(search);
+    if (novo === "mensal") proximos.delete("ciclo");
+    else proximos.set("ciclo", novo);
+    navigate(`/checkout?${proximos.toString()}`, { replace: true });
+  };
+
+  // combo pronto já vem com ciclo fechado no cadastro e o adicional de futebol é
+  // sempre mensal — nesses dois casos escolher periodicidade não faz sentido
+  const podeEscolherCiclo = Boolean(pacoteId || apps.length) && !comboId;
 
   return (
     <AuthShell
@@ -179,6 +201,36 @@ export default function CheckoutPage() {
             </>
           )}
         </div>
+
+        {/* ---------------- periodicidade ---------------- */}
+        {podeEscolherCiclo && !pagar.data && (
+          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="font-sans text-[10px] uppercase tracking-[0.2em] text-white/35">
+                Por quanto tempo você quer pagar
+              </div>
+              {resumo.data && resumo.data.meses > 1 && (
+                <Pill accent="cyan">
+                  {brl(resumo.data.mensal)} / mês equivalente
+                </Pill>
+              )}
+            </div>
+
+            <SeletorCiclo
+              valor={ciclo}
+              onChange={trocarCiclo}
+              accent="cyan"
+              className="mt-3"
+            />
+
+            {resumo.data && resumo.data.meses > 1 && (
+              <p className="mt-2 font-sans text-[11px] leading-relaxed text-neon-cyan">
+                Você paga {brl(resumo.data.valor)} uma vez e fica {resumo.data.meses} meses sem se
+                preocupar com renovação.
+              </p>
+            )}
+          </div>
+        )}
 
         {/* ---------------- sem sessão ---------------- */}
         {semSessao && pronto && (

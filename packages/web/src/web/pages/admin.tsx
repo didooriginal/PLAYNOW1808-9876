@@ -38,7 +38,10 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AppIcon } from "../components/app-icon";
-import { ContaMatrizCard, diasParaVencer } from "../components/admin/conta-card";
+import {
+  ContaMatrizCard,
+  diasParaVencer,
+} from "../components/admin/conta-card";
 import { AppsView } from "../components/admin/apps-view";
 import { AfiliadosView } from "../components/admin/afiliados-view";
 import { CodigosView } from "../components/admin/codigos-view";
@@ -55,6 +58,7 @@ import { RecuperacaoView } from "../components/admin/recuperacao-view";
 import { SenhasView } from "../components/admin/senhas-view";
 import { ComissoesView } from "../components/admin/comissoes-view";
 import { PixView } from "../components/admin/pix-view";
+import { BarraSalvamento, useAutoSalvar } from "../components/admin/salvamento";
 import { PanelShell, type NavItem } from "../components/panel-shell";
 import {
   GlassCard,
@@ -64,7 +68,13 @@ import {
   ProgressBar,
   accentHex,
 } from "../components/ui/kit";
-import { Ajuda, Campo, Rotulo, TituloSecao, Tooltip } from "../components/ui/tooltip";
+import {
+  Ajuda,
+  Campo,
+  Rotulo,
+  TituloSecao,
+  Tooltip,
+} from "../components/ui/tooltip";
 import {
   brl,
   serviceById,
@@ -117,7 +127,11 @@ type Pacote = NonNullable<ReturnType<typeof usePacotes>["data"]>[number];
 
 /* ------------------------------------------------------------------ */
 
-function Loading({ label = "Carregando dados do banco..." }: { label?: string }) {
+function Loading({
+  label = "Carregando dados do banco...",
+}: {
+  label?: string;
+}) {
   return (
     <GlassCard className="flex items-center justify-center gap-3 p-12">
       <Loader2 className="size-5 animate-spin text-neon-cyan" />
@@ -130,8 +144,12 @@ function ErrorBox({ message }: { message?: string }) {
   return (
     <GlassCard accent="red" className="p-8 text-center">
       <AlertTriangle className="mx-auto size-6 text-neon-red" />
-      <p className="mt-3 font-display text-sm font-bold text-white">Erro ao consultar o banco</p>
-      <p className="mt-1.5 font-sans text-xs text-white/45">{message ?? "Tente novamente."}</p>
+      <p className="mt-3 font-display text-sm font-bold text-white">
+        Erro ao consultar o banco
+      </p>
+      <p className="mt-1.5 font-sans text-xs text-white/45">
+        {message ?? "Tente novamente."}
+      </p>
     </GlassCard>
   );
 }
@@ -141,16 +159,26 @@ function ErrorBox({ message }: { message?: string }) {
 function SeedBanner() {
   const { data: status } = useSeedStatus();
   const seed = useRodarSeed();
-  const vazio = status && status.pacotes === 0 && status.contas === 0 && status.usuarios === 0;
+  const vazio =
+    status &&
+    status.pacotes === 0 &&
+    status.contas === 0 &&
+    status.usuarios === 0;
   if (!vazio) return null;
 
   return (
-    <GlassCard strong accent="cyan" className="flex flex-wrap items-center gap-4 p-5">
+    <GlassCard
+      strong
+      accent="cyan"
+      className="flex flex-wrap items-center gap-4 p-5"
+    >
       <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl border border-neon-cyan/40 bg-neon-cyan/10 text-neon-cyan">
         <Database className="size-5" />
       </span>
       <div className="min-w-0 flex-1">
-        <div className="font-display text-sm font-bold text-white">Banco vazio</div>
+        <div className="font-display text-sm font-bold text-white">
+          Banco vazio
+        </div>
         <p className="mt-0.5 font-sans text-xs text-white/45">
           Popule as tabelas <span className="font-mono">pacotes</span>,{" "}
           <span className="font-mono">contas_matrizes</span> e{" "}
@@ -163,7 +191,11 @@ function SeedBanner() {
         onClick={() => seed.mutate({ force: false })}
         disabled={seed.isPending}
       >
-        {seed.isPending ? <Loader2 className="size-4 animate-spin" /> : <Database className="size-4" />}
+        {seed.isPending ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : (
+          <Database className="size-4" />
+        )}
         Popular banco
       </NeonButton>
     </GlassCard>
@@ -180,21 +212,27 @@ function StatCards() {
     {
       label: "Clientes ativos",
       value: clientes.data ? String(clientes.data.ativos) : "—",
-      delta: clientes.data ? `${clientes.data.total} cadastrados no total` : "carregando",
+      delta: clientes.data
+        ? `${clientes.data.total} cadastrados no total`
+        : "carregando",
       accent: "cyan" as Accent,
       Icon: Users,
     },
     {
       label: "Faturas a vencer",
       value: clientes.data ? String(clientes.data.vencendo) : "—",
-      delta: clientes.data ? `${brl(clientes.data.emAtraso)} em atraso` : "carregando",
+      delta: clientes.data
+        ? `${brl(clientes.data.emAtraso)} em atraso`
+        : "carregando",
       accent: "purple" as Accent,
       Icon: Receipt,
     },
     {
       label: "Receita mensal (MRR)",
       value: clientes.data ? brl(clientes.data.mrr) : "—",
-      delta: estoque.data ? `custo de matrizes ${brl(estoque.data.custoMensal)}` : "carregando",
+      delta: estoque.data
+        ? `custo de matrizes ${brl(estoque.data.custoMensal)}`
+        : "carregando",
       accent: "cyan" as Accent,
       Icon: TrendingUp,
     },
@@ -223,21 +261,32 @@ function StatCards() {
           >
             <div
               className="pointer-events-none absolute -right-12 -top-12 size-32 rounded-full blur-2xl"
-              style={{ background: `radial-gradient(circle, ${hex}33 0%, transparent 70%)` }}
+              style={{
+                background: `radial-gradient(circle, ${hex}33 0%, transparent 70%)`,
+              }}
             />
             <div className="relative flex items-start justify-between">
               <div>
                 <div className="font-sans text-[11px] uppercase tracking-[0.2em] text-white/35">
                   {s.label}
                 </div>
-                <div className="mt-2 font-display text-3xl font-extrabold text-white">{s.value}</div>
-                <div className="mt-1.5 font-sans text-[11px]" style={{ color: hex }}>
+                <div className="mt-2 font-display text-3xl font-extrabold text-white">
+                  {s.value}
+                </div>
+                <div
+                  className="mt-1.5 font-sans text-[11px]"
+                  style={{ color: hex }}
+                >
                   {s.delta}
                 </div>
               </div>
               <span
                 className="flex size-10 items-center justify-center rounded-2xl border"
-                style={{ borderColor: `${hex}44`, background: `${hex}14`, color: hex }}
+                style={{
+                  borderColor: `${hex}44`,
+                  background: `${hex}14`,
+                  color: hex,
+                }}
               >
                 <s.Icon className="size-5" />
               </span>
@@ -295,14 +344,22 @@ function NovaContaForm({ onClose }: { onClose: () => void }) {
             onChange={(e) => set("servico", e.target.value)}
             className={input}
           >
-            {(apps.length ? apps : services.map((s) => ({ slug: s.id, nome: s.name }))).map((a) => (
+            {(apps.length
+              ? apps
+              : services.map((s) => ({ slug: s.id, nome: s.name }))
+            ).map((a) => (
               <option key={a.slug} value={a.slug} className="bg-[#09090b]">
                 {a.nome}
               </option>
             ))}
           </select>
         </Campo>
-        <Campo label="Rótulo" ajuda="contas.rotulo" htmlFor="nc-rotulo" obrigatorio>
+        <Campo
+          label="Rótulo"
+          ajuda="contas.rotulo"
+          htmlFor="nc-rotulo"
+          obrigatorio
+        >
           <input
             id="nc-rotulo"
             className={input}
@@ -311,7 +368,12 @@ function NovaContaForm({ onClose }: { onClose: () => void }) {
             onChange={(e) => set("rotulo", e.target.value)}
           />
         </Campo>
-        <Campo label="E-mail do streaming" ajuda="contas.email" htmlFor="nc-email" obrigatorio>
+        <Campo
+          label="E-mail do streaming"
+          ajuda="contas.email"
+          htmlFor="nc-email"
+          obrigatorio
+        >
           <input
             id="nc-email"
             className={input}
@@ -320,7 +382,12 @@ function NovaContaForm({ onClose }: { onClose: () => void }) {
             onChange={(e) => set("email", e.target.value)}
           />
         </Campo>
-        <Campo label="Senha" ajuda="contas.senha" htmlFor="nc-senha" obrigatorio>
+        <Campo
+          label="Senha"
+          ajuda="contas.senha"
+          htmlFor="nc-senha"
+          obrigatorio
+        >
           <input
             id="nc-senha"
             className={input}
@@ -329,7 +396,11 @@ function NovaContaForm({ onClose }: { onClose: () => void }) {
             onChange={(e) => set("senha", e.target.value)}
           />
         </Campo>
-        <Campo label="Total de vagas" ajuda="contas.totalVagas" htmlFor="nc-vagas">
+        <Campo
+          label="Total de vagas"
+          ajuda="contas.totalVagas"
+          htmlFor="nc-vagas"
+        >
           <input
             id="nc-vagas"
             className={input}
@@ -339,7 +410,11 @@ function NovaContaForm({ onClose }: { onClose: () => void }) {
             onChange={(e) => set("totalVagas", Number(e.target.value))}
           />
         </Campo>
-        <Campo label="Renovação" ajuda="contas.vencimento" htmlFor="nc-renovacao">
+        <Campo
+          label="Renovação"
+          ajuda="contas.vencimento"
+          htmlFor="nc-renovacao"
+        >
           <input
             id="nc-renovacao"
             className={input}
@@ -348,7 +423,11 @@ function NovaContaForm({ onClose }: { onClose: () => void }) {
             onChange={(e) => set("renovacao", e.target.value)}
           />
         </Campo>
-        <Campo label="Custo mensal" ajuda="contas.custoMensal" htmlFor="nc-custo">
+        <Campo
+          label="Custo mensal"
+          ajuda="contas.custoMensal"
+          htmlFor="nc-custo"
+        >
           <input
             id="nc-custo"
             className={input}
@@ -368,7 +447,11 @@ function NovaContaForm({ onClose }: { onClose: () => void }) {
             onChange={(e) => set("regiao", e.target.value)}
           />
         </Campo>
-        <Campo label="Data de vencimento" ajuda="contas.vencimento" htmlFor="nc-vencimento">
+        <Campo
+          label="Data de vencimento"
+          ajuda="contas.vencimento"
+          htmlFor="nc-vencimento"
+        >
           <input
             id="nc-vencimento"
             className={input}
@@ -377,7 +460,11 @@ function NovaContaForm({ onClose }: { onClose: () => void }) {
             onChange={(e) => set("dataVencimento", e.target.value)}
           />
         </Campo>
-        <Campo label="Cartão utilizado" ajuda="contas.cartao" htmlFor="nc-cartao">
+        <Campo
+          label="Cartão utilizado"
+          ajuda="contas.cartao"
+          htmlFor="nc-cartao"
+        >
           <input
             id="nc-cartao"
             className={input}
@@ -389,7 +476,9 @@ function NovaContaForm({ onClose }: { onClose: () => void }) {
       </div>
 
       {criar.isError && (
-        <p className="mt-3 font-sans text-xs text-neon-red">{criar.error?.message}</p>
+        <p className="mt-3 font-sans text-xs text-neon-red">
+          {criar.error?.message}
+        </p>
       )}
 
       <NeonButton
@@ -401,7 +490,8 @@ function NovaContaForm({ onClose }: { onClose: () => void }) {
           criar.mutate(
             {
               ...form,
-              rotulo: form.rotulo || `${serviceById(form.servico).name} — Matriz`,
+              rotulo:
+                form.rotulo || `${serviceById(form.servico).name} — Matriz`,
               vagasOcupadas: 0,
               status: "ativo",
             },
@@ -409,7 +499,11 @@ function NovaContaForm({ onClose }: { onClose: () => void }) {
           )
         }
       >
-        {criar.isPending ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+        {criar.isPending ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : (
+          <Plus className="size-4" />
+        )}
         Salvar no banco
       </NeonButton>
     </GlassCard>
@@ -423,7 +517,9 @@ function StockView() {
   const resumo = useResumoEstoque();
   const mapa = useMapaAlocacoes();
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<"todas" | "esgotadas" | "livres" | "vencendo">("todas");
+  const [filter, setFilter] = useState<
+    "todas" | "esgotadas" | "livres" | "vencendo"
+  >("todas");
   const [criando, setCriando] = useState(false);
 
   const filtered = useMemo(() => {
@@ -463,7 +559,9 @@ function StockView() {
           {
             label: "Vagas ocupadas",
             value: `${usedSlots}/${totalSlots}`,
-            sub: totalSlots ? `${Math.round((usedSlots / totalSlots) * 100)}% de ocupação` : "—",
+            sub: totalSlots
+              ? `${Math.round((usedSlots / totalSlots) * 100)}% de ocupação`
+              : "—",
             accent: "purple" as const,
           },
           {
@@ -474,7 +572,9 @@ function StockView() {
           },
           {
             label: "Vencendo em 5 dias",
-            value: String((resumo.data?.vencendo ?? 0) + (resumo.data?.vencidas ?? 0)),
+            value: String(
+              (resumo.data?.vencendo ?? 0) + (resumo.data?.vencidas ?? 0),
+            ),
             sub: `${resumo.data?.vencidas ?? 0} já vencida(s)`,
             accent: "red" as const,
           },
@@ -483,8 +583,13 @@ function StockView() {
             <div className="font-sans text-[11px] uppercase tracking-[0.2em] text-white/35">
               {s.label}
             </div>
-            <div className="mt-2 font-display text-2xl font-extrabold text-white">{s.value}</div>
-            <div className="mt-1 font-sans text-[11px]" style={{ color: accentHex[s.accent] }}>
+            <div className="mt-2 font-display text-2xl font-extrabold text-white">
+              {s.value}
+            </div>
+            <div
+              className="mt-1 font-sans text-[11px]"
+              style={{ color: accentHex[s.accent] }}
+            >
               {s.sub}
             </div>
           </GlassCard>
@@ -520,7 +625,11 @@ function StockView() {
             </button>
           ))}
         </div>
-        <NeonButton accent="purple" size="md" onClick={() => setCriando((v) => !v)}>
+        <NeonButton
+          accent="purple"
+          size="md"
+          onClick={() => setCriando((v) => !v)}
+        >
           <Plus className="size-4" />
           Nova matriz
         </NeonButton>
@@ -545,7 +654,9 @@ function StockView() {
           {filtered.length === 0 && (
             <GlassCard className="p-10 text-center">
               <Boxes className="mx-auto size-6 text-white/20" />
-              <p className="mt-3 font-sans text-sm text-white/40">Nenhuma conta encontrada.</p>
+              <p className="mt-3 font-sans text-sm text-white/40">
+                Nenhuma conta encontrada.
+              </p>
             </GlassCard>
           )}
         </>
@@ -563,9 +674,15 @@ function StockView() {
  * `pacotes.atualizar`, que aceita o input parcial — mandamos o objeto
  * inteiro para o admin conseguir corrigir qualquer campo numa passada.
  */
-function ModalEditarPacote({ pacote, onClose }: { pacote: Pacote; onClose: () => void }) {
+function ModalEditarPacote({
+  pacote,
+  onClose,
+}: {
+  pacote: Pacote;
+  onClose: () => void;
+}) {
   const atualizar = useAtualizarPacote();
-  const [form, setForm] = useState({
+  const [form, setFormRaw] = useState({
     nome: pacote.nome,
     tagline: pacote.tagline ?? "",
     preco: pacote.preco,
@@ -578,6 +695,15 @@ function ModalEditarPacote({ pacote, onClose }: { pacote: Pacote; onClose: () =>
     servicos: [...(pacote.servicos ?? [])] as string[],
   });
 
+  /**
+   * Todo setForm limpa o erro anterior: se o admin mexeu no campo depois da
+   * falha, é uma tentativa nova e o auto-save volta a valer.
+   */
+  const setForm: typeof setFormRaw = (valor) => {
+    atualizar.reset();
+    setFormRaw(valor);
+  };
+
   const toggle = (id: string) =>
     setForm((f) => ({
       ...f,
@@ -585,6 +711,52 @@ function ModalEditarPacote({ pacote, onClose }: { pacote: Pacote; onClose: () =>
         ? f.servicos.filter((x) => x !== id)
         : [...f.servicos, id],
     }));
+
+  const perksLista = form.perks
+    .split(",")
+    .map((x) => x.trim())
+    .filter(Boolean);
+
+  /** payload único: o auto-save e o Confirmar gravam exatamente a mesma coisa */
+  const payload = {
+    id: pacote.id,
+    nome: form.nome.trim(),
+    tagline: form.tagline,
+    preco: form.preco,
+    precoAnual: form.precoAnual > 0 ? form.precoAnual : null,
+    servicos: form.servicos,
+    perks: perksLista,
+    accent: form.accent,
+    badge: form.badge.trim() || null,
+    destaque: form.destaque,
+    vagasRestantes: form.vagasRestantes,
+  };
+
+  const valido = form.nome.trim().length > 0 && form.servicos.length > 0;
+
+  /** comparado com o que veio do banco: define o selo e dispara o auto-save */
+  const mudou =
+    valido &&
+    (payload.nome !== pacote.nome ||
+      payload.tagline !== (pacote.tagline ?? "") ||
+      payload.preco !== pacote.preco ||
+      payload.precoAnual !== (pacote.precoAnual ?? null) ||
+      payload.badge !== (pacote.badge ?? null) ||
+      payload.accent !== (pacote.accent ?? "cyan") ||
+      payload.destaque !== pacote.destaque ||
+      payload.vagasRestantes !== (pacote.vagasRestantes ?? 0) ||
+      perksLista.join("|") !== (pacote.perks ?? []).join("|") ||
+      [...payload.servicos].sort().join("|") !==
+        [...(pacote.servicos ?? [])].sort().join("|"));
+
+  const { estado, confirmar } = useAutoSalvar({
+    mudou,
+    salvando: atualizar.isPending,
+    erro: atualizar.isError
+      ? (atualizar.error?.message ?? "Falha ao salvar")
+      : null,
+    salvar: () => atualizar.mutate(payload),
+  });
 
   const input =
     "w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 font-sans text-sm text-white placeholder:text-white/25 focus:border-neon-purple/50 focus:outline-none";
@@ -600,9 +772,12 @@ function ModalEditarPacote({ pacote, onClose }: { pacote: Pacote; onClose: () =>
             <div className="font-sans text-[10px] uppercase tracking-[0.22em] text-white/35">
               Editar pacote
             </div>
-            <h3 className="mt-1 font-display text-xl font-extrabold text-white">{pacote.nome}</h3>
+            <h3 className="mt-1 font-display text-xl font-extrabold text-white">
+              {pacote.nome}
+            </h3>
             <p className="mt-1 font-sans text-[12px] text-white/40">
-              As mudanças valem na hora na landing. Quem já assina mantém os apps liberados.
+              As mudanças valem na hora na landing. Quem já assina mantém os
+              apps liberados.
             </p>
           </div>
           <button
@@ -616,7 +791,12 @@ function ModalEditarPacote({ pacote, onClose }: { pacote: Pacote; onClose: () =>
         </div>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-[1.4fr_0.6fr]">
-          <Campo label="Nome do pacote" ajuda="pacote.nome" htmlFor="ep-nome" obrigatorio>
+          <Campo
+            label="Nome do pacote"
+            ajuda="pacote.nome"
+            htmlFor="ep-nome"
+            obrigatorio
+          >
             <input
               id="ep-nome"
               className={input}
@@ -625,14 +805,21 @@ function ModalEditarPacote({ pacote, onClose }: { pacote: Pacote; onClose: () =>
               onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))}
             />
           </Campo>
-          <Campo label="Preço mensal" ajuda="pacote.precoMensal" htmlFor="ep-preco" obrigatorio>
+          <Campo
+            label="Preço mensal"
+            ajuda="pacote.precoMensal"
+            htmlFor="ep-preco"
+            obrigatorio
+          >
             <input
               id="ep-preco"
               type="number"
               step="0.01"
               className={input}
               value={form.preco}
-              onChange={(e) => setForm((f) => ({ ...f, preco: Number(e.target.value) }))}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, preco: Number(e.target.value) }))
+              }
             />
           </Campo>
         </div>
@@ -643,58 +830,93 @@ function ModalEditarPacote({ pacote, onClose }: { pacote: Pacote; onClose: () =>
               id="ep-tagline"
               className={input}
               value={form.tagline}
-              onChange={(e) => setForm((f) => ({ ...f, tagline: e.target.value }))}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, tagline: e.target.value }))
+              }
             />
           </Campo>
-          <Campo label="Preço anual /mês" ajuda="pacote.precoAnual" htmlFor="ep-preco-anual">
+          <Campo
+            label="Preço anual /mês"
+            ajuda="pacote.precoAnual"
+            htmlFor="ep-preco-anual"
+          >
             <input
               id="ep-preco-anual"
               type="number"
               step="0.01"
               className={input}
               value={form.precoAnual}
-              onChange={(e) => setForm((f) => ({ ...f, precoAnual: Number(e.target.value) }))}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, precoAnual: Number(e.target.value) }))
+              }
             />
           </Campo>
         </div>
 
         <div className="mt-3 grid gap-3 sm:grid-cols-[1.4fr_0.6fr]">
-          <Campo label="Benefícios" ajuda="pacote.beneficios" htmlFor="ep-perks">
+          <Campo
+            label="Benefícios"
+            ajuda="pacote.beneficios"
+            htmlFor="ep-perks"
+          >
             <input
               id="ep-perks"
               className={input}
               placeholder="Separados por vírgula"
               value={form.perks}
-              onChange={(e) => setForm((f) => ({ ...f, perks: e.target.value }))}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, perks: e.target.value }))
+              }
             />
           </Campo>
-          <Campo label="Vagas restantes" ajuda="pacote.vagas" htmlFor="ep-vagas">
+          <Campo
+            label="Vagas restantes"
+            ajuda="pacote.vagas"
+            htmlFor="ep-vagas"
+          >
             <input
               id="ep-vagas"
               type="number"
               className={input}
               value={form.vagasRestantes}
-              onChange={(e) => setForm((f) => ({ ...f, vagasRestantes: Number(e.target.value) }))}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  vagasRestantes: Number(e.target.value),
+                }))
+              }
             />
           </Campo>
         </div>
 
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <Campo label="Etiqueta do card" ajuda="pacote.badge" htmlFor="ep-badge">
+          <Campo
+            label="Etiqueta do card"
+            ajuda="pacote.badge"
+            htmlFor="ep-badge"
+          >
             <input
               id="ep-badge"
               className={input}
               placeholder="Ex.: Mais vendido"
               value={form.badge}
-              onChange={(e) => setForm((f) => ({ ...f, badge: e.target.value }))}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, badge: e.target.value }))
+              }
             />
           </Campo>
-          <Campo label="Cor de destaque" ajuda="pacote.accent" htmlFor="ep-accent">
+          <Campo
+            label="Cor de destaque"
+            ajuda="pacote.accent"
+            htmlFor="ep-accent"
+          >
             <select
               id="ep-accent"
               className={input}
               value={form.accent}
-              onChange={(e) => setForm((f) => ({ ...f, accent: e.target.value as Accent }))}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, accent: e.target.value as Accent }))
+              }
             >
               <option value="red" className="bg-[#09090b]">
                 Vermelho
@@ -713,7 +935,9 @@ function ModalEditarPacote({ pacote, onClose }: { pacote: Pacote; onClose: () =>
           <input
             type="checkbox"
             checked={form.destaque}
-            onChange={(e) => setForm((f) => ({ ...f, destaque: e.target.checked }))}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, destaque: e.target.checked }))
+            }
             className="size-4 accent-[#ff1f3d]"
           />
           Pacote em destaque
@@ -721,7 +945,9 @@ function ModalEditarPacote({ pacote, onClose }: { pacote: Pacote; onClose: () =>
         </label>
 
         <div className="mt-4">
-          <Rotulo ajuda="pacote.apps">Apps do pacote ({form.servicos.length})</Rotulo>
+          <Rotulo ajuda="pacote.apps">
+            Apps do pacote ({form.servicos.length})
+          </Rotulo>
           <div className="mt-2 flex flex-wrap gap-2">
             {services.map((sv) => {
               const on = form.servicos.includes(sv.id);
@@ -745,45 +971,28 @@ function ModalEditarPacote({ pacote, onClose }: { pacote: Pacote; onClose: () =>
           </div>
         </div>
 
-        {atualizar.isError && (
-          <p className="mt-3 font-sans text-xs text-neon-red">{atualizar.error?.message}</p>
+        {!valido && (
+          <p className="mt-3 font-sans text-xs text-amber-300">
+            Para salvar, o pacote precisa de nome e de pelo menos um app.
+          </p>
         )}
 
-        <NeonButton
-          accent="purple"
-          size="sm"
+        <BarraSalvamento
           className="mt-5"
+          estado={estado}
+          erro={atualizar.error?.message}
+          rotulo="Confirmar alterações"
+          onConfirmar={confirmar}
+        />
+
+        <button
+          type="button"
           data-testid="salvar-pacote"
-          disabled={atualizar.isPending || !form.nome.trim() || form.servicos.length === 0}
-          onClick={() =>
-            atualizar.mutate(
-              {
-                id: pacote.id,
-                nome: form.nome.trim(),
-                tagline: form.tagline,
-                preco: form.preco,
-                precoAnual: form.precoAnual > 0 ? form.precoAnual : null,
-                servicos: form.servicos,
-                perks: form.perks
-                  .split(",")
-                  .map((x) => x.trim())
-                  .filter(Boolean),
-                accent: form.accent,
-                badge: form.badge.trim() || null,
-                destaque: form.destaque,
-                vagasRestantes: form.vagasRestantes,
-              },
-              { onSuccess: onClose },
-            )
-          }
+          onClick={onClose}
+          className="mt-3 w-full rounded-xl border border-white/10 px-3 py-2.5 font-sans text-xs text-white/50 transition-colors hover:border-white/25 hover:text-white"
         >
-          {atualizar.isPending ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            <Pencil className="size-4" />
-          )}
-          Salvar alterações
-        </NeonButton>
+          Fechar
+        </button>
       </div>
     </div>
   );
@@ -833,70 +1042,105 @@ function PackagesView() {
       <GlassCard strong accent="purple" className="p-5">
         <TituloSecao ajuda="secao.pacotes">Novo pacote</TituloSecao>
         <div className="mt-4 grid gap-3 sm:grid-cols-[1.4fr_0.6fr]">
-          <Campo label="Nome do pacote" ajuda="pacote.nome" htmlFor="pk-nome" obrigatorio>
-          <input
-            id="pk-nome"
-            value={form.nome}
-            onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))}
-            placeholder="Ex.: Turbo 10 em 1"
-            className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 font-sans text-sm text-white placeholder:text-white/25 focus:border-neon-purple/50 focus:outline-none"
-          />
+          <Campo
+            label="Nome do pacote"
+            ajuda="pacote.nome"
+            htmlFor="pk-nome"
+            obrigatorio
+          >
+            <input
+              id="pk-nome"
+              value={form.nome}
+              onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))}
+              placeholder="Ex.: Turbo 10 em 1"
+              className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 font-sans text-sm text-white placeholder:text-white/25 focus:border-neon-purple/50 focus:outline-none"
+            />
           </Campo>
-          <Campo label="Preço mensal" ajuda="pacote.precoMensal" htmlFor="pk-preco" obrigatorio>
-          <input
-            id="pk-preco"
-            type="number"
-            step="0.01"
-            value={form.preco}
-            onChange={(e) => setForm((f) => ({ ...f, preco: Number(e.target.value) }))}
-            placeholder="0,00"
-            className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 font-sans text-sm text-white placeholder:text-white/25 focus:border-neon-purple/50 focus:outline-none"
-          />
+          <Campo
+            label="Preço mensal"
+            ajuda="pacote.precoMensal"
+            htmlFor="pk-preco"
+            obrigatorio
+          >
+            <input
+              id="pk-preco"
+              type="number"
+              step="0.01"
+              value={form.preco}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, preco: Number(e.target.value) }))
+              }
+              placeholder="0,00"
+              className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 font-sans text-sm text-white placeholder:text-white/25 focus:border-neon-purple/50 focus:outline-none"
+            />
           </Campo>
         </div>
 
         <div className="mt-3 grid gap-3 sm:grid-cols-[1.4fr_0.6fr]">
           <Campo label="Tagline" ajuda="pacote.tagline" htmlFor="pk-tagline">
-          <input
-            id="pk-tagline"
-            value={form.tagline}
-            onChange={(e) => setForm((f) => ({ ...f, tagline: e.target.value }))}
-            placeholder="Aparece no card da landing"
-            className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 font-sans text-sm text-white placeholder:text-white/25 focus:border-neon-purple/50 focus:outline-none"
-          />
+            <input
+              id="pk-tagline"
+              value={form.tagline}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, tagline: e.target.value }))
+              }
+              placeholder="Aparece no card da landing"
+              className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 font-sans text-sm text-white placeholder:text-white/25 focus:border-neon-purple/50 focus:outline-none"
+            />
           </Campo>
-          <Campo label="Preço anual /mês" ajuda="pacote.precoAnual" htmlFor="pk-preco-anual">
-          <input
-            id="pk-preco-anual"
-            type="number"
-            step="0.01"
-            value={form.precoAnual}
-            onChange={(e) => setForm((f) => ({ ...f, precoAnual: Number(e.target.value) }))}
-            placeholder="0,00"
-            className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 font-sans text-sm text-white placeholder:text-white/25 focus:border-neon-purple/50 focus:outline-none"
-          />
+          <Campo
+            label="Preço anual /mês"
+            ajuda="pacote.precoAnual"
+            htmlFor="pk-preco-anual"
+          >
+            <input
+              id="pk-preco-anual"
+              type="number"
+              step="0.01"
+              value={form.precoAnual}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, precoAnual: Number(e.target.value) }))
+              }
+              placeholder="0,00"
+              className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 font-sans text-sm text-white placeholder:text-white/25 focus:border-neon-purple/50 focus:outline-none"
+            />
           </Campo>
         </div>
 
         <div className="mt-3 grid gap-3 sm:grid-cols-[1.4fr_0.6fr]">
-          <Campo label="Benefícios" ajuda="pacote.beneficios" htmlFor="pk-perks">
-          <input
-            id="pk-perks"
-            value={form.perks}
-            onChange={(e) => setForm((f) => ({ ...f, perks: e.target.value }))}
-            placeholder="Separados por vírgula"
-            className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 font-sans text-sm text-white placeholder:text-white/25 focus:border-neon-purple/50 focus:outline-none"
-          />
+          <Campo
+            label="Benefícios"
+            ajuda="pacote.beneficios"
+            htmlFor="pk-perks"
+          >
+            <input
+              id="pk-perks"
+              value={form.perks}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, perks: e.target.value }))
+              }
+              placeholder="Separados por vírgula"
+              className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 font-sans text-sm text-white placeholder:text-white/25 focus:border-neon-purple/50 focus:outline-none"
+            />
           </Campo>
-          <Campo label="Vagas restantes" ajuda="pacote.vagas" htmlFor="pk-vagas">
-          <input
-            id="pk-vagas"
-            type="number"
-            value={form.vagasRestantes}
-            onChange={(e) => setForm((f) => ({ ...f, vagasRestantes: Number(e.target.value) }))}
-            placeholder="0"
-            className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 font-sans text-sm text-white placeholder:text-white/25 focus:border-neon-purple/50 focus:outline-none"
-          />
+          <Campo
+            label="Vagas restantes"
+            ajuda="pacote.vagas"
+            htmlFor="pk-vagas"
+          >
+            <input
+              id="pk-vagas"
+              type="number"
+              value={form.vagasRestantes}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  vagasRestantes: Number(e.target.value),
+                }))
+              }
+              placeholder="0"
+              className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 font-sans text-sm text-white placeholder:text-white/25 focus:border-neon-purple/50 focus:outline-none"
+            />
           </Campo>
         </div>
 
@@ -904,7 +1148,9 @@ function PackagesView() {
           <input
             type="checkbox"
             checked={form.destaque}
-            onChange={(e) => setForm((f) => ({ ...f, destaque: e.target.checked }))}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, destaque: e.target.checked }))
+            }
             className="size-4 accent-[#ff1f3d]"
           />
           Pacote em destaque (usado no hero e no comparativo da landing)
@@ -934,7 +1180,9 @@ function PackagesView() {
         </div>
 
         {criar.isError && (
-          <p className="mt-3 font-sans text-xs text-neon-red">{criar.error?.message}</p>
+          <p className="mt-3 font-sans text-xs text-neon-red">
+            {criar.error?.message}
+          </p>
         )}
 
         <NeonButton
@@ -963,7 +1211,11 @@ function PackagesView() {
             )
           }
         >
-          {criar.isPending ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+          {criar.isPending ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <Plus className="size-4" />
+          )}
           Criar pacote
         </NeonButton>
       </GlassCard>
@@ -977,11 +1229,16 @@ function PackagesView() {
               key={p.id}
               accent={p.accent as Accent}
               hover
-              className={cn("flex flex-col p-5", !p.ativo && "opacity-55 saturate-50")}
+              className={cn(
+                "flex flex-col p-5",
+                !p.ativo && "opacity-55 saturate-50",
+              )}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="truncate font-display text-lg font-bold text-white">{p.nome}</div>
+                  <div className="truncate font-display text-lg font-bold text-white">
+                    {p.nome}
+                  </div>
                   <div className="mt-0.5 font-sans text-[11px] text-white/40">
                     {p.tagline || `${p.servicos.length} apps`}
                   </div>
@@ -1003,7 +1260,10 @@ function PackagesView() {
               {p.perks?.length ? (
                 <ul className="mt-3 space-y-1">
                   {p.perks.slice(0, 3).map((perk) => (
-                    <li key={perk} className="truncate font-sans text-[11px] text-white/40">
+                    <li
+                      key={perk}
+                      className="truncate font-sans text-[11px] text-white/40"
+                    >
                       · {perk}
                     </li>
                   ))}
@@ -1012,57 +1272,70 @@ function PackagesView() {
 
               <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-white/8 pt-4">
                 <Pill accent="cyan">{p.servicos.length} apps</Pill>
-                {p.precoAnual ? <Pill accent="purple">anual {brl(p.precoAnual)}</Pill> : null}
+                {p.precoAnual ? (
+                  <Pill accent="purple">anual {brl(p.precoAnual)}</Pill>
+                ) : null}
                 {p.destaque ? <Pill accent="red">destaque</Pill> : null}
                 {p.ativo ? null : (
-                  <Pill accent="red" className="!text-white/60" icon={<Power className="size-3" />}>
+                  <Pill
+                    accent="red"
+                    className="!text-white/60"
+                    icon={<Power className="size-3" />}
+                  >
                     inativo
                   </Pill>
                 )}
 
                 <div className="ml-auto flex shrink-0 items-center gap-2">
-                <Tooltip texto="pacote.ativar" titulo={p.ativo ? "Desativar" : "Ativar"}>
-                  <button
-                    type="button"
-                    data-testid={`ativar-pacote-${p.id}`}
-                    aria-label={p.ativo ? "Desativar pacote" : "Ativar pacote"}
-                    disabled={atualizar.isPending}
-                    onClick={() => atualizar.mutate({ id: p.id, ativo: !p.ativo })}
-                    className={cn(
-                      "flex h-8 items-center gap-1.5 rounded-lg border px-2.5 font-sans text-[11px] transition-colors",
-                      p.ativo
-                        ? "border-neon-cyan/45 text-neon-cyan hover:bg-neon-cyan/10"
-                        : "border-white/12 text-white/40 hover:border-white/30 hover:text-white",
-                    )}
+                  <Tooltip
+                    texto="pacote.ativar"
+                    titulo={p.ativo ? "Desativar" : "Ativar"}
                   >
-                    <Power className="size-3.5" />
-                    {p.ativo ? "Ativo" : "Inativo"}
-                  </button>
-                </Tooltip>
+                    <button
+                      type="button"
+                      data-testid={`ativar-pacote-${p.id}`}
+                      aria-label={
+                        p.ativo ? "Desativar pacote" : "Ativar pacote"
+                      }
+                      disabled={atualizar.isPending}
+                      onClick={() =>
+                        atualizar.mutate({ id: p.id, ativo: !p.ativo })
+                      }
+                      className={cn(
+                        "flex h-8 items-center gap-1.5 rounded-lg border px-2.5 font-sans text-[11px] transition-colors",
+                        p.ativo
+                          ? "border-neon-cyan/45 text-neon-cyan hover:bg-neon-cyan/10"
+                          : "border-white/12 text-white/40 hover:border-white/30 hover:text-white",
+                      )}
+                    >
+                      <Power className="size-3.5" />
+                      {p.ativo ? "Ativo" : "Inativo"}
+                    </button>
+                  </Tooltip>
 
-                <Tooltip texto="pacote.editar" titulo="Editar pacote">
-                  <button
-                    type="button"
-                    data-testid={`editar-pacote-${p.id}`}
-                    aria-label="Editar pacote"
-                    onClick={() => setEditando(p)}
-                    className="flex size-8 items-center justify-center rounded-lg border border-white/10 text-white/35 transition-colors hover:border-neon-purple/50 hover:text-neon-purple"
-                  >
-                    <Pencil className="size-3.5" />
-                  </button>
-                </Tooltip>
+                  <Tooltip texto="pacote.editar" titulo="Editar pacote">
+                    <button
+                      type="button"
+                      data-testid={`editar-pacote-${p.id}`}
+                      aria-label="Editar pacote"
+                      onClick={() => setEditando(p)}
+                      className="flex size-8 items-center justify-center rounded-lg border border-white/10 text-white/35 transition-colors hover:border-neon-purple/50 hover:text-neon-purple"
+                    >
+                      <Pencil className="size-3.5" />
+                    </button>
+                  </Tooltip>
 
-                <Tooltip texto="pacote.excluir" titulo="Excluir pacote">
-                  <button
-                    type="button"
-                    className="flex size-8 items-center justify-center rounded-lg border border-white/10 text-white/35 transition-colors hover:border-neon-red/50 hover:text-neon-red"
-                    aria-label="Excluir pacote"
-                    disabled={remover.isPending}
-                    onClick={() => remover.mutate({ id: p.id })}
-                  >
-                    <Trash2 className="size-3.5" />
-                  </button>
-                </Tooltip>
+                  <Tooltip texto="pacote.excluir" titulo="Excluir pacote">
+                    <button
+                      type="button"
+                      className="flex size-8 items-center justify-center rounded-lg border border-white/10 text-white/35 transition-colors hover:border-neon-red/50 hover:text-neon-red"
+                      aria-label="Excluir pacote"
+                      disabled={remover.isPending}
+                      onClick={() => remover.mutate({ id: p.id })}
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  </Tooltip>
                 </div>
               </div>
             </GlassCard>
@@ -1070,7 +1343,12 @@ function PackagesView() {
         </div>
       )}
 
-      {editando && <ModalEditarPacote pacote={editando} onClose={() => setEditando(null)} />}
+      {editando && (
+        <ModalEditarPacote
+          pacote={editando}
+          onClose={() => setEditando(null)}
+        />
+      )}
     </div>
   );
 }
@@ -1088,12 +1366,17 @@ function RevenueChart() {
     <GlassCard className="flex h-full flex-col p-5 sm:p-6">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <div className="font-display text-sm font-bold text-white">Receita faturada</div>
+          <div className="font-display text-sm font-bold text-white">
+            Receita faturada
+          </div>
           <div className="mt-0.5 font-sans text-[11px] text-white/35">
             últimos 7 meses · receita reconhecida (planos anuais rateados)
           </div>
         </div>
-        <Pill accent={variacao >= 0 ? "cyan" : "red"} icon={<BarChart3 className="size-3" />}>
+        <Pill
+          accent={variacao >= 0 ? "cyan" : "red"}
+          icon={<BarChart3 className="size-3" />}
+        >
           {variacao >= 0 ? "+" : ""}
           {variacao}% no período
         </Pill>
@@ -1196,8 +1479,12 @@ function QueueCard() {
     <GlassCard className="p-5 sm:p-6">
       <div className="flex items-center gap-2">
         <Activity className="size-4 text-neon-red" />
-        <div className="font-display text-sm font-bold text-white">Fila operacional</div>
-        <span className="ml-auto font-sans text-[11px] text-white/30">{itens.length} itens</span>
+        <div className="font-display text-sm font-bold text-white">
+          Fila operacional
+        </div>
+        <span className="ml-auto font-sans text-[11px] text-white/30">
+          {itens.length} itens
+        </span>
       </div>
       <div className="mt-5 space-y-3">
         {itens.map((q) => (
@@ -1208,10 +1495,15 @@ function QueueCard() {
           >
             <span
               className="mt-0.5 size-2 shrink-0 rounded-full"
-              style={{ background: accentHex[q.accent], boxShadow: `0 0 10px ${accentHex[q.accent]}` }}
+              style={{
+                background: accentHex[q.accent],
+                boxShadow: `0 0 10px ${accentHex[q.accent]}`,
+              }}
             />
             <div className="min-w-0">
-              <div className="font-display text-xs font-bold text-white">{q.title}</div>
+              <div className="font-display text-xs font-bold text-white">
+                {q.title}
+              </div>
               <div className="mt-0.5 font-sans text-[11px] leading-relaxed text-white/40">
                 {q.detail}
               </div>
@@ -1219,7 +1511,9 @@ function QueueCard() {
           </div>
         ))}
         {itens.length === 0 && (
-          <p className="font-sans text-sm text-white/35">Nada pendente. Operação em dia.</p>
+          <p className="font-sans text-sm text-white/35">
+            Nada pendente. Operação em dia.
+          </p>
         )}
       </div>
     </GlassCard>
@@ -1247,7 +1541,13 @@ const STATUS_STYLE: Record<string, string> = {
 const HORAS_PADRAO_CONFIANCA = 48;
 
 /** Modal da trava de vencimento: exige motivo e mostra o historico. */
-function ModalVencimento({ cliente, onClose }: { cliente: Cliente; onClose: () => void }) {
+function ModalVencimento({
+  cliente,
+  onClose,
+}: {
+  cliente: Cliente;
+  onClose: () => void;
+}) {
   const alterar = useAlterarVencimento();
   const historico = useHistoricoVencimento(cliente.id);
   const [data, setData] = useState(cliente.proximaCobranca || "");
@@ -1271,8 +1571,8 @@ function ModalVencimento({ cliente, onClose }: { cliente: Cliente; onClose: () =
               Alterar vencimento · {cliente.nome}
             </h3>
             <p className="mt-1 font-sans text-[12px] text-white/40">
-              Data atual {cliente.proximaCobranca || "—"}. Toda mudança fica registrada com autor,
-              data e motivo.
+              Data atual {cliente.proximaCobranca || "—"}. Toda mudança fica
+              registrada com autor, data e motivo.
             </p>
           </div>
           <button
@@ -1286,7 +1586,12 @@ function ModalVencimento({ cliente, onClose }: { cliente: Cliente; onClose: () =
         </div>
 
         <div className="mt-5 space-y-3">
-          <Campo label="Nova data" ajuda="fatura.novaData" htmlFor="mv-data" obrigatorio>
+          <Campo
+            label="Nova data"
+            ajuda="fatura.novaData"
+            htmlFor="mv-data"
+            obrigatorio
+          >
             <input
               id="mv-data"
               className={input}
@@ -1296,7 +1601,12 @@ function ModalVencimento({ cliente, onClose }: { cliente: Cliente; onClose: () =
               onChange={(e) => setData(e.target.value)}
             />
           </Campo>
-          <Campo label="Motivo da alteração" ajuda="fatura.motivo" htmlFor="mv-motivo" obrigatorio>
+          <Campo
+            label="Motivo da alteração"
+            ajuda="fatura.motivo"
+            htmlFor="mv-motivo"
+            obrigatorio
+          >
             <textarea
               id="mv-motivo"
               className={cn(input, "min-h-[90px] resize-y")}
@@ -1307,16 +1617,24 @@ function ModalVencimento({ cliente, onClose }: { cliente: Cliente; onClose: () =
             />
           </Campo>
           {alterar.isError && (
-            <p className="font-sans text-xs text-neon-red">{alterar.error?.message}</p>
+            <p className="font-sans text-xs text-neon-red">
+              {alterar.error?.message}
+            </p>
           )}
           <NeonButton
             accent="purple"
             size="sm"
             data-testid="salvar-vencimento"
-            disabled={alterar.isPending || motivo.trim().length < 5 || !data.trim()}
+            disabled={
+              alterar.isPending || motivo.trim().length < 5 || !data.trim()
+            }
             onClick={() =>
               alterar.mutate(
-                { id: cliente.id, proximaCobranca: data.trim(), motivo: motivo.trim() },
+                {
+                  id: cliente.id,
+                  proximaCobranca: data.trim(),
+                  motivo: motivo.trim(),
+                },
                 { onSuccess: onClose },
               )
             }
@@ -1331,10 +1649,14 @@ function ModalVencimento({ cliente, onClose }: { cliente: Cliente; onClose: () =
         </div>
 
         <div className="mt-6 border-t border-white/8 pt-4">
-          <div className="font-display text-xs font-bold text-white/70">Histórico</div>
+          <div className="font-display text-xs font-bold text-white/70">
+            Histórico
+          </div>
           <div className="mt-3 space-y-2">
             {(historico.data ?? []).length === 0 && (
-              <p className="font-sans text-[12px] text-white/35">Nenhuma alteração registrada.</p>
+              <p className="font-sans text-[12px] text-white/35">
+                Nenhuma alteração registrada.
+              </p>
             )}
             {(historico.data ?? []).map((h) => (
               <div
@@ -1345,7 +1667,9 @@ function ModalVencimento({ cliente, onClose }: { cliente: Cliente; onClose: () =
                   {h.de || "—"} → {h.para}
                 </span>
                 <span className="block mt-0.5">{h.motivo}</span>
-                <span className="mt-0.5 block text-[10.5px] text-white/25">{h.autor}</span>
+                <span className="mt-0.5 block text-[10.5px] text-white/25">
+                  {h.autor}
+                </span>
               </div>
             ))}
           </div>
@@ -1367,7 +1691,13 @@ function ModalVencimento({ cliente, onClose }: { cliente: Cliente; onClose: () =
  * Conceder de novo com credito ativo ESTENDE a partir de agora (nao soma) e
  * nao conta como uma nova vez no contador.
  */
-function ModalConfianca({ cliente, onClose }: { cliente: Cliente; onClose: () => void }) {
+function ModalConfianca({
+  cliente,
+  onClose,
+}: {
+  cliente: Cliente;
+  onClose: () => void;
+}) {
   const conceder = useConcederConfianca();
   const [horas, setHoras] = useState(HORAS_PADRAO_CONFIANCA);
   const [motivo, setMotivo] = useState("");
@@ -1391,8 +1721,9 @@ function ModalConfianca({ cliente, onClose }: { cliente: Cliente; onClose: () =>
               Liberar acesso · {cliente.nome}
             </h3>
             <p className="mt-1 font-sans text-[12px] text-white/40">
-              O cliente volta a usar tudo normalmente durante o prazo, como se estivesse em dia.
-              Quando o prazo vence, o bloqueio volta automaticamente.
+              O cliente volta a usar tudo normalmente durante o prazo, como se
+              estivesse em dia. Quando o prazo vence, o bloqueio volta
+              automaticamente.
             </p>
           </div>
           <button
@@ -1407,9 +1738,10 @@ function ModalConfianca({ cliente, onClose }: { cliente: Cliente; onClose: () =>
 
         {ativa && (
           <div className="mt-4 rounded-2xl border border-neon-cyan/30 bg-neon-cyan/[0.07] p-3 font-sans text-[12px] text-neon-cyan">
-            Já existe um crédito ativo, restam {cliente.confianca.horasRestantes}h{" "}
-            {cliente.confianca.minutosRestantes}m. Salvar aqui recomeça a contagem a partir de
-            agora.
+            Já existe um crédito ativo, restam{" "}
+            {cliente.confianca.horasRestantes}h{" "}
+            {cliente.confianca.minutosRestantes}m. Salvar aqui recomeça a
+            contagem a partir de agora.
           </div>
         )}
 
@@ -1432,7 +1764,12 @@ function ModalConfianca({ cliente, onClose }: { cliente: Cliente; onClose: () =>
             ))}
           </div>
 
-          <Campo label="Duração (horas)" ajuda="cliente.confiancaHoras" htmlFor="cf-horas" obrigatorio>
+          <Campo
+            label="Duração (horas)"
+            ajuda="cliente.confiancaHoras"
+            htmlFor="cf-horas"
+            obrigatorio
+          >
             <input
               id="cf-horas"
               type="number"
@@ -1445,7 +1782,11 @@ function ModalConfianca({ cliente, onClose }: { cliente: Cliente; onClose: () =>
             />
           </Campo>
 
-          <Campo label="Motivo" ajuda="cliente.confiancaMotivo" htmlFor="cf-motivo">
+          <Campo
+            label="Motivo"
+            ajuda="cliente.confiancaMotivo"
+            htmlFor="cf-motivo"
+          >
             <textarea
               id="cf-motivo"
               className={cn(input, "min-h-[80px] resize-y")}
@@ -1457,7 +1798,9 @@ function ModalConfianca({ cliente, onClose }: { cliente: Cliente; onClose: () =>
           </Campo>
 
           {conceder.isError && (
-            <p className="font-sans text-xs text-neon-red">{conceder.error?.message}</p>
+            <p className="font-sans text-xs text-neon-red">
+              {conceder.error?.message}
+            </p>
           )}
 
           <NeonButton
@@ -1481,7 +1824,8 @@ function ModalConfianca({ cliente, onClose }: { cliente: Cliente; onClose: () =>
           </NeonButton>
 
           <p className="font-sans text-[11px] text-white/30">
-            Créditos já concedidos a esse cliente: {cliente.confianca?.vezes ?? 0}.
+            Créditos já concedidos a esse cliente:{" "}
+            {cliente.confianca?.vezes ?? 0}.
           </p>
         </div>
       </div>
@@ -1494,7 +1838,9 @@ function ClientsTable({ compact = false }: { compact?: boolean }) {
   const remover = useRemoverUsuario();
   const atualizar = useAtualizarUsuario();
   const [aba, setAba] = useState<string>("todos");
-  const [editandoVencimento, setEditandoVencimento] = useState<Cliente | null>(null);
+  const [editandoVencimento, setEditandoVencimento] = useState<Cliente | null>(
+    null,
+  );
   const [dandoConfianca, setDandoConfianca] = useState<Cliente | null>(null);
   const revogar = useRevogarConfianca();
 
@@ -1503,9 +1849,12 @@ function ClientsTable({ compact = false }: { compact?: boolean }) {
 
   const todos = (data ?? []) as Cliente[];
   const contagem = (id: string) =>
-    id === "todos" ? todos.length : todos.filter((c) => c.statusPagamento === id).length;
+    id === "todos"
+      ? todos.length
+      : todos.filter((c) => c.statusPagamento === id).length;
 
-  const filtrados = aba === "todos" ? todos : todos.filter((c) => c.statusPagamento === aba);
+  const filtrados =
+    aba === "todos" ? todos : todos.filter((c) => c.statusPagamento === aba);
   const rows = compact ? filtrados.slice(0, 5) : filtrados;
 
   return (
@@ -1517,11 +1866,16 @@ function ClientsTable({ compact = false }: { compact?: boolean }) {
             {compact ? "Últimos clientes" : "Todos os clientes"}
           </div>
         </div>
-        <span className="font-sans text-[11px] text-white/30">{rows.length} registros</span>
+        <span className="font-sans text-[11px] text-white/30">
+          {rows.length} registros
+        </span>
       </div>
 
       {!compact && (
-        <div className="flex flex-wrap gap-2 border-b border-white/8 px-5 py-3" data-testid="abas-status">
+        <div
+          className="flex flex-wrap gap-2 border-b border-white/8 px-5 py-3"
+          data-testid="abas-status"
+        >
           {ABAS_STATUS.map((a) => (
             <button
               key={a.id}
@@ -1559,7 +1913,10 @@ function ClientsTable({ compact = false }: { compact?: boolean }) {
           </thead>
           <tbody className="divide-y divide-white/6">
             {rows.map((c: Cliente) => (
-              <tr key={c.id} className="transition-colors hover:bg-white/[0.025]">
+              <tr
+                key={c.id}
+                className="transition-colors hover:bg-white/[0.025]"
+              >
                 <td className="px-5 py-3.5">
                   <div className="flex items-center gap-3">
                     <span className="flex size-8 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.05] font-display text-[10px] font-bold text-white/60">
@@ -1573,7 +1930,9 @@ function ClientsTable({ compact = false }: { compact?: boolean }) {
                       <div className="truncate font-display text-xs font-semibold text-white">
                         {c.nome}
                       </div>
-                      <div className="truncate font-mono text-[10px] text-white/30">{c.email}</div>
+                      <div className="truncate font-mono text-[10px] text-white/30">
+                        {c.email}
+                      </div>
                     </div>
                   </div>
                 </td>
@@ -1591,11 +1950,18 @@ function ClientsTable({ compact = false }: { compact?: boolean }) {
                     className="rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1.5 font-sans text-[11px] text-white/70 focus:border-neon-purple/50 focus:outline-none"
                     value={c.formaPagamento ?? "pix"}
                     onChange={(e) =>
-                      atualizar.mutate({ id: c.id, formaPagamento: e.target.value as "pix" })
+                      atualizar.mutate({
+                        id: c.id,
+                        formaPagamento: e.target.value as "pix",
+                      })
                     }
                   >
                     {FORMAS_PAGAMENTO.map((f) => (
-                      <option key={f.valor} value={f.valor} className="bg-[#09090b]">
+                      <option
+                        key={f.valor}
+                        value={f.valor}
+                        className="bg-[#09090b]"
+                      >
                         {f.rotulo}
                       </option>
                     ))}
@@ -1606,7 +1972,10 @@ function ClientsTable({ compact = false }: { compact?: boolean }) {
                     <span className="font-sans text-xs text-white/45">
                       {c.proximaCobranca || "—"}
                     </span>
-                    <Tooltip texto="fatura.novaData" titulo="Alterar vencimento">
+                    <Tooltip
+                      texto="fatura.novaData"
+                      titulo="Alterar vencimento"
+                    >
                       <button
                         type="button"
                         data-testid={`alterar-vencimento-${c.id}`}
@@ -1626,10 +1995,14 @@ function ClientsTable({ compact = false }: { compact?: boolean }) {
                       STATUS_STYLE[c.statusPagamento] ?? STATUS_STYLE.pendente,
                     )}
                   >
-                    {ROTULO_STATUS_CLIENTE[c.statusPagamento] ?? c.statusPagamento}
+                    {ROTULO_STATUS_CLIENTE[c.statusPagamento] ??
+                      c.statusPagamento}
                   </span>
                   {c.confianca?.ativa && (
-                    <div className="mt-1.5" data-testid={`selo-confianca-${c.id}`}>
+                    <div
+                      className="mt-1.5"
+                      data-testid={`selo-confianca-${c.id}`}
+                    >
                       <Tooltip
                         texto="cliente.confiancaAtiva"
                         titulo="Crédito de confiança ativo"
@@ -1637,7 +2010,8 @@ function ClientsTable({ compact = false }: { compact?: boolean }) {
                       >
                         <span className="inline-flex items-center gap-1 rounded-full border border-neon-cyan/45 bg-neon-cyan/10 px-2 py-0.5 font-sans text-[10px] text-neon-cyan">
                           <ShieldCheck className="size-3" />
-                          {c.confianca.horasRestantes}h {c.confianca.minutosRestantes}m
+                          {c.confianca.horasRestantes}h{" "}
+                          {c.confianca.minutosRestantes}m
                         </span>
                       </Tooltip>
                     </div>
@@ -1645,55 +2019,67 @@ function ClientsTable({ compact = false }: { compact?: boolean }) {
                 </td>
                 <td className="px-5 py-3.5">
                   <div className="flex items-center justify-end gap-2">
-                  {c.confianca?.ativa ? (
-                    <Tooltip texto="cliente.confiancaRevogar" titulo="Encerrar crédito" lado="left">
+                    {c.confianca?.ativa ? (
+                      <Tooltip
+                        texto="cliente.confiancaRevogar"
+                        titulo="Encerrar crédito"
+                        lado="left"
+                      >
+                        <button
+                          type="button"
+                          data-testid={`revogar-confianca-${c.id}`}
+                          aria-label="Encerrar crédito de confiança"
+                          disabled={revogar.isPending}
+                          onClick={() => revogar.mutate({ id: c.id })}
+                          className="flex size-8 items-center justify-center rounded-lg border border-white/10 text-white/30 transition-colors hover:border-amber-400/60 hover:text-amber-300"
+                        >
+                          <ShieldOff className="size-3.5" />
+                        </button>
+                      </Tooltip>
+                    ) : (
+                      <Tooltip
+                        texto="cliente.confianca"
+                        titulo="Crédito de confiança"
+                        lado="left"
+                      >
+                        <button
+                          type="button"
+                          data-testid={`dar-confianca-${c.id}`}
+                          aria-label="Conceder crédito de confiança"
+                          onClick={() => setDandoConfianca(c)}
+                          className={cn(
+                            "flex size-8 items-center justify-center rounded-lg border transition-colors",
+                            c.statusPagamento === "atrasado" ||
+                              c.statusPagamento === "suspenso"
+                              ? "border-neon-cyan/45 text-neon-cyan hover:bg-neon-cyan/10"
+                              : "border-white/10 text-white/30 hover:border-neon-cyan/50 hover:text-neon-cyan",
+                          )}
+                        >
+                          <ShieldCheck className="size-3.5" />
+                        </button>
+                      </Tooltip>
+                    )}
+                    <Tooltip texto="cliente.excluir" titulo="Excluir cliente">
                       <button
                         type="button"
-                        data-testid={`revogar-confianca-${c.id}`}
-                        aria-label="Encerrar crédito de confiança"
-                        disabled={revogar.isPending}
-                        onClick={() => revogar.mutate({ id: c.id })}
-                        className="flex size-8 items-center justify-center rounded-lg border border-white/10 text-white/30 transition-colors hover:border-amber-400/60 hover:text-amber-300"
+                        className="flex size-8 items-center justify-center rounded-lg border border-white/10 text-white/30 transition-colors hover:border-neon-red/50 hover:text-neon-red"
+                        aria-label="Excluir cliente"
+                        disabled={remover.isPending}
+                        onClick={() => remover.mutate({ id: c.id })}
                       >
-                        <ShieldOff className="size-3.5" />
+                        <Trash2 className="size-3.5" />
                       </button>
                     </Tooltip>
-                  ) : (
-                    <Tooltip texto="cliente.confianca" titulo="Crédito de confiança" lado="left">
-                      <button
-                        type="button"
-                        data-testid={`dar-confianca-${c.id}`}
-                        aria-label="Conceder crédito de confiança"
-                        onClick={() => setDandoConfianca(c)}
-                        className={cn(
-                          "flex size-8 items-center justify-center rounded-lg border transition-colors",
-                          c.statusPagamento === "atrasado" || c.statusPagamento === "suspenso"
-                            ? "border-neon-cyan/45 text-neon-cyan hover:bg-neon-cyan/10"
-                            : "border-white/10 text-white/30 hover:border-neon-cyan/50 hover:text-neon-cyan",
-                        )}
-                      >
-                        <ShieldCheck className="size-3.5" />
-                      </button>
-                    </Tooltip>
-                  )}
-                  <Tooltip texto="cliente.excluir" titulo="Excluir cliente">
-                    <button
-                      type="button"
-                      className="flex size-8 items-center justify-center rounded-lg border border-white/10 text-white/30 transition-colors hover:border-neon-red/50 hover:text-neon-red"
-                      aria-label="Excluir cliente"
-                      disabled={remover.isPending}
-                      onClick={() => remover.mutate({ id: c.id })}
-                    >
-                      <Trash2 className="size-3.5" />
-                    </button>
-                  </Tooltip>
                   </div>
                 </td>
               </tr>
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-5 py-10 text-center font-sans text-sm text-white/35">
+                <td
+                  colSpan={7}
+                  className="px-5 py-10 text-center font-sans text-sm text-white/35"
+                >
                   Nenhum cliente nesta aba.
                 </td>
               </tr>
@@ -1710,7 +2096,10 @@ function ClientsTable({ compact = false }: { compact?: boolean }) {
       )}
 
       {dandoConfianca && (
-        <ModalConfianca cliente={dandoConfianca} onClose={() => setDandoConfianca(null)} />
+        <ModalConfianca
+          cliente={dandoConfianca}
+          onClose={() => setDandoConfianca(null)}
+        />
       )}
     </GlassCard>
   );
@@ -1737,68 +2126,87 @@ function NovoClienteForm() {
       <TituloSecao ajuda="secao.clientes">Novo cliente</TituloSecao>
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <Campo label="Nome" ajuda="cliente.nome" htmlFor="ncl-nome" obrigatorio>
-        <input
-          id="ncl-nome"
-          className={input}
-          placeholder="Nome do cliente"
-          value={form.nome}
-          onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))}
-        />
+          <input
+            id="ncl-nome"
+            className={input}
+            placeholder="Nome do cliente"
+            value={form.nome}
+            onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))}
+          />
         </Campo>
-        <Campo label="E-mail" ajuda="cliente.email" htmlFor="ncl-email" obrigatorio>
-        <input
-          id="ncl-email"
-          className={input}
-          placeholder="cliente@email.com"
-          value={form.email}
-          onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-        />
+        <Campo
+          label="E-mail"
+          ajuda="cliente.email"
+          htmlFor="ncl-email"
+          obrigatorio
+        >
+          <input
+            id="ncl-email"
+            className={input}
+            placeholder="cliente@email.com"
+            value={form.email}
+            onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+          />
         </Campo>
         <Campo label="Pacote" ajuda="cliente.pacote" htmlFor="ncl-pacote">
-        <select
-          id="ncl-pacote"
-          className={input}
-          value={form.pacoteId}
-          onChange={(e) => {
-            const id = Number(e.target.value);
-            const p = (pacotes ?? []).find((x) => x.id === id);
-            setForm((f) => ({ ...f, pacoteId: id, valor: p?.preco ?? f.valor }));
-          }}
-        >
-          <option value={0} className="bg-[#09090b]">
-            Sem pacote
-          </option>
-          {(pacotes ?? []).map((p) => (
-            <option key={p.id} value={p.id} className="bg-[#09090b]">
-              {p.nome}
+          <select
+            id="ncl-pacote"
+            className={input}
+            value={form.pacoteId}
+            onChange={(e) => {
+              const id = Number(e.target.value);
+              const p = (pacotes ?? []).find((x) => x.id === id);
+              setForm((f) => ({
+                ...f,
+                pacoteId: id,
+                valor: p?.preco ?? f.valor,
+              }));
+            }}
+          >
+            <option value={0} className="bg-[#09090b]">
+              Sem pacote
             </option>
-          ))}
-        </select>
+            {(pacotes ?? []).map((p) => (
+              <option key={p.id} value={p.id} className="bg-[#09090b]">
+                {p.nome}
+              </option>
+            ))}
+          </select>
         </Campo>
         <Campo label="Valor cobrado" ajuda="cliente.valor" htmlFor="ncl-valor">
-        <input
-          id="ncl-valor"
-          className={input}
-          type="number"
-          step="0.01"
-          placeholder="0,00"
-          value={form.valor}
-          onChange={(e) => setForm((f) => ({ ...f, valor: Number(e.target.value) }))}
-        />
+          <input
+            id="ncl-valor"
+            className={input}
+            type="number"
+            step="0.01"
+            placeholder="0,00"
+            value={form.valor}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, valor: Number(e.target.value) }))
+            }
+          />
         </Campo>
-        <Campo label="Próxima cobrança" ajuda="cliente.proximaCobranca" htmlFor="ncl-cobranca">
-        <input
-          id="ncl-cobranca"
-          className={input}
-          placeholder="dd/mm/aaaa"
-          value={form.proximaCobranca}
-          onChange={(e) => setForm((f) => ({ ...f, proximaCobranca: e.target.value }))}
-        />
+        <Campo
+          label="Próxima cobrança"
+          ajuda="cliente.proximaCobranca"
+          htmlFor="ncl-cobranca"
+        >
+          <input
+            id="ncl-cobranca"
+            className={input}
+            placeholder="dd/mm/aaaa"
+            value={form.proximaCobranca}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, proximaCobranca: e.target.value }))
+            }
+          />
         </Campo>
       </div>
 
       {criar.isError && (
-        <p className="mt-3 font-sans text-xs text-neon-red">{criar.error?.message}</p>
+        <p className="mt-3 font-sans text-xs text-neon-red">
+          {criar.error?.message}
+        </p>
       )}
 
       <NeonButton
@@ -1821,12 +2229,22 @@ function NovoClienteForm() {
             },
             {
               onSuccess: () =>
-                setForm({ nome: "", email: "", pacoteId: 0, valor: 0, proximaCobranca: "" }),
+                setForm({
+                  nome: "",
+                  email: "",
+                  pacoteId: 0,
+                  valor: 0,
+                  proximaCobranca: "",
+                }),
             },
           )
         }
       >
-        {criar.isPending ? <Loader2 className="size-4 animate-spin" /> : <UserPlus className="size-4" />}
+        {criar.isPending ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : (
+          <UserPlus className="size-4" />
+        )}
         Cadastrar no banco
       </NeonButton>
     </GlassCard>
@@ -1842,7 +2260,9 @@ function InvoicesAdminView() {
   const resumo = useResumoFaturas();
   const clientes = useUsuarios();
   const baixa = useRegistrarPagamento();
-  const [filtro, setFiltro] = useState<"pendentes" | "todas" | "pagas">("pendentes");
+  const [filtro, setFiltro] = useState<"pendentes" | "todas" | "pagas">(
+    "pendentes",
+  );
 
   if (isPending) return <Loading label="Carregando faturas..." />;
   if (isError) return <ErrorBox message={error?.message} />;
@@ -1850,10 +2270,16 @@ function InvoicesAdminView() {
   const todas = data ?? [];
   const pendentes = todas.filter((f) => f.status !== "pago");
   const lista =
-    filtro === "pendentes" ? pendentes : filtro === "pagas" ? todas.filter((f) => f.status === "pago") : todas;
+    filtro === "pendentes"
+      ? pendentes
+      : filtro === "pagas"
+        ? todas.filter((f) => f.status === "pago")
+        : todas;
 
   const totalClientes = (clientes.data ?? []).length;
-  const ticket = totalClientes ? (resumo.data?.recebido ?? 0) / Math.max(1, totalClientes) : 0;
+  const ticket = totalClientes
+    ? (resumo.data?.recebido ?? 0) / Math.max(1, totalClientes)
+    : 0;
 
   const statusStyle: Record<string, string> = {
     pago: "border-emerald-400/35 bg-emerald-400/10 text-emerald-300",
@@ -1894,8 +2320,13 @@ function InvoicesAdminView() {
             <div className="font-sans text-[11px] uppercase tracking-[0.2em] text-white/35">
               {s.label}
             </div>
-            <div className="mt-2 font-display text-2xl font-extrabold text-white">{s.value}</div>
-            <div className="mt-1 font-sans text-[11px]" style={{ color: accentHex[s.accent] }}>
+            <div className="mt-2 font-display text-2xl font-extrabold text-white">
+              {s.value}
+            </div>
+            <div
+              className="mt-1 font-sans text-[11px]"
+              style={{ color: accentHex[s.accent] }}
+            >
               {s.sub}
             </div>
           </GlassCard>
@@ -1940,7 +2371,9 @@ function InvoicesAdminView() {
               </span>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <div className="font-display text-xs font-bold text-white">{f.clienteNome}</div>
+                  <div className="font-display text-xs font-bold text-white">
+                    {f.clienteNome}
+                  </div>
                   {f.cupom && (
                     <span className="rounded-full border border-neon-cyan/30 bg-neon-cyan/10 px-2 py-0.5 font-sans text-[10px] font-semibold text-neon-cyan">
                       {f.cupom} · {f.desconto}% OFF
@@ -1970,7 +2403,9 @@ function InvoicesAdminView() {
               <button
                 type="button"
                 disabled={baixa.isPending}
-                onClick={() => baixa.mutate({ id: f.id, pago: f.status !== "pago" })}
+                onClick={() =>
+                  baixa.mutate({ id: f.id, pago: f.status !== "pago" })
+                }
                 className="rounded-lg border border-white/10 px-2.5 py-1.5 font-sans text-[11px] text-white/45 transition-colors hover:border-white/25 hover:text-white disabled:opacity-40"
               >
                 {f.status === "pago" ? "Reabrir" : "Dar baixa"}
@@ -1993,7 +2428,9 @@ function InvoicesAdminView() {
             </div>
           ))}
           {lista.length === 0 && (
-            <p className="px-5 py-6 font-sans text-sm text-white/35">Nenhuma fatura aqui.</p>
+            <p className="px-5 py-6 font-sans text-sm text-white/35">
+              Nenhuma fatura aqui.
+            </p>
           )}
         </div>
       </GlassCard>
@@ -2019,9 +2456,14 @@ export default function AdminPage() {
   const alertas = useAlertasAdmin();
   const estoqueGift = useResumoEstoqueGift();
 
-  const esgotadas = (contas.data ?? []).filter((c) => c.vagasOcupadas >= c.totalVagas).length;
-  const pendentesSuporte = (suporte.data?.abertos ?? 0) + (suporte.data?.emAndamento ?? 0);
-  const aVencer = (clientes.data ?? []).filter((c) => c.statusPagamento !== "ativo").length;
+  const esgotadas = (contas.data ?? []).filter(
+    (c) => c.vagasOcupadas >= c.totalVagas,
+  ).length;
+  const pendentesSuporte =
+    (suporte.data?.abertos ?? 0) + (suporte.data?.emAndamento ?? 0);
+  const aVencer = (clientes.data ?? []).filter(
+    (c) => c.statusPagamento !== "ativo",
+  ).length;
   const avisosGamificacao = gamificacao.data?.avisosPendentes ?? 0;
 
   const nav: NavItem[] = [
@@ -2069,7 +2511,12 @@ export default function AdminPage() {
       icon: LifeBuoy,
       badge: pendentesSuporte ? String(pendentesSuporte) : undefined,
     },
-    { id: "faturas", label: "Faturas", icon: Receipt, badge: aVencer ? String(aVencer) : undefined },
+    {
+      id: "faturas",
+      label: "Faturas",
+      icon: Receipt,
+      badge: aVencer ? String(aVencer) : undefined,
+    },
     {
       id: "codigos",
       label: "Central de Códigos",
@@ -2093,12 +2540,18 @@ export default function AdminPage() {
   ];
 
   const titles: Record<string, { title: string; sub: string }> = {
-    visao: { title: "Visão Geral", sub: "Saúde da operação, direto do banco de dados." },
+    visao: {
+      title: "Visão Geral",
+      sub: "Saúde da operação, direto do banco de dados.",
+    },
     estoque: {
       title: "Gestão de Estoque / Contas Matrizes",
       sub: "Lotação real, clientes vinculados e alertas de vencimento de cada matriz.",
     },
-    pacotes: { title: "Pacotes", sub: "Combos vendidos: nome, preço e serviços incluídos." },
+    pacotes: {
+      title: "Pacotes",
+      sub: "Combos vendidos: nome, preço e serviços incluídos.",
+    },
     aplicativos: {
       title: "Catálogo de Aplicativos",
       sub: "Cadastre os apps disponíveis. Eles alimentam os pacotes e as contas matrizes.",
@@ -2107,7 +2560,10 @@ export default function AdminPage() {
       title: "Suporte",
       sub: "Problemas relatados pelos clientes — resolva e responda direto daqui.",
     },
-    clientes: { title: "Clientes", sub: "Base completa de assinantes e seus pacotes." },
+    clientes: {
+      title: "Clientes",
+      sub: "Base completa de assinantes e seus pacotes.",
+    },
     gestaocontas: {
       title: "Gestão de Contas",
       sub: "Saldo de gift card de cada matriz, custo mensal, alerta de saldo crítico e os parâmetros do negócio.",
@@ -2132,7 +2588,10 @@ export default function AdminPage() {
       title: "Afiliados / Gamificação",
       sub: "Quem indicou quem, XP acumulado, níveis e prêmios liberados — tudo calculado automaticamente.",
     },
-    faturas: { title: "Faturas", sub: "Cobranças a vencer, recebimentos e inadimplência." },
+    faturas: {
+      title: "Faturas",
+      sub: "Cobranças a vencer, recebimentos e inadimplência.",
+    },
     codigos: {
       title: "Central de Códigos",
       sub: "Códigos de verificação dos streamings, extraídos do e-mail e entregues ao cliente. Expiram em 1 hora.",
@@ -2164,7 +2623,11 @@ export default function AdminPage() {
         onNavigate={setActive}
         accent="purple"
         role="Administrador"
-        user={{ name: "Central PPN", email: "admin@playplusnow.com", initials: "PN" }}
+        user={{
+          name: "Central PPN",
+          email: "admin@playplusnow.com",
+          initials: "PN",
+        }}
       >
         <div className="mx-auto max-w-7xl space-y-6">
           <div className="flex flex-wrap items-end justify-between gap-4">
@@ -2173,9 +2636,15 @@ export default function AdminPage() {
                 <h1 className="font-display text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
                   {titles[active].title}
                 </h1>
-                <Ajuda ajuda={`secao.${active}`} lado="bottom" className="size-[18px] text-[11px]" />
+                <Ajuda
+                  ajuda={`secao.${active}`}
+                  lado="bottom"
+                  className="size-[18px] text-[11px]"
+                />
               </div>
-              <p className="mt-1.5 font-sans text-sm text-white/40">{titles[active].sub}</p>
+              <p className="mt-1.5 font-sans text-sm text-white/40">
+                {titles[active].sub}
+              </p>
             </div>
             <Pill accent="purple" icon={<ShieldCheck className="size-3" />}>
               Sessão admin · dados do banco

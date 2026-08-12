@@ -219,6 +219,20 @@ export const AJUDA: Record<string, string> = {
   "winback.voltou": "Marca como recuperado: o cliente voltou a pagar e sai da régua.",
   "winback.descartar":
     "Tira o cliente da régua sem recuperação. Ele não recebe mais mensagens desta campanha.",
+
+  /* ---------------- ordem da grade de apps ---------------- */
+  "ordem.grade":
+    "Define em que sequência os aplicativos aparecem na vitrine da landing e no montador de combo. Os primeiros da lista são os mais vistos — deixe ali o que você mais quer vender.",
+  "ordem.confirmar":
+    "Grava a nova sequência. Enquanto você não confirmar, a landing continua mostrando a ordem antiga, então pode reorganizar com calma.",
+
+  /* ---------------- salvamento / backup ---------------- */
+  "salvamento.confirmar":
+    "As alterações já são salvas sozinhas alguns segundos depois de você digitar. Este botão salva na hora e mostra o selo 'Salvo' para você ter certeza antes de sair da tela.",
+  "backup.baixar":
+    "Baixa uma planilha .xlsx com uma aba por tabela do banco (clientes, contas, pacotes, faturas...). Serve de cópia de segurança e para conferir números fora do painel.",
+  "backup.senhas":
+    "Inclui na planilha a senha das contas matrizes. Só marque se o arquivo for ficar em lugar seguro — qualquer pessoa com a planilha consegue entrar nos streamings.",
 };
 
 /**

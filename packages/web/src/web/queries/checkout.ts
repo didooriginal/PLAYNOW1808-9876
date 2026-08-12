@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { orpc } from "../lib/api";
+import type { Ciclo } from "./ciclos";
 
 /**
  * CHECKOUT NA PLATAFORMA — resumo com preço do servidor, Pix e liberação
@@ -10,7 +11,8 @@ export type PedidoInput = {
   pacoteId?: number | null;
   comboId?: number | null;
   apps?: string[];
-  ciclo?: "mensal" | "anual";
+  /** periodicidade escolhida — o desconto de cada ciclo é aplicado no servidor */
+  ciclo?: Ciclo;
   jogos?: boolean;
 };
 

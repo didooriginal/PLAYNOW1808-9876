@@ -1,5 +1,13 @@
 import { useMemo, useState } from "react";
-import { Loader2, Monitor, Plus, Sparkles, Store, Trash2, Users } from "lucide-react";
+import {
+  Loader2,
+  Monitor,
+  Plus,
+  Sparkles,
+  Store,
+  Trash2,
+  Users,
+} from "lucide-react";
 import { AppIcon } from "../app-icon";
 import { GlassCard, NeonButton, Pill, accentHex } from "../ui/kit";
 import { Ajuda, Campo, Rotulo, TituloSecao, Tooltip } from "../ui/tooltip";
@@ -10,6 +18,7 @@ import {
   useCriarCombo,
   useRemoverCombo,
 } from "../../queries/combos";
+import { SeloSalvo, useSeloTransitorio } from "./salvamento";
 
 type AppMinimo = {
   id: number;
@@ -72,6 +81,20 @@ export function ComboBuilder({ apps }: { apps: AppMinimo[] }) {
   const atualizar = useAtualizarCombo();
   const remover = useRemoverCombo();
 
+  /** cada gravação pontual (toggle, criar, remover) acende o selo "Salvo" */
+  const [salvos, setSalvos] = useState(0);
+  const marcarSalvo = () => setSalvos((n) => n + 1);
+  const erroSalvar =
+    (atualizar.isError
+      ? (atualizar.error?.message ?? "Falha ao salvar")
+      : null) ??
+    (remover.isError ? (remover.error?.message ?? "Falha ao remover") : null);
+  const selo = useSeloTransitorio({
+    salvando: atualizar.isPending || criar.isPending || remover.isPending,
+    erro: erroSalvar,
+    sucessos: salvos,
+  });
+
   const [aberto, setAberto] = useState(false);
   const [sel, setSel] = useState<string[]>([]);
   const [form, setForm] = useState({
@@ -87,22 +110,30 @@ export function ComboBuilder({ apps }: { apps: AppMinimo[] }) {
     setForm((f) => ({ ...f, [k]: v }));
 
   const disponiveis = useMemo(
-    () => apps.filter((a) => a.ativo).sort((a, b) => a.nome.localeCompare(b.nome)),
+    () =>
+      apps.filter((a) => a.ativo).sort((a, b) => a.nome.localeCompare(b.nome)),
     [apps],
   );
 
   const somaAvulsa = useMemo(
     () =>
       Math.round(
-        sel.reduce((s, slug) => s + (apps.find((a) => a.slug === slug)?.preco ?? 0), 0) * 100,
+        sel.reduce(
+          (s, slug) => s + (apps.find((a) => a.slug === slug)?.preco ?? 0),
+          0,
+        ) * 100,
       ) / 100,
     [sel, apps],
   );
   const desconto =
-    somaAvulsa > 0 && form.preco > 0 ? Math.round((1 - form.preco / somaAvulsa) * 100) : 0;
+    somaAvulsa > 0 && form.preco > 0
+      ? Math.round((1 - form.preco / somaAvulsa) * 100)
+      : 0;
 
   const alternar = (slug: string) =>
-    setSel((s) => (s.includes(slug) ? s.filter((x) => x !== slug) : [...s, slug]));
+    setSel((s) =>
+      s.includes(slug) ? s.filter((x) => x !== slug) : [...s, slug],
+    );
 
   const limpar = () => {
     setSel([]);
@@ -137,21 +168,33 @@ export function ComboBuilder({ apps }: { apps: AppMinimo[] }) {
             Combo Inteligente
           </TituloSecao>
           <p className="mt-1.5 font-sans text-xs text-white/40">
-            Escolha 2 ou mais apps, defina o preço promocional e o desconto aparece sozinho na
-            landing e no painel do cliente.
+            Escolha 2 ou mais apps, defina o preço promocional e o desconto
+            aparece sozinho na landing e no painel do cliente.
           </p>
         </div>
-        <NeonButton
-          accent="cyan"
-          size="sm"
-          onClick={() => {
-            setAberto((v) => !v);
-            if (aberto) limpar();
-          }}
-        >
-          {aberto ? "Fechar" : <><Plus className="size-4" /> Montar combo</>}
-        </NeonButton>
+        <div className="flex items-center gap-2">
+          {selo && <SeloSalvo estado={selo} />}
+          <NeonButton
+            accent="cyan"
+            size="sm"
+            onClick={() => {
+              setAberto((v) => !v);
+              if (aberto) limpar();
+            }}
+          >
+            {aberto ? (
+              "Fechar"
+            ) : (
+              <>
+                <Plus className="size-4" /> Montar combo
+              </>
+            )}
+          </NeonButton>
+        </div>
       </div>
+      {erroSalvar && (
+        <p className="mt-2 font-sans text-[11px] text-neon-red">{erroSalvar}</p>
+      )}
 
       {aberto && (
         <div className="mt-5 space-y-4 rounded-2xl border border-white/[0.07] bg-black/25 p-4">
@@ -177,8 +220,12 @@ export function ComboBuilder({ apps }: { apps: AppMinimo[] }) {
                     }
                   >
                     <AppIcon id={app.slug} size="xs" active={on} />
-                    <span className="font-sans text-xs text-white">{app.nome}</span>
-                    <span className="font-mono text-[10px] text-white/35">{brl(app.preco)}</span>
+                    <span className="font-sans text-xs text-white">
+                      {app.nome}
+                    </span>
+                    <span className="font-mono text-[10px] text-white/35">
+                      {brl(app.preco)}
+                    </span>
                   </button>
                 );
               })}
@@ -186,7 +233,12 @@ export function ComboBuilder({ apps }: { apps: AppMinimo[] }) {
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Campo label="Nome do combo" ajuda="combo.nome" htmlFor="combo-nome" obrigatorio>
+            <Campo
+              label="Nome do combo"
+              ajuda="combo.nome"
+              htmlFor="combo-nome"
+              obrigatorio
+            >
               <input
                 id="combo-nome"
                 className={inputCls}
@@ -195,7 +247,11 @@ export function ComboBuilder({ apps }: { apps: AppMinimo[] }) {
                 onChange={(e) => set("nome", e.target.value)}
               />
             </Campo>
-            <Campo label="Chamada curta" ajuda="combo.descricao" htmlFor="combo-descricao">
+            <Campo
+              label="Chamada curta"
+              ajuda="combo.descricao"
+              htmlFor="combo-descricao"
+            >
               <input
                 id="combo-descricao"
                 className={inputCls}
@@ -209,7 +265,9 @@ export function ComboBuilder({ apps }: { apps: AppMinimo[] }) {
               ajuda="combo.preco"
               htmlFor="combo-preco"
               obrigatorio
-              dica={desconto > 0 ? `${desconto}% abaixo da soma avulsa` : undefined}
+              dica={
+                desconto > 0 ? `${desconto}% abaixo da soma avulsa` : undefined
+              }
             >
               <input
                 id="combo-preco"
@@ -222,19 +280,21 @@ export function ComboBuilder({ apps }: { apps: AppMinimo[] }) {
               />
             </Campo>
             <Campo label="Ciclo" ajuda="combo.ciclo" htmlFor="combo-ciclo">
-            <select
-              id="combo-ciclo"
-              className={inputCls}
-              value={form.ciclo}
-              onChange={(e) => set("ciclo", e.target.value as "mensal" | "anual")}
-            >
-              <option value="mensal" className="bg-[#09090b]">
-                Mensal
-              </option>
-              <option value="anual" className="bg-[#09090b]">
-                Anual
-              </option>
-            </select>
+              <select
+                id="combo-ciclo"
+                className={inputCls}
+                value={form.ciclo}
+                onChange={(e) =>
+                  set("ciclo", e.target.value as "mensal" | "anual")
+                }
+              >
+                <option value="mensal" className="bg-[#09090b]">
+                  Mensal
+                </option>
+                <option value="anual" className="bg-[#09090b]">
+                  Anual
+                </option>
+              </select>
             </Campo>
           </div>
 
@@ -287,13 +347,17 @@ export function ComboBuilder({ apps }: { apps: AppMinimo[] }) {
           </div>
 
           {criar.isError && (
-            <p className="font-sans text-xs text-neon-red">{criar.error?.message}</p>
+            <p className="font-sans text-xs text-neon-red">
+              {criar.error?.message}
+            </p>
           )}
 
           <NeonButton
             accent="cyan"
             size="sm"
-            disabled={criar.isPending || sel.length < 2 || !form.nome || form.preco <= 0}
+            disabled={
+              criar.isPending || sel.length < 2 || !form.nome || form.preco <= 0
+            }
             onClick={() =>
               criar.mutate(
                 { ...form, apps: sel },
@@ -301,6 +365,7 @@ export function ComboBuilder({ apps }: { apps: AppMinimo[] }) {
                   onSuccess: () => {
                     limpar();
                     setAberto(false);
+                    marcarSalvo();
                   },
                 },
               )
@@ -322,7 +387,11 @@ export function ComboBuilder({ apps }: { apps: AppMinimo[] }) {
             <div
               key={combo.id}
               className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-4"
-              style={combo.destaque ? { borderColor: `${accentHex.cyan}55` } : undefined}
+              style={
+                combo.destaque
+                  ? { borderColor: `${accentHex.cyan}55` }
+                  : undefined
+              }
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -331,23 +400,34 @@ export function ComboBuilder({ apps }: { apps: AppMinimo[] }) {
                   </div>
                   <div className="font-sans text-[11px] text-white/35">
                     {combo.apps.length} apps · {combo.ciclo} ·{" "}
-                    <span className="text-white/25 line-through">{brl(combo.precoCheio)}</span>{" "}
-                    <span className="font-semibold text-neon-cyan">{brl(combo.preco)}</span>{" "}
+                    <span className="text-white/25 line-through">
+                      {brl(combo.precoCheio)}
+                    </span>{" "}
+                    <span className="font-semibold text-neon-cyan">
+                      {brl(combo.preco)}
+                    </span>{" "}
                     {combo.economiaPct > 0 && (
-                      <span className="text-neon-red">({combo.economiaPct}% OFF)</span>
+                      <span className="text-neon-red">
+                        ({combo.economiaPct}% OFF)
+                      </span>
                     )}
                   </div>
                 </div>
                 <Tooltip texto="combo.remover" titulo="Remover combo">
-                <button
-                  type="button"
-                  aria-label="Remover combo"
-                  disabled={remover.isPending}
-                  onClick={() => remover.mutate({ id: combo.id })}
-                  className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-white/10 text-white/40 transition-colors hover:border-neon-red/50 hover:text-neon-red"
-                >
-                  <Trash2 className="size-3.5" />
-                </button>
+                  <button
+                    type="button"
+                    aria-label="Remover combo"
+                    disabled={remover.isPending}
+                    onClick={() =>
+                      remover.mutate(
+                        { id: combo.id },
+                        { onSuccess: marcarSalvo },
+                      )
+                    }
+                    className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-white/10 text-white/40 transition-colors hover:border-neon-red/50 hover:text-neon-red"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </button>
                 </Tooltip>
               </div>
 
@@ -361,7 +441,10 @@ export function ComboBuilder({ apps }: { apps: AppMinimo[] }) {
                 <Toggle
                   on={combo.visivelLanding}
                   onClick={() =>
-                    atualizar.mutate({ id: combo.id, visivelLanding: !combo.visivelLanding })
+                    atualizar.mutate(
+                      { id: combo.id, visivelLanding: !combo.visivelLanding },
+                      { onSuccess: marcarSalvo },
+                    )
                   }
                   label="Landing"
                   ajuda="combo.visivelLanding"
@@ -370,7 +453,10 @@ export function ComboBuilder({ apps }: { apps: AppMinimo[] }) {
                 <Toggle
                   on={combo.visivelCliente}
                   onClick={() =>
-                    atualizar.mutate({ id: combo.id, visivelCliente: !combo.visivelCliente })
+                    atualizar.mutate(
+                      { id: combo.id, visivelCliente: !combo.visivelCliente },
+                      { onSuccess: marcarSalvo },
+                    )
                   }
                   label="Painel do cliente"
                   ajuda="combo.visivelCliente"
@@ -378,7 +464,12 @@ export function ComboBuilder({ apps }: { apps: AppMinimo[] }) {
                 />
                 <Toggle
                   on={combo.ativo}
-                  onClick={() => atualizar.mutate({ id: combo.id, ativo: !combo.ativo })}
+                  onClick={() =>
+                    atualizar.mutate(
+                      { id: combo.id, ativo: !combo.ativo },
+                      { onSuccess: marcarSalvo },
+                    )
+                  }
                   label={combo.ativo ? "Ativo" : "Inativo"}
                   ajuda="combo.ativo"
                   icon={<Sparkles className="size-3.5" />}

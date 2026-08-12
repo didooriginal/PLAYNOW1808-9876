@@ -18,6 +18,14 @@ import {
   urlPublicaSegura,
 } from "../lib/mercadopago";
 import { avisarAdminPagamento } from "../lib/aviso-pagamento";
+import {
+  comoOrigem,
+  mesesDoCiclo,
+  normalizarCiclo,
+  paraIso,
+  somarMeses,
+  type Ciclo,
+} from "../lib/ciclos";
 
 /**
  * GATEWAY PIX — PRODUÇÃO (Mercado Pago)
@@ -57,7 +65,10 @@ type RespostaCobranca = {
 
 const EXPIRA_MIN = 60;
 
-const PROVEDORES: Record<string, (p: PedidoCobranca) => Promise<RespostaCobranca>> = {
+const PROVEDORES: Record<
+  string,
+  (p: PedidoCobranca) => Promise<RespostaCobranca>
+> = {
   mercadopago: async (p) => {
     const pagamento = await criarPagamentoPix({
       valor: p.valor,
@@ -103,7 +114,9 @@ export async function abrirCobranca(entrada: {
   }
 
   const params = await lerParametros();
-  const provedor = PROVEDORES[params.pixProvedor] ? params.pixProvedor : PROVEDOR_PADRAO;
+  const provedor = PROVEDORES[params.pixProvedor]
+    ? params.pixProvedor
+    : PROVEDOR_PADRAO;
   const criar = PROVEDORES[provedor];
   const txid = gerarTxid(entrada.clienteId);
 
@@ -180,8 +193,12 @@ function gerarTxid(clienteId: number) {
 }
 
 async function clienteDaSessao(authUserId: string) {
-  const [cliente] = await db.select().from(usuarios).where(eq(usuarios.authUserId, authUserId));
-  if (!cliente) throw new ORPCError("NOT_FOUND", { message: "Cliente não encontrado" });
+  const [cliente] = await db
+    .select()
+    .from(usuarios)
+    .where(eq(usuarios.authUserId, authUserId));
+  if (!cliente)
+    throw new ORPCError("NOT_FOUND", { message: "Cliente não encontrado" });
   return cliente;
 }
 
@@ -193,33 +210,35 @@ async function clienteDaSessao(authUserId: string) {
  * Empurra a data de cobrança para o próximo ciclo enquanto ela estiver no
  * passado, preservando o dia escolhido pelo cliente.
  */
-function avancarVencimento(atual: string | null, ciclo: "mensal" | "anual") {
-  // sem data válida no cadastro (ou cliente novo): conta a partir de hoje —
-  // mensal = +30 dias, anual = +1 ano
-  if (!atual || !/^\d{4}-\d{2}-\d{2}$/.test(atual)) {
-    const base = new Date();
-    base.setHours(0, 0, 0, 0);
-    if (ciclo === "anual") base.setFullYear(base.getFullYear() + 1);
-    else base.setDate(base.getDate() + 30);
-    return base.toISOString().slice(0, 10);
+function avancarVencimento(atual: string | null, ciclo: Ciclo) {
+  // quantos meses o cliente pagou de uma vez (1, 3, 6 ou 12) — sempre a
+  // tabela de `lib/ciclos.ts`, nunca número escrito aqui
+  const meses = mesesDoCiclo(ciclo);
+  const hojeIso = new Date().toISOString().slice(0, 10);
+
+  // a coluna pode estar em DD/MM/AAAA (cadastro antigo) ou ISO: normaliza
+  const atualIso = paraIso(atual);
+
+  // sem data válida no cadastro (ou cliente novo): conta a partir de hoje
+  if (!atualIso) return comoOrigem(somarMeses(hojeIso, meses), atual);
+
+  // enquanto a data estiver no passado, empurra um ciclo inteiro por vez,
+  // preservando o dia escolhido pelo cliente
+  let data = atualIso;
+  for (let voltas = 0; data <= hojeIso && voltas < 60; voltas += 1) {
+    data = somarMeses(data, meses);
   }
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
-  const data = new Date(`${atual}T00:00:00`);
-  let voltas = 0;
-  while (data <= hoje && voltas < 60) {
-    if (ciclo === "anual") data.setFullYear(data.getFullYear() + 1);
-    else data.setMonth(data.getMonth() + 1);
-    voltas += 1;
-  }
-  return data.toISOString().slice(0, 10);
+  return comoOrigem(data, atual);
 }
 
 export async function confirmarPagamento(
   txid: string,
   origem: "webhook" | "admin" | "assinatura",
 ) {
-  const [cobranca] = await db.select().from(cobrancasPix).where(eq(cobrancasPix.txid, txid));
+  const [cobranca] = await db
+    .select()
+    .from(cobrancasPix)
+    .where(eq(cobrancasPix.txid, txid));
   if (!cobranca) return { ok: false, motivo: "cobrança não encontrada" };
   if (cobranca.status === "pago") return { ok: true, jaEstava: true };
 
@@ -244,9 +263,15 @@ export async function confirmarPagamento(
   // pagamento de fatura simples: empurra o vencimento para o próximo ciclo,
   // senão o cliente pago continuaria aparecendo como atrasado
   if (!cobranca.pedido) {
-    const [dono] = await db.select().from(usuarios).where(eq(usuarios.id, cobranca.clienteId));
+    const [dono] = await db
+      .select()
+      .from(usuarios)
+      .where(eq(usuarios.id, cobranca.clienteId));
     if (dono) {
-      const proxima = avancarVencimento(dono.proximaCobranca, dono.ciclo === "anual" ? "anual" : "mensal");
+      const proxima = avancarVencimento(
+        dono.proximaCobranca,
+        normalizarCiclo(dono.ciclo),
+      );
       if (proxima && proxima !== dono.proximaCobranca) {
         await db
           .update(usuarios)
@@ -314,7 +339,10 @@ export async function confirmarPagamento(
  * notificação atrasar, falhar ou o ambiente ser local.
  */
 export async function sincronizarCobranca(txid: string) {
-  const [cobranca] = await db.select().from(cobrancasPix).where(eq(cobrancasPix.txid, txid));
+  const [cobranca] = await db
+    .select()
+    .from(cobrancasPix)
+    .where(eq(cobrancasPix.txid, txid));
   if (!cobranca) return null;
   if (cobranca.status !== "aguardando" || !cobranca.provedorId) return cobranca;
 
@@ -322,7 +350,9 @@ export async function sincronizarCobranca(txid: string) {
     const pagamento = await buscarPagamento(cobranca.provedorId);
     if (pagamento.status === "approved") {
       await confirmarPagamento(txid, "webhook");
-    } else if (["cancelled", "rejected", "refunded"].includes(pagamento.status)) {
+    } else if (
+      ["cancelled", "rejected", "refunded"].includes(pagamento.status)
+    ) {
       await db
         .update(cobrancasPix)
         .set({ status: "cancelado" })
@@ -337,7 +367,10 @@ export async function sincronizarCobranca(txid: string) {
     /* indisponibilidade do gateway não pode quebrar a tela do cliente */
   }
 
-  const [fresca] = await db.select().from(cobrancasPix).where(eq(cobrancasPix.txid, txid));
+  const [fresca] = await db
+    .select()
+    .from(cobrancasPix)
+    .where(eq(cobrancasPix.txid, txid));
   return fresca ?? cobranca;
 }
 
@@ -353,30 +386,49 @@ export const pix = {
         [fatura] = await db
           .select()
           .from(faturas)
-          .where(and(eq(faturas.id, input.faturaId), eq(faturas.clienteId, cliente.id)));
+          .where(
+            and(
+              eq(faturas.id, input.faturaId),
+              eq(faturas.clienteId, cliente.id),
+            ),
+          );
       } else {
         [fatura] = await db
           .select()
           .from(faturas)
-          .where(and(eq(faturas.clienteId, cliente.id), eq(faturas.status, "aberto")))
+          .where(
+            and(
+              eq(faturas.clienteId, cliente.id),
+              eq(faturas.status, "aberto"),
+            ),
+          )
           .orderBy(desc(faturas.competencia))
           .limit(1);
       }
 
       const valor = fatura ? fatura.valorFinal || fatura.valor : cliente.valor;
-      if (valor <= 0) throw new ORPCError("BAD_REQUEST", { message: "Nada a cobrar" });
+      if (valor <= 0)
+        throw new ORPCError("BAD_REQUEST", { message: "Nada a cobrar" });
 
       // reaproveita cobrança viva da mesma fatura em vez de gerar QR novo
       const [viva] = await db
         .select()
         .from(cobrancasPix)
         .where(
-          and(eq(cobrancasPix.clienteId, cliente.id), eq(cobrancasPix.status, "aguardando")),
+          and(
+            eq(cobrancasPix.clienteId, cliente.id),
+            eq(cobrancasPix.status, "aguardando"),
+          ),
         )
         .orderBy(desc(cobrancasPix.criadoEm))
         .limit(1);
 
-      if (viva && viva.faturaId === (fatura?.id ?? null) && viva.expiraEm && viva.expiraEm > new Date()) {
+      if (
+        viva &&
+        viva.faturaId === (fatura?.id ?? null) &&
+        viva.expiraEm &&
+        viva.expiraEm > new Date()
+      ) {
         return {
           txid: viva.txid,
           valor: viva.valor,
@@ -406,11 +458,22 @@ export const pix = {
       const [dono] = await db
         .select({ id: cobrancasPix.id })
         .from(cobrancasPix)
-        .where(and(eq(cobrancasPix.txid, input.txid), eq(cobrancasPix.clienteId, cliente.id)));
-      if (!dono) throw new ORPCError("NOT_FOUND", { message: "Cobrança não encontrada" });
+        .where(
+          and(
+            eq(cobrancasPix.txid, input.txid),
+            eq(cobrancasPix.clienteId, cliente.id),
+          ),
+        );
+      if (!dono)
+        throw new ORPCError("NOT_FOUND", {
+          message: "Cobrança não encontrada",
+        });
 
       const cobranca = await sincronizarCobranca(input.txid);
-      if (!cobranca) throw new ORPCError("NOT_FOUND", { message: "Cobrança não encontrada" });
+      if (!cobranca)
+        throw new ORPCError("NOT_FOUND", {
+          message: "Cobrança não encontrada",
+        });
       return {
         status: cobranca.status,
         valor: cobranca.valor,
@@ -441,7 +504,9 @@ export const pix = {
       .limit(60);
 
     return {
-      provedor: PROVEDORES[params.pixProvedor] ? params.pixProvedor : PROVEDOR_PADRAO,
+      provedor: PROVEDORES[params.pixProvedor]
+        ? params.pixProvedor
+        : PROVEDOR_PADRAO,
       provedoresDisponiveis: Object.keys(PROVEDORES),
       chaveConfigurada: mercadoPagoConfigurado(),
       ambiente: ambienteMP(),
