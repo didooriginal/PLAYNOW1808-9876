@@ -20,9 +20,9 @@ const REGRAS = [
   },
   {
     id: "perfil",
-    titulo: "Uso só o meu perfil e não mexo nos outros",
+    titulo: "Uso apenas o perfil indicado no meu card",
     detalhe:
-      "Nunca renomeie, exclua ou entre em perfis que não são seus, e nunca troque a senha da conta matriz.",
+      "Nunca crie novos perfis, nunca renomeie perfis existentes e nunca entre em perfis que não foram indicados para você.",
   },
   {
     id: "pagamento",

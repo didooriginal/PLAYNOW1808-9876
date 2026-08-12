@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { Instagram, MessageCircle, Send, ShieldCheck } from "lucide-react";
+import { MessageCircle, Send, ShieldCheck } from "lucide-react";
 import { Logo } from "../logo";
 import { GlassCard, NeonButton } from "../ui/kit";
 import { whatsappLink } from "@/lib/mock-data";
@@ -57,7 +57,7 @@ export function Footer() {
             de demonstração com dados fictícios.
           </p>
           <div className="mt-5 flex gap-2">
-            {[MessageCircle, Instagram, Send].map((Icon, i) => (
+            {[MessageCircle, Send].map((Icon, i) => (
               <span
                 key={i}
                 className="flex size-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/45 transition-colors hover:border-neon-red/40 hover:text-neon-red"
@@ -75,7 +75,8 @@ export function Footer() {
               { label: "Pacotes prontos", href: "#pacotes" },
               { label: "Monte seu combo", href: "#montador" },
               { label: "Economia", href: "#economia" },
-              { label: "Depoimentos", href: "#depoimentos" },
+              { label: "Vantagens", href: "#features" },
+              { label: "Perguntas (FAQ)", href: "#faq" },
             ],
           },
           {

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   ArrowDownToLine,
+  Award,
   Check,
   Copy,
   Gift,
@@ -12,9 +13,11 @@ import {
 import { GlassCard, NeonButton, Pill, ProgressBar } from "../ui/kit";
 import {
   brlCarteira as brl,
+  useBannersAfiliados,
   useMeuPainelAfiliado,
   useResgatar,
   useSimularResgate,
+  useTornarAfiliado,
 } from "../../queries/afiliados";
 
 /**
@@ -30,8 +33,10 @@ const inputCls =
 
 export function CarteiraAfiliado() {
   const { data, isLoading } = useMeuPainelAfiliado();
+  const banners = useBannersAfiliados();
   const simular = useSimularResgate();
   const resgatar = useResgatar();
+  const ativarAfiliado = useTornarAfiliado();
   const [valor, setValor] = useState("");
   const [chavePix, setChavePix] = useState("");
   const [copiado, setCopiado] = useState(false);
@@ -40,9 +45,148 @@ export function CarteiraAfiliado() {
 
   const carteira = data?.carteira;
   const regras = data?.regras;
+  const nivel = data?.nivel ?? 1;
+  const afiliadoAtivo = data?.afiliadoAtivo ?? false;
   const numero = Number(valor.replace(",", ".")) || 0;
   const emDia = (data?.indicados ?? []).filter((i) => i.emDia).length;
   const total = data?.indicados.length ?? 0;
+
+  const copiarLink = () => {
+    void navigator.clipboard.writeText(data?.link ?? "");
+    setCopiado(true);
+    setTimeout(() => setCopiado(false), 1600);
+  };
+
+  /**
+   * CONVITE — cliente já chegou ao nível 3, mas ainda não aceitou virar
+   * afiliado. Ele vê o convite (com banner promocional, quando existir) e só
+   * destrava a carteira depois de ativar.
+   */
+  if (nivel >= 3 && !afiliadoAtivo) {
+    return (
+      <div className="space-y-6">
+        {banners.data?.map((banner) => (
+          <GlassCard
+            key={banner.id}
+            strong
+            accent="purple"
+            className="relative overflow-hidden p-0"
+          >
+            <div className="flex flex-col md:flex-row">
+              <div className="h-40 md:h-auto md:w-1/3">
+                <img
+                  src={banner.imagemUrl}
+                  alt={banner.titulo}
+                  className="h-full w-full object-cover opacity-60"
+                />
+              </div>
+              <div className="flex flex-1 flex-col justify-center p-6 md:p-8">
+                <div className="flex items-center gap-2">
+                  <Award className="size-5 text-neon-purple" />
+                  <span className="font-display text-xs font-bold uppercase tracking-widest text-neon-purple">
+                    Exclusivo Nível {nivel}
+                  </span>
+                </div>
+                <h2 className="mt-2 font-display text-2xl font-extrabold text-white">
+                  {banner.titulo}
+                </h2>
+                <p className="mt-2 font-sans text-sm leading-relaxed text-white/60">
+                  {banner.subtitulo}
+                </p>
+                <div className="mt-6">
+                  <NeonButton
+                    accent="purple"
+                    onClick={() => ativarAfiliado.mutate({})}
+                    disabled={ativarAfiliado.isPending}
+                  >
+                    {ativarAfiliado.isPending ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <Gift className="size-4" />
+                    )}
+                    Ativar meu painel de afiliado
+                  </NeonButton>
+                </div>
+              </div>
+            </div>
+          </GlassCard>
+        ))}
+
+        {/* fallback quando nenhum banner está cadastrado */}
+        {!banners.data?.length && (
+          <GlassCard strong accent="purple" className="p-8 text-center">
+            <Gift className="mx-auto size-12 text-neon-purple" />
+            <h2 className="mt-4 font-display text-2xl font-extrabold text-white">
+              Você atingiu o Nível {nivel}!
+            </h2>
+            <p className="mx-auto mt-2 max-w-md font-sans text-sm text-white/60">
+              Como cliente VIP, você já pode se tornar afiliado oficial e ganhar comissões em
+              dinheiro por cada indicação.
+            </p>
+            <div className="mt-8">
+              <NeonButton
+                accent="purple"
+                size="lg"
+                onClick={() => ativarAfiliado.mutate({})}
+                disabled={ativarAfiliado.isPending}
+              >
+                {ativarAfiliado.isPending ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  "Quero ser afiliado"
+                )}
+              </NeonButton>
+            </div>
+          </GlassCard>
+        )}
+
+        {ativarAfiliado.error && (
+          <p className="font-sans text-xs text-neon-red">{ativarAfiliado.error.message}</p>
+        )}
+      </div>
+    );
+  }
+
+  /**
+   * VISÃO RESTRITA — abaixo do nível 3 o cliente indica e ganha recompensas na
+   * Jornada, mas ainda não tem carteira em dinheiro.
+   */
+  if (nivel < 3) {
+    return (
+      <div className="space-y-5">
+        <GlassCard strong accent="cyan" className="p-6">
+          <div className="flex items-center gap-2">
+            <Network className="size-4 text-neon-cyan" />
+            <span className="font-display text-sm font-bold text-white">Seu link de indicação</span>
+          </div>
+          <p className="mt-1.5 font-sans text-xs text-white/40">
+            Indique amigos e ganhe recompensas na sua Jornada do Cliente. Ao atingir o Nível 3, você
+            poderá converter indicações em dinheiro.
+          </p>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <span className="min-w-0 flex-1 truncate rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 font-mono text-xs text-neon-cyan">
+              {data?.link}
+            </span>
+            <NeonButton accent="cyan" onClick={copiarLink}>
+              {copiado ? <Check className="size-4" /> : <Copy className="size-4" />}
+              {copiado ? "Copiado" : "Copiar"}
+            </NeonButton>
+          </div>
+        </GlassCard>
+
+        <GlassCard className="p-8 text-center">
+          <TrendingUp className="mx-auto size-10 text-white/20" />
+          <h3 className="mt-4 font-display text-lg font-bold text-white">Como ganhar dinheiro?</h3>
+          <p className="mt-2 font-sans text-sm text-white/40">
+            Continue indicando para subir de nível.
+            <br />
+            No <strong className="font-semibold text-white/70">Nível 3</strong>, liberamos saques em
+            Pix e bônus de afiliado.
+          </p>
+        </GlassCard>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">

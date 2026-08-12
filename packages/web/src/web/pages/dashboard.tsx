@@ -19,6 +19,7 @@ import {
   LayoutGrid,
   MessageCircle,
   Receipt,
+  Settings,
   Sparkles,
   TrendingUp,
   TriangleAlert,
@@ -59,6 +60,7 @@ import { TelaBloqueio } from "../components/cliente/bloqueio";
 import { AvisosCliente } from "../components/cliente/avisos";
 import { SalaJogos } from "../components/cliente/sala-jogos";
 import { CarteiraAfiliado } from "../components/cliente/carteira";
+import { AlterarSenhaView } from "../components/cliente/alterar-senha";
 import { ContadorEconomia } from "../components/cliente/economia";
 import { PagarPix } from "../components/cliente/pagar-pix";
 import { AreaPagamento } from "../components/cliente/pagamento";
@@ -629,10 +631,15 @@ export default function DashboardPage() {
       },
       { id: "jornada", label: "Jornada / Recompensas", icon: Trophy },
       { id: "jogos", label: "Futebol Ao Vivo", icon: Goal },
-      { id: "carteira", label: "Indique e Ganhe", icon: Wallet },
+      {
+        id: "carteira",
+        label: (data?.cliente.nivel ?? 1) >= 3 ? "Afiliados / Saque" : "Indique e Ganhe",
+        icon: Wallet,
+      },
       { id: "novidades", label: "Novidades/Upgrades", icon: Sparkles, badge: String(upgrades.length) },
       { id: "pagamento", label: "Pagar / Renovar", icon: BadgePercent },
       { id: "faturas", label: "Faturas", icon: Receipt },
+      { id: "senha", label: "Segurança", icon: Settings },
       {
         id: "suporte",
         label: "Suporte",
@@ -720,10 +727,12 @@ export default function DashboardPage() {
               {active === "netflix" && "Desbloquear Tela Netflix"}
               {active === "jornada" && "Jornada do Cliente"}
               {active === "jogos" && "Futebol Ao Vivo"}
-              {active === "carteira" && "Indique e Ganhe"}
+              {active === "carteira" &&
+                (cliente.nivel >= 3 ? "Programa de Afiliados" : "Indique e Ganhe")}
               {active === "novidades" && "Novidades e Upgrades"}
               {active === "pagamento" && "Pagar e Renovar"}
               {active === "faturas" && "Minhas Faturas"}
+              {active === "senha" && "Segurança da Conta"}
               {active === "suporte" && "Suporte"}
             </h1>
             <p className="mt-1.5 font-sans text-sm text-white/40">
@@ -741,6 +750,7 @@ export default function DashboardPage() {
               {active === "pagamento" &&
                 "Escolha a periodicidade que mais te economiza ou antecipe o pagamento com desconto no Pix."}
               {active === "faturas" && "Acompanhe pagamentos, vencimentos e recibos."}
+              {active === "senha" && "Altere sua senha de acesso ao painel."}
               {active === "suporte" && "Relate um problema e acompanhe o andamento do chamado."}
             </p>
             </div>
@@ -800,6 +810,7 @@ export default function DashboardPage() {
               />
             </>
           )}
+          {active === "senha" && <AlterarSenhaView />}
           {active === "suporte" && <SuporteClienteView />}
         </div>
       </PanelShell>

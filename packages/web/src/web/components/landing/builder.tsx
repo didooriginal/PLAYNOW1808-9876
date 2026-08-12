@@ -251,7 +251,7 @@ export function Builder() {
       >
         <NeonButton accent="red" size="lg" className="w-full" disabled={selected.length === 0}>
           <UserPlus className="size-4" />
-          {meses > 1 ? `Assinar ${defCiclo?.rotulo.toLowerCase()} por Pix` : "Assinar e pagar por Pix"}
+          Assine agora!
         </NeonButton>
       </Link>
       <p className="mt-2.5 text-center font-sans text-[10px] leading-relaxed text-white/25">

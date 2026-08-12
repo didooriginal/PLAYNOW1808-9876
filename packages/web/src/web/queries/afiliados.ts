@@ -25,6 +25,15 @@ export function useResgatar() {
   return useMutation(orpc.afiliados.resgatar.mutationOptions({ onSuccess: invalidar }));
 }
 
+export function useTornarAfiliado() {
+  const invalidar = useInvalidarAfiliados();
+  return useMutation(orpc.afiliados.tornarAfiliado.mutationOptions({ onSuccess: invalidar }));
+}
+
+export function useBannersAfiliados() {
+  return useQuery(orpc.afiliados.listarBanners.queryOptions({ staleTime: 60_000 }));
+}
+
 export function useLiberarComissao() {
   const invalidar = useInvalidarAfiliados();
   return useMutation(orpc.afiliados.liberarComissao.mutationOptions({ onSuccess: invalidar }));

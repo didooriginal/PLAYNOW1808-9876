@@ -165,7 +165,7 @@ export function Savings() {
   );
 }
 
-function ServiceName({ id }: { id: (typeof mega.items)[number] }) {
+function ServiceName({ id }: { id: string }) {
   const names: Record<string, string> = {
     netflix: "Netflix Premium",
     disney: "Disney+ Padrão",

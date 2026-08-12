@@ -9,6 +9,7 @@ import { CtaBand, Footer } from "../components/landing/footer";
 import { AssistenteVisitante } from "../components/landing/assistente-visitante";
 import { WhatsappFlutuante } from "../components/landing/whatsapp-flutuante";
 import { NeonBackdrop } from "../components/ui/kit";
+import { Faq, Features, Stats } from "../components/landing/new-sections";
 
 function Index() {
   return (
@@ -18,10 +19,13 @@ function Index() {
       <main className="pb-24 lg:pb-0">
         <Hero />
         <Savings />
+        <Stats />
+        <Features />
         <Plans />
         <Combos />
         <Builder />
         <SocialProof />
+        <Faq />
         <CtaBand />
       </main>
       <Footer />

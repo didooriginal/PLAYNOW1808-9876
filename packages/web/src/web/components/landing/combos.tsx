@@ -113,7 +113,7 @@ export function Combos() {
                   className="w-full"
                 >
                   <Zap className="size-4" />
-                  Assinar combo
+                  Assine agora!
                 </NeonButton>
               </Link>
             </GlassCard>

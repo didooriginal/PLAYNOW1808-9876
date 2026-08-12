@@ -14,6 +14,7 @@ export type AbaPainel =
   | "carteira"
   | "novidades"
   | "faturas"
+  | "senha"
   | "suporte";
 
 /** manda o painel abrir a aba pedida e sobe a página */

@@ -3,7 +3,14 @@ import { and, desc, eq, inArray, ne } from "drizzle-orm";
 import { ORPCError } from "@orpc/server";
 import { adminOnly, authed } from "../middleware/auth";
 import { db } from "../database";
-import { carteiras, comissoes, faturas, saques, usuarios } from "../database/schema";
+import {
+  bannersAfiliados,
+  carteiras,
+  comissoes,
+  faturas,
+  saques,
+  usuarios,
+} from "../database/schema";
 import { lerParametros } from "../lib/config";
 
 /**
@@ -270,6 +277,8 @@ export const afiliados = {
       codigo,
       link: `${base}/signup?ref=${codigo}`,
       carteira: carteira ?? null,
+      nivel: cliente.nivel,
+      afiliadoAtivo: cliente.afiliadoAtivo,
       indicados: indicados.map((i) => ({
         ...i,
         emDia: STATUS_EM_DIA.has(i.statusPagamento),
@@ -290,6 +299,27 @@ export const afiliados = {
         performanceLiberada: redeEmDia >= params.metaRedeEmDia,
       },
     };
+  }),
+
+  /** ativa o status de afiliado — exclusivo de clientes nível 3 ou superior */
+  tornarAfiliado: authed.handler(async ({ context }) => {
+    const cliente = await euCliente(context.user.id, context.user.email);
+    if (cliente.nivel < 3) {
+      throw new ORPCError("FORBIDDEN", {
+        message: "Apenas clientes nível 3 ou superior podem se tornar afiliados.",
+      });
+    }
+    const [row] = await db
+      .update(usuarios)
+      .set({ afiliadoAtivo: true })
+      .where(eq(usuarios.id, cliente.id))
+      .returning();
+    return { ok: true, afiliadoAtivo: row.afiliadoAtivo };
+  }),
+
+  /** banners promocionais ativos para o afiliado divulgar */
+  listarBanners: authed.handler(async () => {
+    return db.select().from(bannersAfiliados).where(eq(bannersAfiliados.ativo, true));
   }),
 
   /**

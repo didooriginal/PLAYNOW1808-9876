@@ -147,6 +147,12 @@ export const usuarios = sqliteTable("usuarios", {
   proximaCobranca: text("proxima_cobranca").notNull().default(""),
   clienteDesde: text("cliente_desde").notNull().default(""),
   admin: integer("admin", { mode: "boolean" }).notNull().default(false),
+  /** 1 | 2 | 3 — define acesso a funcionalidades como o painel de afiliados */
+  nivel: integer("nivel").notNull().default(1),
+  /** se o cliente ja aceitou se tornar um afiliado (apenas nivel 3) */
+  afiliadoAtivo: integer("afiliado_ativo", { mode: "boolean" })
+    .notNull()
+    .default(false),
   /** codigo unico de indicacao - vira o link `site.com/signup?ref=CODIGO` */
   referralCode: text("referral_code").unique(),
   /** id do cliente que indicou este cadastro (preenchido no signup via ?ref=) */
@@ -733,6 +739,25 @@ export const saques = sqliteTable("saques", {
 });
 
 export type Saque = typeof saques.$inferSelect;
+
+/* ------------------------------------------------------------------ */
+/* BANNERS PARA AFILIADOS                                              */
+/* ------------------------------------------------------------------ */
+
+export const bannersAfiliados = sqliteTable("banners_afiliados", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  titulo: text("titulo").notNull(),
+  subtitulo: text("subtitulo").notNull().default(""),
+  imagemUrl: text("imagem_url").notNull(),
+  linkDestino: text("link_destino").notNull().default(""),
+  ativo: integer("ativo", { mode: "boolean" }).notNull().default(true),
+  criadoEm: integer("criado_em", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+export type BannerAfiliado = typeof bannersAfiliados.$inferSelect;
+export type NovoBannerAfiliado = typeof bannersAfiliados.$inferInsert;
 
 /* ------------------------------------------------------------------ */
 /* COBRANÇAS PIX — gateway plugável (modo simulado por padrão)         */

@@ -1,4 +1,13 @@
-import { ArrowRight, PlayCircle, ShieldCheck, Sparkles, Star, Zap } from "lucide-react";
+import {
+  ArrowRight,
+  ChevronRight,
+  HelpCircle,
+  PlayCircle,
+  ShieldCheck,
+  Sparkles,
+  Star,
+  Zap,
+} from "lucide-react";
 import { AppIcon } from "../app-icon";
 import { Logo } from "../logo";
 import { GlassCard, NeonButton, Pill } from "../ui/kit";
@@ -40,14 +49,21 @@ export function Hero() {
             </div>
 
             <div className="mb-6 flex flex-wrap justify-center gap-2 lg:justify-start">
-              <Pill accent="red" icon={<Zap className="size-3" />}>
-                Ativação em até 10 min
-              </Pill>
+              <a href="#economia" className="group">
+                <Pill
+                  accent="red"
+                  icon={<Zap className="size-3" />}
+                  className="transition-all hover:bg-neon-red/20"
+                >
+                  Economize até 80%
+                  <ChevronRight className="size-3 transition-transform group-hover:translate-x-0.5" />
+                </Pill>
+              </a>
               <Pill accent="cyan" icon={<ShieldCheck className="size-3" />}>
-                1.540 assinaturas ativas
+                Ativação em 10 min
               </Pill>
               <Pill accent="purple" icon={<Star className="size-3" />}>
-                4,9/5 na avaliação dos clientes
+                5.4k+ Clientes
               </Pill>
             </div>
 
@@ -82,6 +98,16 @@ export function Hero() {
                 <NeonButton accent="cyan" variant="outline" size="lg" className="w-full sm:w-auto">
                   <Sparkles className="size-4" />
                   Montar meu combo
+                </NeonButton>
+              </a>
+              <a href="#faq" className="sm:w-auto">
+                <NeonButton
+                  variant="ghost"
+                  size="lg"
+                  className="w-full gap-2 border border-white/5 bg-white/5 sm:w-auto"
+                >
+                  <HelpCircle className="size-4" />
+                  Dúvidas frequentes
                 </NeonButton>
               </a>
             </div>

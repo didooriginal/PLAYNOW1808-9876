@@ -2,7 +2,7 @@ import { z } from "zod";
 import { eq, sql } from "drizzle-orm";
 import { adminOnly } from "../middleware/auth";
 import { db } from "../database";
-import { aplicativos, combos, contasMatrizes, pacotes, usuarios } from "../database/schema";
+import { aplicativos, bannersAfiliados, combos, contasMatrizes, pacotes, usuarios } from "../database/schema";
 
 /**
  * Popula o banco com o catálogo inicial da operação.
@@ -206,16 +206,40 @@ export async function semearPoolJogos() {
   return CONTAS_JOGOS.length;
 }
 
-const CLIENTES = [
-  { nome: "Diego Dias Silva", email: "diego.silva@email.com", pacote: "Turbo", statusPagamento: "ativo", ciclo: "mensal", valor: 49, proximaCobranca: "12/09/2026", clienteDesde: "12/03/2025" },
-  { nome: "Camila Ribeiro", email: "camila.rib@email.com", pacote: "15 em 1", statusPagamento: "ativo", ciclo: "mensal", valor: 99.9, proximaCobranca: "20/09/2026", clienteDesde: "07/08/2025" },
-  { nome: "Lucas Ferraz", email: "lucas.ferraz@email.com", pacote: "Pacote 03", statusPagamento: "pendente", ciclo: "mensal", valor: 34.9, proximaCobranca: "09/08/2026", clienteDesde: "09/12/2025" },
-  { nome: "Juliana Prado", email: "ju.prado@email.com", pacote: "Pacote 03", statusPagamento: "ativo", ciclo: "mensal", valor: 41.5, proximaCobranca: "28/08/2026", clienteDesde: "28/02/2026" },
-  { nome: "Rafael Monteiro", email: "rafa.monteiro@email.com", pacote: "Turbo", statusPagamento: "ativo", ciclo: "anual", valor: 470.4, proximaCobranca: "02/02/2027", clienteDesde: "02/02/2024" },
-  { nome: "Beatriz Aguiar", email: "bia.aguiar@email.com", pacote: "15 em 1", statusPagamento: "ativo", ciclo: "anual", valor: 958.8, proximaCobranca: "17/11/2026", clienteDesde: "17/11/2025" },
-  { nome: "Marcos Tavares", email: "marcos.tv@email.com", pacote: "Pacote 03", statusPagamento: "atrasado", ciclo: "mensal", valor: 34.9, proximaCobranca: "26/07/2026", clienteDesde: "26/01/2026" },
-  { nome: "Fernanda Lopes", email: "fer.lopes@email.com", pacote: "Turbo", statusPagamento: "pendente", ciclo: "mensal", valor: 49, proximaCobranca: "10/08/2026", clienteDesde: "10/04/2026" },
+/** Clientes de demonstração (também usados para restaurar a base depois de migrações). */
+export const CLIENTES = [
+  { nome: "Diego Dias Silva", email: "diego.silva@email.com", pacote: "Turbo", statusPagamento: "ativo", ciclo: "mensal", valor: 49, proximaCobranca: "12/09/2026", clienteDesde: "12/03/2025", nivel: 1 },
+  { nome: "Camila Ribeiro", email: "camila.rib@email.com", pacote: "15 em 1", statusPagamento: "ativo", ciclo: "mensal", valor: 99.9, proximaCobranca: "20/09/2026", clienteDesde: "07/08/2025", nivel: 2 },
+  { nome: "Lucas Ferraz", email: "lucas.ferraz@email.com", pacote: "Pacote 03", statusPagamento: "pendente", ciclo: "mensal", valor: 34.9, proximaCobranca: "09/08/2026", clienteDesde: "09/12/2025", nivel: 3 },
+  { nome: "Juliana Prado", email: "ju.prado@email.com", pacote: "Pacote 03", statusPagamento: "ativo", ciclo: "mensal", valor: 41.5, proximaCobranca: "28/08/2026", clienteDesde: "28/02/2026", nivel: 3 },
+  { nome: "Rafael Monteiro", email: "rafa.monteiro@email.com", pacote: "Turbo", statusPagamento: "ativo", ciclo: "anual", valor: 470.4, proximaCobranca: "02/02/2027", clienteDesde: "02/02/2024", nivel: 3 },
+  { nome: "Beatriz Aguiar", email: "bia.aguiar@email.com", pacote: "15 em 1", statusPagamento: "ativo", ciclo: "anual", valor: 958.8, proximaCobranca: "17/11/2026", clienteDesde: "17/11/2025", nivel: 1 },
+  { nome: "Marcos Tavares", email: "marcos.tv@email.com", pacote: "Pacote 03", statusPagamento: "atrasado", ciclo: "mensal", valor: 34.9, proximaCobranca: "26/07/2026", clienteDesde: "26/01/2026", nivel: 2 },
+  { nome: "Fernanda Lopes", email: "fer.lopes@email.com", pacote: "Turbo", statusPagamento: "pendente", ciclo: "mensal", valor: 49, proximaCobranca: "10/08/2026", clienteDesde: "10/04/2026", nivel: 3 },
 ];
+
+const BANNERS_AFILIADOS = [
+  {
+    titulo: "Torne-se um Afiliado PPN",
+    subtitulo: "Ganhe até 10% de comissão recorrente por cada amigo indicado.",
+    imagemUrl: "https://images.unsplash.com/photo-1557804506-669a67965ba0?q=80&w=800&auto=format&fit=crop",
+    linkDestino: "/dashboard",
+  },
+  {
+    titulo: "Vantagens do Nível 3",
+    subtitulo: "Como afiliado nível 3, você tem acesso a saques via Pix e bônus exclusivos.",
+    imagemUrl: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?q=80&w=800&auto=format&fit=crop",
+    linkDestino: "/dashboard",
+  },
+];
+
+/** Banners do convite de afiliado — só insere quando a tabela está vazia. */
+async function semearBannersAfiliados() {
+  const [b] = await db.select({ n: sql<number>`count(*)` }).from(bannersAfiliados);
+  if (Number(b?.n ?? 0) > 0) return 0;
+  await db.insert(bannersAfiliados).values(BANNERS_AFILIADOS);
+  return BANNERS_AFILIADOS.length;
+}
 
 async function contar() {
   const [p] = await db.select({ n: sql<number>`count(*)` }).from(pacotes);
@@ -233,6 +257,8 @@ export async function executarSeed({ force = false }: { force?: boolean } = {}) 
   // catálogo de apps é sincronizado sempre — preço de tabela muda com o tempo
   await semearAplicativos();
   await semearPoolJogos();
+  // banners do convite de afiliado: idempotente, roda mesmo em banco já populado
+  await semearBannersAfiliados();
 
   if (!force && (antes.pacotes > 0 || antes.contas > 0 || antes.usuarios > 0)) {
     return { seeded: false, ...antes };
@@ -242,6 +268,8 @@ export async function executarSeed({ force = false }: { force?: boolean } = {}) 
     await db.delete(usuarios);
     await db.delete(contasMatrizes);
     await db.delete(pacotes);
+    await db.delete(bannersAfiliados);
+    await semearBannersAfiliados();
   }
 
   const criados = await db.insert(pacotes).values(PACOTES).returning();
@@ -263,6 +291,7 @@ export async function executarSeed({ force = false }: { force?: boolean } = {}) 
       valor: c.valor,
       proximaCobranca: c.proximaCobranca,
       clienteDesde: c.clienteDesde,
+      nivel: c.nivel,
       pacoteId: criados.find((p) => p.nome === c.pacote)?.id ?? null,
     })),
   );

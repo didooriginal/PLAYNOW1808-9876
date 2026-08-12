@@ -5,7 +5,7 @@
 // `tipo` muda o roteiro de login:
 //   - "web"  → site no navegador (Netflix, Disney+, ...)
 //   - "app"  → app/TV Box com código de ativação (IPTV, UniTV, Funplay, ...)
-//   - "perfil" → conta compartilhada onde o cliente tem um PERFIL próprio
+//   - "perfil" → conta compartilhada (o cliente usa o perfil indicado no painel)
 
 export type TipoAcesso = "web" | "app" | "perfil";
 
@@ -27,7 +27,7 @@ export type ServicoInfo = {
 export const REGRAS_OURO: string[] = [
   "Nunca troque a senha, o e-mail ou o telefone da conta — isso derruba o acesso e o pedido de reposição pode levar até 24h.",
   "Não convide outras pessoas, não altere o plano e não cancele nada dentro do app.",
-  "Use somente o seu perfil. Mexer no perfil de outro usuário apaga a lista e o histórico dele.",
+  "Use somente o perfil indicado no seu card. Mexer no perfil de outro usuário apaga a lista e o histórico dele.",
   "Se pedir um código de verificação por e-mail, pegue em “Seu código de acesso recente” aqui no painel.",
   "Deu erro de login ou “muitos dispositivos”? Use o botão Relatar problema no card — a reposição é automática.",
 ];
@@ -42,9 +42,9 @@ const PASSOS_WEB = (nome: string) => [
 
 const PASSOS_PERFIL = (nome: string) => [
   `Toque em “Abrir ${nome}” e faça login com o e-mail e a senha do card.`,
-  "Na tela de perfis, escolha o perfil com o SEU nome.",
-  "Se ainda não existe um perfil seu, crie um com o seu primeiro nome.",
-  "Pronto: sua lista e seu histórico ficam salvos nesse perfil.",
+  "Na tela de perfis, escolha o perfil indicado no seu card do painel.",
+  "Nunca crie perfis novos e nunca altere o nome dos perfis existentes.",
+  "Pronto: sua lista e seu histórico ficam salvos no perfil que foi reservado para você.",
 ];
 
 const PASSOS_APP = (nome: string) => [
@@ -90,7 +90,7 @@ function app(url: string, nome: string, dispositivos: string, dicas: string[] = 
 export const SERVICOS_INFO: Record<string, ServicoInfo> = {
   /* ---------------- streaming de vídeo ---------------- */
   netflix: web("https://www.netflix.com/br/login", "Netflix", "Smart TV, celular, navegador, console", [
-    "Escolha sempre o perfil com o seu nome — a Netflix guarda “Continuar assistindo” por perfil.",
+    "Escolha sempre o perfil indicado no seu card — o app guarda “Continuar assistindo” por perfil.",
     "Se pedir “Atualize sua residência”, não confirme nada: peça o código pelo painel.",
   ], "perfil"),
   "netflix-individual": web("https://www.netflix.com/br/login", "Netflix", "Smart TV, celular, navegador, console", [

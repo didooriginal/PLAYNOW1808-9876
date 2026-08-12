@@ -70,7 +70,7 @@ export function SiteHeader() {
           <Link to="/signup">
             <NeonButton accent="red" size="sm">
               <Zap className="size-4" />
-              Assine Agora
+              Assine agora!
             </NeonButton>
           </Link>
           <button
@@ -114,7 +114,7 @@ export function SiteHeader() {
               onClick={() => setOpen(false)}
               className="rounded-xl px-4 py-3 font-sans text-sm font-semibold text-neon-red hover:bg-white/5"
             >
-              Assinar Agora
+              Assine agora!
             </Link>
           </div>
         </div>

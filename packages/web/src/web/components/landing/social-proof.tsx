@@ -5,7 +5,7 @@ import { testimonials } from "@/lib/mock-data";
 const guarantees = [
   {
     icon: ShieldCheck,
-    title: "1.540 assinaturas ativas",
+    title: "Qualidade garantida",
     text: "Contas conferidas uma a uma antes de entrar no seu painel.",
     accent: "cyan" as const,
   },
@@ -45,7 +45,7 @@ export function SocialProof() {
           eyebrow="Quem acredita na gente"
           title={
             <>
-              <span className="text-neon-red glow-red">1.540</span> assinaturas ativas pagando
+              <span className="text-neon-red glow-red">5.4k+</span> assinaturas ativas pagando
               menos todo mês
             </>
           }

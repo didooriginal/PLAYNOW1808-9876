@@ -396,6 +396,8 @@ export const usuarios = {
         ciclo: z.enum(["mensal", "anual"]).default("mensal"),
         valor: z.number().nonnegative().default(0),
         telefone: z.string().optional(),
+        senha: z.string().optional(),
+        confirmarSenha: z.string().optional(),
       }),
     )
     .handler(async ({ input, context }) => {
@@ -404,6 +406,11 @@ export const usuarios = {
         .from(tabelaUsuarios)
         .where(eq(tabelaUsuarios.authUserId, context.user.id));
       if (!cliente) throw new ORPCError("NOT_FOUND", { message: "Cliente não encontrado" });
+
+      // confere a confirmação de senha também no servidor
+      if (input.senha && input.confirmarSenha && input.senha !== input.confirmarSenha) {
+        throw new ORPCError("BAD_REQUEST", { message: "As senhas informadas não coincidem." });
+      }
 
       const [row] = await db
         .update(tabelaUsuarios)

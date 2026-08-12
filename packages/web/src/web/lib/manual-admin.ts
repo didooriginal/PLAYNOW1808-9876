@@ -582,7 +582,7 @@ export const MANUAL: SecaoManual[] = [
         itens: [
           {
             termo: "Checklist de boas-vindas",
-            desc: "No primeiro acesso o cliente é obrigado a marcar as 5 regras de uso (não repassar senha, 1 tela, só o próprio perfil, pagar em dia, tentar o autoatendimento antes). O aceite fica gravado com data e hora.",
+            desc: "No primeiro acesso o cliente é obrigado a marcar as 5 regras de uso (não repassar senha, 1 tela, apenas o perfil indicado, pagar em dia, tentar o autoatendimento antes). O aceite fica gravado com data e hora.",
           },
           {
             termo: "Contador regressivo",

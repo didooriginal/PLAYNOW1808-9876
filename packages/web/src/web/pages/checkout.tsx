@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useSearch } from "wouter";
 import {
+  ArrowLeft,
   ArrowRight,
   Check,
   Copy,
@@ -83,6 +84,8 @@ export default function CheckoutPage() {
   const [metodo, setMetodo] = useState<"pix" | "cartao">("pix");
   const [txid, setTxid] = useState<string | null>(null);
   const [copiado, setCopiado] = useState(false);
+  /** volta do QR gerado para a escolha de método sem recarregar o checkout */
+  const resetarPix = () => setTxid(null);
   const status = useStatusCheckout(txid);
   const pago = status.data?.status === "pago";
 
@@ -371,6 +374,16 @@ export default function CheckoutPage() {
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
+                {txid && !pago && (
+                  <button
+                    type="button"
+                    onClick={resetarPix}
+                    aria-label="Voltar e escolher outro método"
+                    className="mr-1 rounded-lg p-1 text-white/40 hover:bg-white/10 hover:text-white"
+                  >
+                    <ArrowLeft className="size-4" />
+                  </button>
+                )}
                 <QrCode className="size-4 text-neon-cyan" />
                 <span className="font-display text-sm font-bold text-white">Pagar com Pix</span>
               </div>

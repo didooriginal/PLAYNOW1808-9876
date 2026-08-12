@@ -94,7 +94,9 @@ export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [telefone, setTelefone] = useState("");
   const [senha, setSenha] = useState("");
+  const [confirmarSenha, setConfirmarSenha] = useState("");
   const [verSenha, setVerSenha] = useState(false);
+  const [verConfirmarSenha, setVerConfirmarSenha] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(false);
 
@@ -103,6 +105,10 @@ export default function SignupPage() {
     setErro(null);
     if (senha.length < 8) {
       setErro("A senha precisa ter no mínimo 8 caracteres.");
+      return;
+    }
+    if (senha !== confirmarSenha) {
+      setErro("As senhas não coincidem.");
       return;
     }
     setCarregando(true);
@@ -133,7 +139,9 @@ export default function SignupPage() {
         pacoteId: pacote?.id ?? null,
         ciclo,
         valor: valorMes,
-        telefone: telefone.trim() || undefined,
+        telefone: telefone.trim(),
+        senha,
+        confirmarSenha,
       });
     } catch {
       /* conta criada — o pacote pode ser ajustado pelo atendimento */
@@ -272,9 +280,10 @@ export default function SignupPage() {
           />
         </AuthField>
 
-        <AuthField label="WhatsApp" hint="Usamos só para suporte e avisos importantes.">
+        <AuthField label="WhatsApp" hint="Essencial para suporte e avisos importantes.">
           <input
             type="tel"
+            required
             value={telefone}
             onChange={(e) => setTelefone(e.target.value)}
             placeholder="(21) 96472-7746"
@@ -304,6 +313,28 @@ export default function SignupPage() {
           </div>
         </AuthField>
 
+        <AuthField label="Confirmar senha">
+          <div className="relative">
+            <input
+              type={verConfirmarSenha ? "text" : "password"}
+              required
+              autoComplete="new-password"
+              value={confirmarSenha}
+              onChange={(e) => setConfirmarSenha(e.target.value)}
+              placeholder="••••••••"
+              className={`${inputClass} pr-12`}
+            />
+            <button
+              type="button"
+              onClick={() => setVerConfirmarSenha((v) => !v)}
+              aria-label={verConfirmarSenha ? "Ocultar senha" : "Mostrar senha"}
+              className="absolute inset-y-0 right-0 flex w-12 items-center justify-center text-white/35 transition-colors hover:text-white/70"
+            >
+              {verConfirmarSenha ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+            </button>
+          </div>
+        </AuthField>
+
         {erro && (
           <div className="flex items-start gap-2.5 rounded-xl border border-neon-red/35 bg-neon-red/10 px-4 py-3">
             <TriangleAlert className="mt-0.5 size-4 shrink-0 text-neon-red" />
@@ -326,7 +357,7 @@ export default function SignupPage() {
         </NeonButton>
 
         <ul className="space-y-2">
-          {["Pagamento por Pix na plataforma, com baixa automática", "Cancele quando quiser, sem multa"].map(
+          {["Pagamento por Pix ou cartão na plataforma, com baixa automática", "Cancele quando quiser, sem multa"].map(
             (t) => (
               <li key={t} className="flex items-start gap-2 font-sans text-[11px] text-white/35">
                 <Check className="mt-0.5 size-3 shrink-0 text-neon-cyan" />
