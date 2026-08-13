@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+Disallow: /api/rpc
+Disallow: /api/auth
+Disallow: /api/webhooks
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /setup
+Disallow: /checkout
+Disallow: /redefinir-senha
+
+Sitemap: https://playplusnow.com.br/sitemap.xml

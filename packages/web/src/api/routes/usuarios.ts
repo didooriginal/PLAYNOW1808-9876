@@ -36,6 +36,8 @@ const usuarioPatch = z.object({
   proximaCobranca: z.string().optional(),
   clienteDesde: z.string().optional(),
   admin: z.boolean().optional(),
+  nivel: z.number().int().min(1).max(3).optional(),
+  aparelhos: z.string().optional(),
 });
 
 const usuarioInput = z.object({
@@ -70,6 +72,8 @@ const listarComPacote = () =>
       proximaCobranca: tabelaUsuarios.proximaCobranca,
       clienteDesde: tabelaUsuarios.clienteDesde,
       admin: tabelaUsuarios.admin,
+      nivel: tabelaUsuarios.nivel,
+      aparelhos: tabelaUsuarios.aparelhos,
       confiancaAte: tabelaUsuarios.confiancaAte,
       confiancaMotivo: tabelaUsuarios.confiancaMotivo,
       confiancaTotal: tabelaUsuarios.confiancaTotal,
@@ -394,8 +398,10 @@ export const usuarios = {
       z.object({
         pacoteId: z.number().int().nullable(),
         ciclo: z.enum(["mensal", "anual"]).default("mensal"),
+        /** apenas referência do front — o servidor recalcula pelo pacote */
         valor: z.number().nonnegative().default(0),
         telefone: z.string().optional(),
+        aparelhos: z.string().optional(),
         senha: z.string().optional(),
         confirmarSenha: z.string().optional(),
       }),
@@ -412,13 +418,33 @@ export const usuarios = {
         throw new ORPCError("BAD_REQUEST", { message: "As senhas informadas não coincidem." });
       }
 
+      /**
+       * PREÇO SEMPRE DO SERVIDOR. O valor que chega do front é ignorado quando
+       * existe pacote — senão bastava editar o payload para pagar R$ 1.
+       */
+      let valorFinal = input.valor;
+      if (input.pacoteId) {
+        const [pacoteOficial] = await db
+          .select({ preco: pacotes.preco, precoAnual: pacotes.precoAnual })
+          .from(pacotes)
+          .where(eq(pacotes.id, input.pacoteId));
+        if (!pacoteOficial) {
+          throw new ORPCError("NOT_FOUND", { message: "Pacote não encontrado" });
+        }
+        valorFinal =
+          input.ciclo === "anual"
+            ? (pacoteOficial.precoAnual ?? pacoteOficial.preco)
+            : pacoteOficial.preco;
+      }
+
       const [row] = await db
         .update(tabelaUsuarios)
         .set({
           pacoteId: input.pacoteId,
           ciclo: input.ciclo,
-          valor: input.valor,
+          valor: valorFinal,
           ...(input.telefone ? { telefone: input.telefone } : {}),
+          ...(input.aparelhos ? { aparelhos: input.aparelhos } : {}),
           statusPagamento: cliente.statusPagamento === "ativo" ? "ativo" : "pendente",
         })
         .where(eq(tabelaUsuarios.id, cliente.id))

@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { ArrowLeft, LogOut } from "lucide-react";
+import { ArrowLeft, LogOut, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "./logo";
-import type { Accent } from "@/lib/mock-data";
+import { whatsappLink, type Accent } from "@/lib/mock-data";
 import { accentHex } from "./ui/kit";
 import { authClient, clearToken } from "../lib/auth";
 
@@ -180,6 +180,17 @@ export function PanelShell({
         </div>
 
         <main className="px-4 py-6 sm:px-7 sm:py-9">{children}</main>
+
+        {/* atalho fixo para o suporte no WhatsApp */}
+        <a
+          href={whatsappLink("Olá! Preciso de ajuda no suporte.")}
+          target="_blank"
+          rel="noreferrer"
+          aria-label="Falar com o suporte no WhatsApp"
+          className="fixed bottom-6 right-6 z-50 flex size-14 items-center justify-center rounded-full border border-emerald-400/50 bg-emerald-500 text-white shadow-[0_0_30px_rgba(16,185,129,0.5)] transition-transform hover:scale-110 active:scale-95 lg:bottom-8 lg:right-8"
+        >
+          <MessageCircle className="size-7" />
+        </a>
       </div>
     </div>
   );

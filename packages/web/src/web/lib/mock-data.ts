@@ -10,8 +10,17 @@
 /** número oficial de atendimento — sobrescreva com VITE_WHATSAPP_NUMERO no .env */
 export const WHATSAPP_NUMBER = import.meta.env.VITE_WHATSAPP_NUMERO ?? "5521964727746";
 
-export function whatsappLink(message: string) {
-  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+/**
+ * Aceita duas formas:
+ *  - `whatsappLink("mensagem")` -> usa o número oficial de atendimento
+ *  - `whatsappLink("21 99999-9999", "mensagem")` -> usa o número informado
+ */
+export function whatsappLink(phoneOrMessage: string, maybeText?: string) {
+  if (maybeText !== undefined) {
+    const numero = phoneOrMessage.replace(/\D/g, "");
+    return `https://wa.me/${numero}?text=${encodeURIComponent(maybeText)}`;
+  }
+  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(phoneOrMessage)}`;
 }
 
 export type Accent = "red" | "cyan" | "purple";
@@ -46,21 +55,23 @@ export type Service = {
   price: number;
   /** categoria do catálogo: Streaming | Esportes | Música | Produtividade | IPTV | Asiático */
   category: string;
+  /** link oficial onde o cliente resgata o gift card / ativa o acesso */
+  redeemUrl?: string;
 };
 
 export const services: Service[] = [
-  { id: "netflix", name: "Netflix", mono: "N", color: "#e50914", retail: 59.9, price: 59.9, category: "Streaming" },
-  { id: "disney", name: "Disney+", mono: "D+", color: "#4f8ef7", retail: 43.9, price: 43.9, category: "Streaming" },
-  { id: "prime", name: "Amazon Prime Video", mono: "PV", color: "#00a8e1", retail: 20, price: 20, category: "Streaming" },
-  { id: "hbomax", name: "HBO Max", mono: "MAX", color: "#8b5cf6", retail: 55.9, price: 55.9, category: "Streaming" },
-  { id: "paramount", name: "Paramount+", mono: "P+", color: "#0064ff", retail: 19.9, price: 19.9, category: "Streaming" },
-  { id: "appletv", name: "Apple TV+", mono: "TV+", color: "#d4d4d8", retail: 21.9, price: 21.9, category: "Streaming" },
-  { id: "spotify", name: "Spotify", mono: "S", color: "#1db954", retail: 21.9, price: 21.9, category: "Música" },
-  { id: "youtube", name: "YouTube Premium", mono: "YT", color: "#ff0033", retail: 25.9, price: 25.9, category: "Streaming" },
-  { id: "crunchyroll", name: "Crunchyroll", mono: "CR", color: "#f47521", retail: 24.9, price: 24.9, category: "Asiático" },
-  { id: "globoplay", name: "Globoplay", mono: "G", color: "#ff5722", retail: 24.9, price: 24.9, category: "Streaming" },
-  { id: "deezer", name: "Deezer", mono: "DZ", color: "#a238ff", retail: 20.9, price: 20.9, category: "Música" },
-  { id: "canva", name: "Canva Pro", mono: "C", color: "#00c4cc", retail: 34.9, price: 34.9, category: "Produtividade" },
+  { id: "netflix", name: "Netflix", mono: "N", color: "#e50914", retail: 59.9, price: 19.9, category: "Streaming", redeemUrl: "https://www.netflix.com/redeem" },
+  { id: "disney", name: "Disney+", mono: "D+", color: "#4f8ef7", retail: 43.9, price: 14.9, category: "Streaming", redeemUrl: "https://www.disneyplus.com/redeem" },
+  { id: "prime", name: "Amazon Prime Video", mono: "PV", color: "#00a8e1", retail: 20, price: 20, category: "Streaming", redeemUrl: "https://www.amazon.com.br/gclp/redeem" },
+  { id: "hbomax", name: "HBO Max", mono: "MAX", color: "#8b5cf6", retail: 55.9, price: 14.9, category: "Streaming", redeemUrl: "https://www.max.com/redeem" },
+  { id: "paramount", name: "Paramount+", mono: "P+", color: "#0064ff", retail: 19.9, price: 9.9, category: "Streaming", redeemUrl: "https://www.paramountplus.com/redeem" },
+  { id: "appletv", name: "Apple TV+", mono: "TV+", color: "#d4d4d8", retail: 21.9, price: 9.9, category: "Streaming", redeemUrl: "https://tv.apple.com/redeem" },
+  { id: "spotify", name: "Spotify", mono: "S", color: "#1db954", retail: 21.9, price: 9.9, category: "Música", redeemUrl: "https://www.spotify.com/redeem" },
+  { id: "youtube", name: "YouTube Premium", mono: "YT", color: "#ff0033", retail: 25.9, price: 12.9, category: "Streaming", redeemUrl: "https://www.youtube.com/redeem" },
+  { id: "crunchyroll", name: "Crunchyroll", mono: "CR", color: "#f47521", retail: 24.9, price: 9.9, category: "Asiático", redeemUrl: "https://www.crunchyroll.com/redeem" },
+  { id: "globoplay", name: "Globoplay", mono: "G", color: "#ff5722", retail: 24.9, price: 9.9, category: "Streaming", redeemUrl: "https://globoplay.globo.com/resgatar" },
+  { id: "deezer", name: "Deezer", mono: "DZ", color: "#a238ff", retail: 20.9, price: 9.9, category: "Música", redeemUrl: "https://www.deezer.com/gift" },
+  { id: "canva", name: "Canva Pro", mono: "C", color: "#00c4cc", retail: 34.9, price: 34.9, category: "Produtividade", redeemUrl: "https://www.canva.com/redeem" },
   { id: "looke", name: "Looke", mono: "LK", color: "#e8112d", retail: 19.9, price: 19.9, category: "Streaming" },
   { id: "recordplus", name: "Record Plus", mono: "R+", color: "#00a3e0", retail: 14.9, price: 14.9, category: "Streaming" },
   { id: "iptv", name: "IPTV + Canais ao vivo", mono: "IP", color: "#22d3ee", retail: 45, price: 45, category: "IPTV" },

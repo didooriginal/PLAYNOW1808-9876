@@ -5,6 +5,7 @@ import {
   Gift,
   HelpCircle,
   Info,
+  Shield,
   LifeBuoy,
   CreditCard as PaymentIcon,
   ShieldCheck,
@@ -82,6 +83,17 @@ const faqCategories = [
       {
         q: "Em quais dispositivos posso assistir?",
         a: "Em qualquer dispositivo que suporte os aplicativos oficiais: Smart TVs, celulares (Android/iOS), tablets, PCs e TV Box.",
+      },
+    ],
+  },
+  {
+    id: "termos",
+    name: "Termos de Uso",
+    icon: Shield,
+    questions: [
+      {
+        q: "Quais são as regras de uso dos grupos?",
+        a: "Ao assinar você concorda em: 1) não compartilhar seus dados com terceiros; 2) usar apenas os 2 aparelhos cadastrados; 3) assistir em 1 tela por vez em cada aplicativo; 4) usar somente o perfil indicado no seu painel. O descumprimento gera banimento sem reembolso.",
       },
     ],
   },

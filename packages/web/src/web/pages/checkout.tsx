@@ -85,7 +85,11 @@ export default function CheckoutPage() {
   const [txid, setTxid] = useState<string | null>(null);
   const [copiado, setCopiado] = useState(false);
   /** volta do QR gerado para a escolha de método sem recarregar o checkout */
-  const resetarPix = () => setTxid(null);
+  const resetarPix = () => {
+    setTxid(null);
+    // limpa o erro/estado da mutação, senão o aviso antigo fica na tela
+    pagar.reset();
+  };
   const status = useStatusCheckout(txid);
   const pago = status.data?.status === "pago";
 

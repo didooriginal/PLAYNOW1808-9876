@@ -7,12 +7,14 @@ import {
   Goal,
   HeartPulse,
   HeartHandshake,
+  Megaphone,
   Wallet,
   CircleDollarSign,
   Copy,
   Database,
   Layers,
   LayoutDashboard,
+  MessageCircle,
   Smartphone,
   Loader2,
   Plus,
@@ -49,6 +51,7 @@ import { SuporteView } from "../components/admin/suporte-view";
 import { ManualView } from "../components/admin/manual-view";
 import { NetflixTvView } from "../components/admin/netflix-tv-view";
 import { CopilotoAdmin } from "../components/admin/copiloto";
+import { MarketingView } from "../components/admin/marketing-view";
 import { AlertasView } from "../components/admin/alertas-view";
 import { GestaoContasView } from "../components/admin/gestao-contas-view";
 import { EstoqueGiftView } from "../components/admin/estoque-gift-view";
@@ -84,7 +87,7 @@ import {
   type ServiceId,
 } from "@/lib/mock-data";
 import { useContas, useCriarConta, useResumoEstoque } from "../queries/contas";
-import { useMapaAlocacoes } from "../queries/alocacoes";
+import { useAlocarPorServico, useMapaAlocacoes } from "../queries/alocacoes";
 import { useAplicativos } from "../queries/aplicativos";
 import { useResumoSuporte } from "../queries/suporte";
 import { useResumoRecompensas } from "../queries/recompensas";
@@ -1842,6 +1845,7 @@ function ClientsTable({ compact = false }: { compact?: boolean }) {
     null,
   );
   const [dandoConfianca, setDandoConfianca] = useState<Cliente | null>(null);
+  const [adicionandoApp, setAdicionandoApp] = useState<Cliente | null>(null);
   const revogar = useRevogarConfianca();
 
   if (isPending) return <Loading label="Carregando clientes..." />;
@@ -1903,6 +1907,8 @@ function ClientsTable({ compact = false }: { compact?: boolean }) {
           <thead>
             <tr className="border-b border-white/8 text-left font-sans text-[10px] uppercase tracking-[0.16em] text-white/30">
               <th className="px-5 py-3 font-medium">Cliente</th>
+              <th className="px-3 py-3 text-center font-medium">Nível</th>
+              <th className="px-3 py-3 font-medium">Contatos &amp; aparelhos</th>
               <th className="px-3 py-3 font-medium">Pacote</th>
               <th className="px-3 py-3 font-medium">Valor</th>
               <th className="px-3 py-3 font-medium">Forma de pagamento</th>
@@ -1927,13 +1933,51 @@ function ClientsTable({ compact = false }: { compact?: boolean }) {
                         .join("")}
                     </span>
                     <div className="min-w-0">
-                      <div className="truncate font-display text-xs font-semibold text-white">
+                      <div className="flex items-center gap-2 truncate font-display text-xs font-semibold text-white">
                         {c.nome}
+                        {c.admin && (
+                          <Tooltip texto="cliente.adminSelo" titulo="Administrador">
+                            <ShieldCheck className="size-3 shrink-0 text-neon-purple" />
+                          </Tooltip>
+                        )}
                       </div>
                       <div className="truncate font-mono text-[10px] text-white/30">
                         {c.email}
                       </div>
                     </div>
+                  </div>
+                </td>
+                <td className="px-3 py-3.5 text-center">
+                  <select
+                    aria-label={`Nível do cliente ${c.nome}`}
+                    className="rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1.5 font-sans text-[11px] text-white/70 focus:border-neon-cyan/50 focus:outline-none"
+                    value={c.nivel ?? 1}
+                    onChange={(e) => atualizar.mutate({ id: c.id, nivel: Number(e.target.value) })}
+                  >
+                    {[1, 2, 3].map((n) => (
+                      <option key={n} value={n} className="bg-[#09090b]">
+                        Nível {n}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+                <td className="px-3 py-3.5">
+                  <div className="flex flex-col gap-1">
+                    <span className="flex items-center gap-1.5 font-sans text-[11px] text-white/60">
+                      <Smartphone className="size-3 shrink-0 text-neon-cyan" />
+                      <span className="max-w-[150px] truncate">{c.aparelhos || "—"}</span>
+                    </span>
+                    {c.telefone && (
+                      <a
+                        href={whatsappLink(c.telefone, `Olá, ${c.nome}!`)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center gap-1.5 font-sans text-[11px] text-white/40 hover:text-neon-cyan"
+                      >
+                        <MessageCircle className="size-3 shrink-0" />
+                        {c.telefone}
+                      </a>
+                    )}
                   </div>
                 </td>
                 <td className="px-3 py-3.5 font-sans text-xs text-white/55">
@@ -2019,6 +2063,41 @@ function ClientsTable({ compact = false }: { compact?: boolean }) {
                 </td>
                 <td className="px-5 py-3.5">
                   <div className="flex items-center justify-end gap-2">
+                    <Tooltip texto="cliente.alocarApp" titulo="Adicionar app manualmente" lado="left">
+                      <button
+                        type="button"
+                        aria-label={`Adicionar app para ${c.nome}`}
+                        onClick={() => setAdicionandoApp(c)}
+                        className="flex size-8 items-center justify-center rounded-lg border border-white/10 text-white/30 transition-colors hover:border-neon-cyan/50 hover:text-neon-cyan"
+                      >
+                        <Plus className="size-3.5" />
+                      </button>
+                    </Tooltip>
+                    <Tooltip
+                      texto="cliente.admin"
+                      titulo={c.admin ? "Remover acesso admin" : "Tornar administrador"}
+                      lado="left"
+                    >
+                      <button
+                        type="button"
+                        aria-label={c.admin ? `Remover admin de ${c.nome}` : `Tornar ${c.nome} admin`}
+                        disabled={atualizar.isPending}
+                        onClick={() => {
+                          const msg = c.admin
+                            ? `Remover os privilégios de administrador de ${c.nome}?`
+                            : `Tornar ${c.nome} administrador do sistema?`;
+                          if (confirm(msg)) atualizar.mutate({ id: c.id, admin: !c.admin });
+                        }}
+                        className={cn(
+                          "flex size-8 items-center justify-center rounded-lg border transition-colors",
+                          c.admin
+                            ? "border-neon-purple/55 bg-neon-purple/12 text-white"
+                            : "border-white/10 text-white/30 hover:border-neon-purple/50 hover:text-neon-purple",
+                        )}
+                      >
+                        <KeyRound className="size-3.5" />
+                      </button>
+                    </Tooltip>
                     {c.confianca?.ativa ? (
                       <Tooltip
                         texto="cliente.confiancaRevogar"
@@ -2065,7 +2144,15 @@ function ClientsTable({ compact = false }: { compact?: boolean }) {
                         className="flex size-8 items-center justify-center rounded-lg border border-white/10 text-white/30 transition-colors hover:border-neon-red/50 hover:text-neon-red"
                         aria-label="Excluir cliente"
                         disabled={remover.isPending}
-                        onClick={() => remover.mutate({ id: c.id })}
+                        onClick={() => {
+                          if (
+                            confirm(
+                              `Excluir o cliente ${c.nome}? A ação é irreversível.`,
+                            )
+                          ) {
+                            remover.mutate({ id: c.id });
+                          }
+                        }}
                       >
                         <Trash2 className="size-3.5" />
                       </button>
@@ -2077,7 +2164,7 @@ function ClientsTable({ compact = false }: { compact?: boolean }) {
             {rows.length === 0 && (
               <tr>
                 <td
-                  colSpan={7}
+                  colSpan={9}
                   className="px-5 py-10 text-center font-sans text-sm text-white/35"
                 >
                   Nenhum cliente nesta aba.
@@ -2095,6 +2182,12 @@ function ClientsTable({ compact = false }: { compact?: boolean }) {
         />
       )}
 
+      {adicionandoApp && (
+        <ModalAdicionarAppCliente
+          cliente={adicionandoApp}
+          onClose={() => setAdicionandoApp(null)}
+        />
+      )}
       {dandoConfianca && (
         <ModalConfianca
           cliente={dandoConfianca}
@@ -2102,6 +2195,93 @@ function ClientsTable({ compact = false }: { compact?: boolean }) {
         />
       )}
     </GlassCard>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+
+/**
+ * ALOCAÇÃO MANUAL — coloca o cliente em uma vaga livre de conta matriz do
+ * serviço escolhido. Sem vaga, o servidor devolve erro em vez de alocar.
+ */
+function ModalAdicionarAppCliente({
+  cliente,
+  onClose,
+}: {
+  cliente: Cliente;
+  onClose: () => void;
+}) {
+  const alocar = useAlocarPorServico();
+  const { data: apps } = useAplicativos();
+  const ativos = (apps ?? []).filter((a) => a.ativo);
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
+      <div className="w-full max-w-md overflow-hidden rounded-3xl border border-white/12 bg-[#0b0b0f] p-6 shadow-2xl">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="font-sans text-[10px] uppercase tracking-[0.22em] text-white/35">
+              Alocação manual
+            </div>
+            <h3 className="mt-1 font-display text-xl font-extrabold text-white">
+              Adicionar app · {cliente.nome}
+            </h3>
+            <p className="mt-1 font-sans text-xs text-white/40">
+              Escolha o serviço — o sistema procura uma vaga livre nas contas matrizes.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Fechar"
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg text-white/40 hover:text-white"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+
+        <div className="mt-6 grid max-h-[50vh] gap-2 overflow-y-auto">
+          {ativos.map((app) => (
+            <button
+              key={app.id}
+              type="button"
+              disabled={alocar.isPending}
+              onClick={() =>
+                alocar.mutate(
+                  { clienteId: cliente.id, servico: app.slug },
+                  { onSuccess: onClose },
+                )
+              }
+              className="flex items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.03] p-3 text-left transition-all hover:border-neon-cyan/50 hover:bg-white/[0.06] disabled:opacity-40"
+            >
+              <AppIcon id={app.slug as ServiceId} size="sm" active />
+              <div className="min-w-0 flex-1">
+                <div className="font-display text-sm font-bold text-white">{app.nome}</div>
+                <div className="font-sans text-[10px] text-white/30">
+                  Alocar em uma matriz disponível
+                </div>
+              </div>
+              {alocar.isPending && alocar.variables?.servico === app.slug ? (
+                <Loader2 className="size-4 animate-spin text-neon-cyan" />
+              ) : (
+                <Plus className="size-4 text-white/20" />
+              )}
+            </button>
+          ))}
+          {ativos.length === 0 && (
+            <p className="py-8 text-center font-sans text-sm text-white/30">
+              Nenhum aplicativo ativo no catálogo.
+            </p>
+          )}
+        </div>
+
+        {alocar.isError && (
+          <div className="mt-4 rounded-xl border border-neon-red/20 bg-neon-red/5 p-3 font-sans text-[11px] text-neon-red">
+            {alocar.error.message}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -2116,6 +2296,7 @@ function NovoClienteForm() {
     pacoteId: 0,
     valor: 0,
     proximaCobranca: "",
+    admin: false,
   });
 
   const input =
@@ -2499,6 +2680,7 @@ export default function AdminPage() {
     { id: "saude", label: "Saúde & Estoque", icon: HeartPulse },
     { id: "jogos", label: "Futebol Ao Vivo", icon: Goal },
     { id: "winback", label: "Recuperação", icon: HeartHandshake },
+    { id: "marketing", label: "Marketing", icon: Megaphone },
     {
       id: "afiliados",
       label: "Afiliados/Gamificação",
@@ -2563,6 +2745,10 @@ export default function AdminPage() {
     clientes: {
       title: "Clientes",
       sub: "Base completa de assinantes e seus pacotes.",
+    },
+    marketing: {
+      title: "Marketing",
+      sub: "Biblioteca de textos prontos para WhatsApp e redes sociais.",
     },
     gestaocontas: {
       title: "Gestão de Contas",
@@ -2685,6 +2871,7 @@ export default function AdminPage() {
           {active === "saude" && <SaudeView />}
           {active === "jogos" && <JogosView />}
           {active === "winback" && <RecuperacaoView />}
+          {active === "marketing" && <MarketingView />}
           {active === "suporte" && <SuporteView />}
           {active === "faturas" && (
             <>

@@ -38,3 +38,9 @@ export function useLiberarVaga() {
   const invalidar = useInvalidarAlocacoes();
   return useMutation(orpc.alocacoes.liberar.mutationOptions({ onSuccess: invalidar }));
 }
+
+/** aloca o cliente em qualquer vaga livre do serviço escolhido (admin) */
+export function useAlocarPorServico() {
+  const invalidar = useInvalidarAlocacoes();
+  return useMutation(orpc.alocacoes.alocarPorServico.mutationOptions({ onSuccess: invalidar }));
+}

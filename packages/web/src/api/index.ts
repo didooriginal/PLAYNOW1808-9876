@@ -28,7 +28,9 @@ import { validarAssinaturaWebhook } from "./lib/mercadopago";
 import { checkout } from "./routes/checkout";
 import { ciclos } from "./routes/ciclos";
 import { senha } from "./routes/senha";
+import { marketing } from "./routes/marketing";
 import { gerarBackupExcel } from "./lib/backup";
+import { processarLembretesVencimento } from "./lib/emails/cron";
 import { auth } from "./auth";
 import { criarAssistente } from "./agent";
 import { criarCopiloto } from "./agent/admin";
@@ -68,6 +70,7 @@ export const router = {
   ciclos,
   senha,
   renovacao,
+  marketing,
   seed,
 };
 
@@ -380,6 +383,27 @@ app.post("/api/webhooks/mercadopago", async (c) => {
     return c.json({ ...resultado, assinatura: assinaturaOk }, 200);
   } catch (e) {
     // erro nosso ou do gateway: devolve 500 para o MP tentar de novo
+    return c.json({ ok: false, erro: e instanceof Error ? e.message : String(e) }, 500);
+  }
+});
+
+/**
+ * CRON de lembrete de vencimento (avisa quem vence em 3 dias).
+ * Chamado por um scheduler externo com `Authorization: Bearer $CRON_SECRET`.
+ * Sem CRON_SECRET no .env o endpoint fica DESLIGADO (503) — nunca aberto.
+ */
+app.get("/api/cron/vencimento", async (c) => {
+  const segredo = process.env.CRON_SECRET;
+  if (!segredo) {
+    return c.json({ ok: false, erro: "CRON_SECRET não configurado" }, 503);
+  }
+  if (c.req.header("authorization") !== `Bearer ${segredo}`) {
+    return c.json({ ok: false, erro: "não autorizado" }, 401);
+  }
+  try {
+    const resultado = await processarLembretesVencimento();
+    return c.json({ ok: true, ...resultado }, 200);
+  } catch (e) {
     return c.json({ ok: false, erro: e instanceof Error ? e.message : String(e) }, 500);
   }
 });

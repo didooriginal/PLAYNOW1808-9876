@@ -51,10 +51,12 @@ export function Footer() {
     <footer className="relative border-t border-white/8 px-4 py-14 sm:px-6">
       <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[1.2fr_1fr_1fr_1fr]">
         <div>
-          <Logo size="sm" />
+          <Link href="/" aria-label="PLAYPLUSNOW — ir para a página inicial" className="inline-block">
+            <Logo size="sm" />
+          </Link>
           <p className="mt-5 max-w-xs font-sans text-xs leading-relaxed text-white/35">
-            PLAYPLUSNOW é uma plataforma de gestão de pacotes de streaming compartilhados. Interface
-            de demonstração com dados fictícios.
+            PLAYPLUSNOW é a sua plataforma de gestão de entretenimento: todos os seus serviços de
+            streaming em um só lugar, pagando menos.
           </p>
           <div className="mt-5 flex gap-2">
             {[MessageCircle, Send].map((Icon, i) => (
@@ -89,10 +91,10 @@ export function Footer() {
           {
             title: "Suporte",
             links: [
-              { label: "Central de ajuda", href: "#" },
-              { label: "Como instalar na TV", href: "#" },
-              { label: "Termos de uso", href: "#" },
-              { label: "Privacidade", href: "#" },
+              { label: "Central de ajuda", href: "#faq" },
+              { label: "Como instalar na TV", href: "/tutoriais", route: true },
+              { label: "Termos de uso", href: "/termos", route: true },
+              { label: "Privacidade", href: "/privacidade", route: true },
             ],
           },
         ].map((col) => (
@@ -127,11 +129,11 @@ export function Footer() {
 
       <div className="mx-auto mt-12 flex max-w-7xl flex-col items-center justify-between gap-3 border-t border-white/8 pt-6 sm:flex-row">
         <span className="font-sans text-[11px] text-white/25">
-          © 2026 PLAYPLUSNOW · Todos os dados exibidos são fictícios
+          © 2026 PLAYPLUSNOW · Todos os direitos reservados
         </span>
         <span className="inline-flex items-center gap-1.5 font-sans text-[11px] text-white/25">
           <ShieldCheck className="size-3.5 text-neon-cyan" />
-          Pagamentos via PIX e cartão · ambiente de demonstração
+          Pagamentos seguros via PIX e cartão
         </span>
       </div>
     </footer>

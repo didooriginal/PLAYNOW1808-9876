@@ -14,9 +14,9 @@ const REGRAS = [
   },
   {
     id: "tela",
-    titulo: "Uso apenas 1 tela por app",
+    titulo: "Uso apenas o meu perfil e os meus aparelhos",
     detalhe:
-      "Cada assinatura dá direito a uma tela simultânea. Telas extras derrubam o acesso de todos na conta.",
+      "Cada assinatura dá direito a 2 aparelhos cadastrados e 1 tela simultânea por app. Não compartilhe com terceiros.",
   },
   {
     id: "perfil",

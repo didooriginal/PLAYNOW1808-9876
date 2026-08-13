@@ -46,9 +46,43 @@ export const auth = betterAuth({
     },
   },
   secret: process.env.BETTER_AUTH_SECRET,
+  /**
+   * Origens confiáveis: em produção só o domínio configurado (WEBSITE_URL) e o
+   * host da própria requisição. Nunca `["*"]` — isso liberava CSRF de qualquer site.
+   * Em dev libera localhost/preview para o fluxo de desenvolvimento continuar.
+   */
   trustedOrigins: (request) => {
+    const permitidas = new Set<string>();
+    const site = process.env.WEBSITE_URL?.replace(/\/$/, "");
+    if (site) permitidas.add(site);
+    permitidas.add("https://playplusnow.com.br");
+    permitidas.add("https://www.playplusnow.com.br");
+
     const origin = request?.headers.get("origin");
-    return origin ? [origin] : ["*"];
+    const ehDev = process.env.NODE_ENV !== "production";
+    if (origin && (ehDev || permitidas.has(origin.replace(/\/$/, "")))) {
+      permitidas.add(origin);
+    }
+    if (ehDev) {
+      const host = request?.headers.get("host");
+      if (host) {
+        permitidas.add(`http://${host}`);
+        permitidas.add(`https://${host}`);
+      }
+    }
+    return [...permitidas];
+  },
+  /** freio de força bruta no login/reset: 20 req por minuto por IP */
+  rateLimit: {
+    enabled: true,
+    window: 60,
+    max: 20,
+    customRules: {
+      "/sign-in/email": { window: 60, max: 8 },
+      "/sign-up/email": { window: 300, max: 5 },
+      "/forget-password": { window: 300, max: 4 },
+      "/reset-password": { window: 300, max: 8 },
+    },
   },
   plugins: [bearer()],
   databaseHooks: {

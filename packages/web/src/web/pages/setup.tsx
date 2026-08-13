@@ -115,6 +115,24 @@ const pendencias = [
   },
 ];
 
+/**
+ * As senhas de teste NUNCA ficam no código nem em HTML servido ao navegador.
+ * Quem precisa recuperá-las usa `bun run admin` / o fluxo de "esqueci minha senha".
+ */
+function SenhaOculta() {
+  return (
+    <div className="rounded-xl border border-white/[0.07] bg-white/[0.02] px-4 py-3">
+      <span className="block font-sans text-[11px] uppercase tracking-wider text-white/35">
+        Senha
+      </span>
+      <span className="mt-1 block font-sans text-xs leading-relaxed text-white/55">
+        Não exposta aqui por segurança. Use{" "}
+        <code className="text-white/75">/esqueci-senha</code> para definir uma nova.
+      </span>
+    </div>
+  );
+}
+
 function Secao({
   id,
   eyebrow,
@@ -533,7 +551,7 @@ export default function SetupPage() {
                   </div>
                   <div className="mt-4 space-y-3">
                     <CopyValue label="E-mail" value="admin@playplusnow.com" />
-                    <CopyValue label="Senha" value="Admin@2026" secreto />
+                    <SenhaOculta />
                   </div>
                 </GlassCard>
 
@@ -545,7 +563,7 @@ export default function SetupPage() {
                   </div>
                   <div className="mt-4 space-y-3">
                     <CopyValue label="E-mail" value="diego.silva@email.com" />
-                    <CopyValue label="Senha" value="Cliente@2026" secreto />
+                    <SenhaOculta />
                   </div>
                   <p className="mt-5 border-t border-white/[0.07] pt-4 font-sans text-xs leading-relaxed text-white/35">
                     O cadastro caiu em cima da linha do seed (Diego Dias Silva, pacote Turbo),

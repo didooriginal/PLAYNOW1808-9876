@@ -16,7 +16,9 @@ export function Logo({ size = "md", withTagline = true, className }: LogoProps) 
   const s = sizes[size];
 
   return (
-    <div className={cn("flex select-none flex-col items-center leading-none", className)}>
+    <div
+      className={cn("flex select-none flex-col items-center leading-none", className)}
+    >
       <span
         className={cn(
           "font-display font-semibold uppercase text-white/70",

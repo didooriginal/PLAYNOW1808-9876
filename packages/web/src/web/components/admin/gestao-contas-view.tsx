@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   AlertTriangle,
   CreditCard,
+  ExternalLink,
   Loader2,
   PiggyBank,
   Plus,
@@ -15,6 +16,8 @@ import { GlassCard, NeonButton, Pill } from "../ui/kit";
 import { Ajuda, Campo, TituloSecao } from "../ui/tooltip";
 import { LinhaCodigo } from "./estoque-gift-view";
 import { BackupCard } from "./backup-card";
+import { cn } from "../../lib/utils";
+import { serviceById } from "../../lib/mock-data";
 import { useCodigosGift } from "../../queries/estoque-gift";
 import {
   useAtualizarConta,
@@ -57,6 +60,7 @@ function AplicarGiftCard({
   const codigos = useCodigosGift({ provider: servico, status: "disponivel" });
   const emUso = useCodigosGift({ provider: servico, status: "em_uso" });
   const lista = [...(emUso.data ?? []), ...(codigos.data ?? [])];
+  const linkResgate = serviceById(servico).redeemUrl;
 
   return (
     <div className="mt-4 rounded-2xl border border-white/8 bg-white/[0.02] p-4">
@@ -66,7 +70,23 @@ function AplicarGiftCard({
           Aplicar gift card
         </span>
         <Ajuda ajuda="contas.aplicarGift" lado="bottom" />
-        <span className="ml-auto font-sans text-[11px] text-white/35">
+        {linkResgate && (
+          <a
+            href={linkResgate}
+            target="_blank"
+            rel="noreferrer"
+            className="ml-auto inline-flex items-center gap-1 font-sans text-[10px] font-bold uppercase text-neon-cyan transition-colors hover:text-white"
+          >
+            <ExternalLink className="size-3" />
+            Resgatar no site
+          </a>
+        )}
+        <span
+          className={cn(
+            "font-sans text-[11px] text-white/35",
+            !linkResgate && "ml-auto",
+          )}
+        >
           {lista.length} código(s) no estoque
         </span>
       </div>

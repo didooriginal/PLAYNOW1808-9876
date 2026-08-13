@@ -93,6 +93,7 @@ export default function SignupPage() {
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
   const [telefone, setTelefone] = useState("");
+  const [aparelhos, setAparelhos] = useState("");
   const [senha, setSenha] = useState("");
   const [confirmarSenha, setConfirmarSenha] = useState("");
   const [verSenha, setVerSenha] = useState(false);
@@ -140,6 +141,7 @@ export default function SignupPage() {
         ciclo,
         valor: valorMes,
         telefone: telefone.trim(),
+        aparelhos: aparelhos.trim(),
         senha,
         confirmarSenha,
       });
@@ -272,6 +274,7 @@ export default function SignupPage() {
           <input
             type="email"
             required
+            pattern="[^@\s]+@[^@\s]+\.[a-zA-Z]{2,}"
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -287,6 +290,20 @@ export default function SignupPage() {
             value={telefone}
             onChange={(e) => setTelefone(e.target.value)}
             placeholder="(21) 96472-7746"
+            className={inputClass}
+          />
+        </AuthField>
+
+        <AuthField
+          label="Quais são os 2 aparelhos que você vai usar?"
+          hint="Informe marca e modelo. O plano libera 2 aparelhos, com 1 tela por vez."
+        >
+          <input
+            type="text"
+            required
+            value={aparelhos}
+            onChange={(e) => setAparelhos(e.target.value)}
+            placeholder="Ex.: TV LG, iPhone 15"
             className={inputClass}
           />
         </AuthField>

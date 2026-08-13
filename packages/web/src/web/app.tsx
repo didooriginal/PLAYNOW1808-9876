@@ -8,6 +8,9 @@ import SetupPage from "./pages/setup";
 import CheckoutPage from "./pages/checkout";
 import EsqueciSenhaPage from "./pages/esqueci-senha";
 import RedefinirSenhaPage from "./pages/redefinir-senha";
+import TermosPage from "./pages/termos";
+import PrivacidadePage from "./pages/privacidade";
+import TutoriaisPage from "./pages/tutoriais";
 import { Provider } from "./components/provider";
 import { AdminRoute, ProtectedRoute } from "./components/protected-route";
 import { AgentFeedback } from "@runablehq/website-runtime";
@@ -19,8 +22,16 @@ function App() {
         <Route path="/" component={Index} />
         <Route path="/login" component={LoginPage} />
         <Route path="/signup" component={SignupPage} />
-        <Route path="/setup" component={SetupPage} />
+        {/* documentação interna: só admin logado (contém detalhes de infra) */}
+        <Route path="/setup">
+          <AdminRoute>
+            <SetupPage />
+          </AdminRoute>
+        </Route>
         <Route path="/checkout" component={CheckoutPage} />
+        <Route path="/termos" component={TermosPage} />
+        <Route path="/privacidade" component={PrivacidadePage} />
+        <Route path="/tutoriais" component={TutoriaisPage} />
         <Route path="/esqueci-senha" component={EsqueciSenhaPage} />
         <Route path="/redefinir-senha" component={RedefinirSenhaPage} />
         <Route path="/dashboard">

@@ -26,6 +26,30 @@ export const AJUDA: Record<string, string> = {
     "Base completa de assinantes: pacote, valor, próxima cobrança e situação de pagamento.",
   "secao.gestaocontas":
     "O caixa das contas matrizes: saldo de gift card, custo mensal, alerta de saldo crítico e os parâmetros do negócio.",
+  "secao.marketing":
+    "Biblioteca de textos prontos (promoções, boas-vindas, suporte) para copiar e colar no WhatsApp e nas redes. Nada aqui é enviado automaticamente.",
+  "marketing.biblioteca":
+    "Todos os textos salvos, do mais novo para o mais antigo. Copiar leva o conteúdo para a área de transferência; editar sobrescreve o texto salvo.",
+  "marketing.titulo":
+    "Nome interno do texto, só para você achar depois. O cliente nunca vê este campo.",
+  "marketing.categoria":
+    "Etiqueta para organizar a lista: promoção, suporte, boas-vindas ou geral. Não muda o conteúdo.",
+  "marketing.conteudo":
+    "A mensagem em si, exatamente como será colada no WhatsApp. Quebras de linha e emojis são preservados.",
+  "marketing.copiloto":
+    "Abre o Copiloto Admin (a IA do painel) já com o seu pedido escrito. A resposta vem no chat — copie e salve aqui como texto.",
+  "cliente.nivel":
+    "Nível do cliente no programa de indicação (1 a 3). Define a comissão que ele recebe por indicação aprovada.",
+  "cliente.aparelhos":
+    "Aparelhos que o cliente informou no cadastro. Serve de referência no suporte — o plano libera 2 aparelhos, 1 tela por vez.",
+  "cliente.adminSelo":
+    "Indica que esta conta também tem acesso ao painel administrativo. Contas com selo não entram nas contagens de faturamento de cliente.",
+  "cliente.alocarApp":
+    "Coloca este cliente em uma vaga livre de conta matriz do serviço escolhido. Se não houver vaga, o sistema avisa em vez de alocar.",
+  "cliente.admin":
+    "Liga ou desliga o acesso ao painel administrativo desta conta. Mudança imediata: no próximo carregamento a pessoa entra (ou perde) o /admin.",
+  "cliente.adminNovo":
+    "Marque para já criar esta conta com acesso ao painel administrativo. Use apenas para a sua equipe.",
   "secao.estoquegift":
     "Os códigos de gift card que você já comprou e ainda não resgatou. Controla saldo disponível por provedor e aplica o código direto na conta matriz.",
   "secao.saude":

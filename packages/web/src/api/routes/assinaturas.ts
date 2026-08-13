@@ -5,6 +5,8 @@ import { adminOnly, authed } from "../middleware/auth";
 import { db } from "../database";
 import { assinaturas as tabelaAssinaturas, cobrancasPix, usuarios } from "../database/schema";
 import { enxugar, precificarPedido, type EntradaPedido, type Pedido } from "../lib/pedidos";
+import { enviarEmail } from "../services/email";
+import { templates } from "../lib/emails/templates";
 import {
   buscarAssinaturaMP,
   cancelarAssinaturaMP,
@@ -121,6 +123,34 @@ export async function baixarCobrancaAssinatura(entradaBaixa: {
       atualizadoEm: agora,
     })
     .where(eq(tabelaAssinaturas.id, assinatura.id));
+
+  // e-mail de confirmação só nas RENOVAÇÕES (a primeira cobrança já recebe a
+  // entrega de acesso em lib/pedidos.ts) — falha de envio não afeta a baixa
+  if (assinatura.cobrancasPagas > 0) {
+    try {
+      const [cliente] = await db
+        .select({ nome: usuarios.nome, email: usuarios.email })
+        .from(usuarios)
+        .where(eq(usuarios.id, assinatura.clienteId));
+      if (cliente) {
+        const email = templates.confirmacaoRenovacao({
+          nome: cliente.nome,
+          valor: `R$ ${(entradaBaixa.valor ?? assinatura.valor).toFixed(2).replace(".", ",")}`,
+          validade: dono?.proximaCobranca
+            ? dono.proximaCobranca.split("-").reverse().join("/")
+            : "—",
+        });
+        await enviarEmail({
+          para: cliente.email,
+          assunto: email.assunto,
+          texto: email.texto,
+          html: email.html,
+        });
+      }
+    } catch (e) {
+      console.error("[Email] falha ao enviar a confirmação de renovação:", e);
+    }
+  }
 
   return resultado;
 }

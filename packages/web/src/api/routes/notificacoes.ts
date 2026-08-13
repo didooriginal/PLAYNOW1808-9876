@@ -269,11 +269,22 @@ export const notificacoes = {
 
   marcarLida: authed
     .input(z.object({ ids: z.array(z.number().int()).min(1) }))
-    .handler(async ({ input }) => {
-      await db
-        .update(tabelaNotificacoes)
-        .set({ lida: true })
-        .where(inArray(tabelaNotificacoes.id, input.ids));
+    .handler(async ({ input, context }) => {
+      // sem este filtro qualquer cliente logado marcava a notificacao de outro (IDOR)
+      const [cliente] = await db
+        .select({ id: usuarios.id, admin: usuarios.admin })
+        .from(usuarios)
+        .where(eq(usuarios.authUserId, context.user.id));
+      if (!cliente) return { ok: false };
+
+      const filtro = cliente.admin
+        ? inArray(tabelaNotificacoes.id, input.ids)
+        : and(
+            inArray(tabelaNotificacoes.id, input.ids),
+            eq(tabelaNotificacoes.clienteId, cliente.id),
+          );
+
+      await db.update(tabelaNotificacoes).set({ lida: true }).where(filtro);
       return { ok: true };
     }),
 

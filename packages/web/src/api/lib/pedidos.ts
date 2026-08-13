@@ -6,6 +6,8 @@
 // tabela do banco. Depois que o Pix é confirmado, `aplicarPedido()` liga tudo
 // sozinho: pacote trocado, apps alocados, próxima cobrança e status ativo.
 import { and, eq, inArray } from "drizzle-orm";
+import { enviarEmail } from "../services/email";
+import { templates } from "./emails/templates";
 import { db } from "../database";
 import {
   aplicativos,
@@ -319,6 +321,24 @@ export async function aplicarPedido(clienteId: number, pedido: Pedido) {
   // o admin vê o cliente aguardando vaga na aba Saúde & Estoque)
   for (const servico of pedido.apps) {
     await garantirAlocacao(clienteId, servico);
+  }
+
+  // e-mail de entrega de acesso — nunca derruba a ativação se o envio falhar
+  try {
+    const linkPainel = `${process.env.WEBSITE_URL || "https://playplusnow.com.br"}/dashboard`;
+    const email = templates.entregaAcesso({
+      nome: cliente.nome,
+      email: cliente.email,
+      linkPainel,
+    });
+    await enviarEmail({
+      para: cliente.email,
+      assunto: email.assunto,
+      texto: email.texto,
+      html: email.html,
+    });
+  } catch (e) {
+    console.error("[Email] falha ao enviar a entrega de acesso:", e);
   }
 }
 

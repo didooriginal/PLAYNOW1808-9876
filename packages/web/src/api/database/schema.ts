@@ -177,6 +177,8 @@ export const usuarios = sqliteTable("usuarios", {
   confiancaConcedidaEm: integer("confianca_concedida_em", { mode: "timestamp" }),
   /** quantas vezes esse cliente já recebeu crédito de confiança */
   confiancaTotal: integer("confianca_total").notNull().default(0),
+  /** aparelhos cadastrados pelo cliente no signup (ex.: "TV LG, iPhone 15") */
+  aparelhos: text("aparelhos").notNull().default(""),
   /** vínculo com a conta de login (tabela `user` do Better Auth) */
   authUserId: text("auth_user_id").unique(),
   criadoEm: integer("criado_em", { mode: "timestamp" })
@@ -998,3 +1000,21 @@ export const assinaturas = sqliteTable("assinaturas", {
 
 export type Assinatura = typeof assinaturas.$inferSelect;
 export type NovaAssinatura = typeof assinaturas.$inferInsert;
+
+/* ------------------------------------------------------------------ */
+/* MARKETING — biblioteca de textos prontos do admin                   */
+/* ------------------------------------------------------------------ */
+
+export const marketingTexts = sqliteTable("marketing_texts", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  titulo: text("titulo").notNull(),
+  conteudo: text("conteudo").notNull(),
+  /** promo | suporte | boas_vindas | geral */
+  categoria: text("categoria").notNull().default("geral"),
+  criadoEm: integer("criado_em", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+export type MarketingText = typeof marketingTexts.$inferSelect;
+export type NovoMarketingText = typeof marketingTexts.$inferInsert;

@@ -353,8 +353,12 @@ function ActivePlanCard({
             rel="noreferrer"
             className="mt-4 block"
           >
-            <NeonButton accent="cyan" variant="outline" size="sm" className="w-full">
-              <MessageCircle className="size-4" />
+            <NeonButton
+              accent="cyan"
+              size="md"
+              className="w-full shadow-[0_0_20px_rgba(34,211,238,0.3)]"
+            >
+              <MessageCircle className="size-5" />
               Suporte no WhatsApp
             </NeonButton>
           </a>

@@ -26,9 +26,9 @@ export type ServicoInfo = {
 /** regras que valem para TODOS os serviços — sempre exibidas no modal */
 export const REGRAS_OURO: string[] = [
   "Nunca troque a senha, o e-mail ou o telefone da conta — isso derruba o acesso e o pedido de reposição pode levar até 24h.",
-  "Não convide outras pessoas, não altere o plano e não cancele nada dentro do app.",
+  "Os serviços são exclusivos para membros dos grupos. NÃO podem ser compartilhados com terceiros, sob risco de banimento sem reembolso.",
   "Use somente o perfil indicado no seu card. Mexer no perfil de outro usuário apaga a lista e o histórico dele.",
-  "Se pedir um código de verificação por e-mail, pegue em “Seu código de acesso recente” aqui no painel.",
+  "Limite de 2 aparelhos cadastrados por assinatura. Use apenas 1 tela por app por vez.",
   "Deu erro de login ou “muitos dispositivos”? Use o botão Relatar problema no card — a reposição é automática.",
 ];
 
@@ -55,7 +55,7 @@ const PASSOS_APP = (nome: string) => [
 ];
 
 const DICAS_PADRAO = [
-  "Assista em 1 tela por vez. Duas telas simultâneas no mesmo acesso podem travar a conta.",
+  "Assista em 1 tela por vez e em até 2 aparelhos cadastrados. Duas telas simultâneas no mesmo acesso travam a conta.",
   "Prefira o app oficial na Smart TV: a qualidade fica melhor do que no navegador.",
 ];
 

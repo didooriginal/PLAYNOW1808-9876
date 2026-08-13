@@ -89,6 +89,20 @@ export function CopilotoAdmin({ nome }: { nome?: string }) {
     return () => document.removeEventListener("keydown", onKey);
   }, []);
 
+  /**
+   * Outras telas do admin (ex.: aba Marketing) pedem um texto pronto disparando
+   * `ppn:abrir-copiloto` com `{ prompt }` — abre o painel já com a pergunta no campo.
+   */
+  useEffect(() => {
+    function onAbrir(e: Event) {
+      const prompt = (e as CustomEvent<{ prompt?: string }>).detail?.prompt ?? "";
+      setAberto(true);
+      if (prompt) setTexto(prompt);
+    }
+    window.addEventListener("ppn:abrir-copiloto", onAbrir);
+    return () => window.removeEventListener("ppn:abrir-copiloto", onAbrir);
+  }, []);
+
   function enviar(pergunta?: string) {
     const conteudo = (pergunta ?? texto).trim();
     if (!conteudo || ocupado) return;

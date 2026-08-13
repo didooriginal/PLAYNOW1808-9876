@@ -239,4 +239,16 @@ export const alocacoes = {
         conta: contas.find((c) => c.id === r.contaId) ?? null,
       }));
     }),
+  /** aloca um cliente em qualquer conta disponível para o serviço informado */
+  alocarPorServico: adminOnly
+    .input(z.object({ clienteId: z.number().int(), servico: z.string().min(1) }))
+    .handler(async ({ input }) => {
+      const row = await garantirAlocacao(input.clienteId, input.servico);
+      if (!row) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: `Nenhuma conta matriz disponível para o serviço "${input.servico}"`,
+        });
+      }
+      return row;
+    }),
 };
