@@ -47,11 +47,29 @@ export function normalizarCodigoTv(bruto: string) {
     .slice(0, 12);
 }
 
-async function clienteDaSessao(authUserId: string) {
+async function clienteDaSessaoOpcional(authUserId: string) {
   const [cliente] = await db.select().from(usuarios).where(eq(usuarios.authUserId, authUserId));
+  return cliente ?? null;
+}
+
+async function clienteDaSessao(authUserId: string) {
+  const cliente = await clienteDaSessaoOpcional(authUserId);
   if (!cliente) throw new ORPCError("NOT_FOUND", { message: "Cliente não encontrado" });
   return cliente;
 }
+
+/**
+ * Estado neutro da secao: usado quando o login existe mas ainda nao ha ficha de
+ * cliente (ex.: conta recem-criada ou cliente removido pelo admin). Sem isso a
+ * query de polling de 10s ficava batendo 404 em loop no console.
+ */
+const SEM_TELA = {
+  temNetflix: false as const,
+  conta: null,
+  codigos: [],
+  solicitacoes: [],
+  pendente: null,
+};
 
 /** vagas ativas do cliente em contas matrizes de Netflix */
 async function minhasContasNetflix(clienteId: number) {
@@ -90,7 +108,9 @@ export const netflix = {
    * historico/estado das solicitacoes de TV (Opcao B).
    */
   minhaTela: authed.handler(async ({ context }) => {
-    const cliente = await clienteDaSessao(context.user.id);
+    const cliente = await clienteDaSessaoOpcional(context.user.id);
+    // login sem ficha de cliente: devolve estado vazio em vez de 404 em loop
+    if (!cliente) return SEM_TELA;
     // inadimplente nao recebe codigo nem abre pedido de TV
     if (estaBloqueado(cliente.statusPagamento, cliente.confiancaAte)) {
       return {

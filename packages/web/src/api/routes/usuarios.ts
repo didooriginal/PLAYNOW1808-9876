@@ -278,10 +278,29 @@ export const usuarios = {
       return { ok: true, confianca: detalheConfianca(row) };
     }),
 
-  remover: adminOnly.input(z.object({ id: z.number().int() })).handler(async ({ input }) => {
-    await db.delete(tabelaUsuarios).where(eq(tabelaUsuarios.id, input.id));
-    return { ok: true };
-  }),
+  remover: adminOnly
+    .input(z.object({ id: z.number().int() }))
+    .handler(async ({ input, context }) => {
+      const [alvo] = await db
+        .select()
+        .from(tabelaUsuarios)
+        .where(eq(tabelaUsuarios.id, input.id));
+      if (!alvo) throw new ORPCError("NOT_FOUND", { message: "Cliente não encontrado" });
+      // trava de segurança: a ficha de um administrador nunca pode ser apagada
+      // pelo painel (foi assim que o acesso ao /admin já se perdeu uma vez).
+      if (alvo.admin) {
+        throw new ORPCError("FORBIDDEN", {
+          message: "Fichas de administrador não podem ser excluídas pelo painel",
+        });
+      }
+      if (alvo.authUserId && alvo.authUserId === context.user.id) {
+        throw new ORPCError("FORBIDDEN", {
+          message: "Você não pode excluir a sua própria ficha",
+        });
+      }
+      await db.delete(tabelaUsuarios).where(eq(tabelaUsuarios.id, input.id));
+      return { ok: true };
+    }),
 
   /**
    * PAINEL DO CLIENTE — exige sessão. Resolve o cliente pelo vínculo
@@ -458,13 +477,37 @@ export const usuarios = {
       .select()
       .from(tabelaUsuarios)
       .where(eq(tabelaUsuarios.authUserId, context.user.id));
+    const email = context.user.email.toLowerCase();
     const [porEmail] = cliente
       ? []
-      : await db
-          .select()
-          .from(tabelaUsuarios)
-          .where(eq(tabelaUsuarios.email, context.user.email.toLowerCase()));
-    const registro = cliente ?? porEmail ?? null;
+      : await db.select().from(tabelaUsuarios).where(eq(tabelaUsuarios.email, email));
+
+    let registro = cliente ?? porEmail ?? null;
+
+    // achou pelo e-mail mas sem vínculo: amarra o auth_user_id de uma vez
+    if (!cliente && porEmail) {
+      await db
+        .update(tabelaUsuarios)
+        .set({ authUserId: context.user.id })
+        .where(eq(tabelaUsuarios.id, porEmail.id));
+      registro = { ...porEmail, authUserId: context.user.id };
+    }
+
+    // conta de login sem ficha (ficha apagada ou criada antes do hook):
+    // recria automaticamente para não deixar a sessão órfã.
+    if (!registro) {
+      const [nova] = await db
+        .insert(tabelaUsuarios)
+        .values({
+          nome: context.user.name || email.split("@")[0],
+          email,
+          authUserId: context.user.id,
+          statusPagamento: "pendente",
+          clienteDesde: new Date().toISOString().slice(0, 10),
+        })
+        .returning();
+      registro = nova ?? null;
+    }
     return {
       authId: context.user.id,
       nome: registro?.nome ?? context.user.name,

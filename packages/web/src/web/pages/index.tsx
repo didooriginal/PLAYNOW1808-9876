@@ -6,7 +6,7 @@ import { Combos } from "../components/landing/combos";
 import { Builder } from "../components/landing/builder";
 import { SocialProof } from "../components/landing/social-proof";
 import { CtaBand, Footer } from "../components/landing/footer";
-import { AssistenteVisitante } from "../components/landing/assistente-visitante";
+import { AssistenteVisitanteLazy } from "../components/landing/assistente-visitante-lazy";
 import { WhatsappFlutuante } from "../components/landing/whatsapp-flutuante";
 import { NeonBackdrop } from "../components/ui/kit";
 import { Faq, Features, Stats } from "../components/landing/new-sections";
@@ -31,7 +31,7 @@ function Index() {
       <Footer />
 
       {/* flutuantes arrastaveis: robo de pre-venda + tag do WhatsApp */}
-      <AssistenteVisitante />
+      <AssistenteVisitanteLazy />
       <WhatsappFlutuante />
     </div>
   );

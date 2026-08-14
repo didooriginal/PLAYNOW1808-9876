@@ -6,7 +6,8 @@ import { useEu } from "../queries/usuarios";
 import { Logo } from "./logo";
 import { GlassCard, NeonBackdrop, NeonButton } from "./ui/kit";
 
-function Carregando() {
+/** Tela neutra de espera — usada na checagem de sessão e no Suspense das rotas. */
+export function Carregando({ texto = "Verificando sessão" }: { texto?: string }) {
   return (
     <main className="relative flex min-h-screen items-center justify-center">
       <NeonBackdrop />
@@ -14,7 +15,7 @@ function Carregando() {
         <Logo size="sm" withTagline={false} />
         <span className="inline-flex items-center gap-2 font-sans text-xs uppercase tracking-[0.22em] text-white/40">
           <Loader2 className="size-3.5 animate-spin" />
-          Verificando sessão
+          {texto}
         </span>
       </div>
     </main>
