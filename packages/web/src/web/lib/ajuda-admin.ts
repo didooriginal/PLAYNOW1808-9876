@@ -78,6 +78,22 @@ export const AJUDA: Record<string, string> = {
     "Fila única de tudo que exige ação humana: código pedido, TV para liberar, vencimento próximo e cliente atrasado.",
   "secao.senhas":
     "Pedidos de 'esqueci minha senha'. O e-mail sai automaticamente; aqui você acompanha e gera link manual quando o cliente não recebe.",
+  "app.opcoes":
+    "Versões do mesmo app com preços diferentes (ex.: Globoplay comum, Premium, Premium + Telecine). Na vitrine o app continua sendo UM card; o cliente escolhe a versão na contratação avulsa. Cada opção tem o próprio estoque: cadastre a conta matriz usando o slug da opção. Pacote é fechado e sempre entrega a opção marcada como padrão.",
+  "app.opcaoNome":
+    "Rótulo curto que o cliente vê, sem repetir o nome do app. Ex.: \u0022Premium + Telecine\u0022, e não \u0022Globoplay Premium + Telecine\u0022.",
+  "app.opcaoDescricao":
+    "Uma linha explicando o que muda nesta versão. Aparece abaixo do nome na hora da escolha.",
+  "app.opcaoPreco":
+    "Quanto a PLAYPLUSNOW cobra por mês nesta versão. Pode ser alterado a qualquer momento.",
+  "app.opcaoPrecoAvulso":
+    "Preço que o cliente pagaria direto no provedor. Serve só para o comparativo de economia.",
+  "app.opcaoEntrega":
+    "\u0022Login e senha\u0022 usa uma vaga de conta matriz do estoque (padrão). \u0022Convite do provedor\u0022 é para casos como a Netflix individual: o cliente informa o e-mail dele, o pedido cai na fila de Convites e você o cadastra como membro extra no painel do provedor — quem envia o acesso é a própria plataforma.",
+  "secao.convites":
+    "Clientes que contrataram uma opção entregue por convite (ex.: Netflix individual). Cadastre o e-mail informado como membro extra no painel do provedor e marque como enviado — o cliente acompanha esse status no painel dele.",
+  "secao.minhasenha":
+    "Troque a senha desta conta de administrador. Exige a senha atual; ao confirmar, as demais sessões são desconectadas.",
   "secao.manual": "Guia operacional do painel: o que cada módulo faz e o que fazer em cada situação.",
 
   /* ---------------- contas matrizes ---------------- */

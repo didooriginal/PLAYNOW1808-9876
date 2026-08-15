@@ -8,6 +8,7 @@ import {
   ChevronsUp,
   Loader2,
   ListOrdered,
+  Layers,
   Plus,
   Power,
   RotateCcw,
@@ -25,6 +26,8 @@ import {
   useReordenarAplicativos,
 } from "../../queries/aplicativos";
 import { ComboBuilder } from "./combo-builder";
+import { ModalOpcoesApp } from "./modal-opcoes-app";
+import { useCatalogoOpcoes } from "../../queries/planos-apps";
 import {
   BarraSalvamento,
   SeloSalvo,
@@ -465,6 +468,12 @@ export function AppsView() {
   const remover = useRemoverAplicativo();
   const [criando, setCriando] = useState(false);
   const [ordenando, setOrdenando] = useState(false);
+  /** app cujas opções (variantes) estão sendo editadas */
+  const [vendoOpcoes, setVendoOpcoes] = useState<{ id: number; nome: string; slug: string } | null>(
+    null,
+  );
+  // só para exibir a contagem de opções no card — a edição vive no modal
+  const { data: catalogoOpcoes } = useCatalogoOpcoes();
   const [filtro, setFiltro] = useState<"todas" | CategoriaId>("todas");
 
   const apps = data ?? [];
@@ -644,6 +653,26 @@ export function AppsView() {
                   </div>
                   <button
                     type="button"
+                    aria-label={`Opções de ${app.nome}`}
+                    onClick={() =>
+                      setVendoOpcoes({ id: app.id, nome: app.nome, slug: app.slug })
+                    }
+                    className="relative flex size-8 shrink-0 items-center justify-center rounded-lg border border-white/10 text-white/40 transition-colors hover:border-neon-purple/50 hover:text-neon-purple"
+                  >
+                    <Layers className="size-3.5" />
+                    {(() => {
+                      const n =
+                        catalogoOpcoes?.find((c) => c.id === app.id)?.opcoes.filter((o) => o.ativo)
+                          .length ?? 0;
+                      return n > 1 ? (
+                        <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-neon-purple font-sans text-[9px] font-bold text-white">
+                          {n}
+                        </span>
+                      ) : null;
+                    })()}
+                  </button>
+                  <button
+                    type="button"
                     aria-label={app.ativo ? "Desativar app" : "Ativar app"}
                     title={app.ativo ? "Desativar" : "Ativar"}
                     disabled={atualizar.isPending}
@@ -683,6 +712,10 @@ export function AppsView() {
         <p className="font-sans text-xs text-neon-red">
           {remover.error?.message}
         </p>
+      )}
+
+      {vendoOpcoes && (
+        <ModalOpcoesApp app={vendoOpcoes} onFechar={() => setVendoOpcoes(null)} />
       )}
     </div>
   );

@@ -4,7 +4,14 @@ import { ORPCError } from "@orpc/server";
 import { base } from "../__core/app";
 import { adminOnly, authed } from "../middleware/auth";
 import { db } from "../database";
-import { contasMatrizes, historicoVencimento, pacotes, usuarios as tabelaUsuarios } from "../database/schema";
+import {
+  contasMatrizes,
+  convitesApps,
+  historicoVencimento,
+  pacotes,
+  usuarios as tabelaUsuarios,
+} from "../database/schema";
+import { resolverServicos, type ServicoResolvido } from "../lib/planos";
 import { garantirAlocacao } from "./alocacoes";
 import {
   FORMAS_PAGAMENTO,
@@ -363,13 +370,63 @@ export const usuarios = {
         status: string;
         regiao: string;
         aguardando: boolean;
+        /** nome completo já resolvido ("Netflix · Individual") */
+        nome: string;
+        /** slug do app pai — ícone, cor e guia continuam vindo dele */
+        appSlug: string;
+        /** como o acesso chega: login e senha (vaga) ou convite do provedor */
+        entrega: "vaga" | "convite";
+        /** só para `entrega = "convite"`: andamento do pedido */
+        convite: { status: string; email: string; observacao: string } | null;
       }[];
 
       // BLOQUEIO POR INADIMPLENCIA: cliente atrasado/suspenso nao ve senha
       // nem e-mail das contas matrizes — so a tela de regularizacao.
       const bloqueado = estaBloqueado(cliente.statusPagamento, cliente.confiancaAte);
 
+      /**
+       * Resolve app x opção de uma vez: precisamos saber quais serviços são
+       * entregues por CONVITE (ex.: Netflix individual = membro extra), porque
+       * esses não consomem vaga nem entram na fila de estoque.
+       */
+      const infos = await resolverServicos(servicos).catch(() => [] as ServicoResolvido[]);
+      const infoPorSlug = new Map(infos.map((i) => [i.slug, i]));
+      const meusConvites = await db
+        .select()
+        .from(convitesApps)
+        .where(eq(convitesApps.clienteId, cliente.id));
+
       for (const servico of servicos) {
+        const info = infoPorSlug.get(servico) ?? null;
+        const nomeServico = info?.nome ?? servico;
+
+        // ENTREGA POR CONVITE: o acesso é o e-mail do próprio cliente, cadastrado
+        // pelo admin no painel do provedor. Não há conta matriz para mostrar.
+        if (info?.entrega === "convite") {
+          const convite =
+            meusConvites.find((c) => c.servico === servico && c.status !== "recusado") ??
+            meusConvites.find((c) => c.servico === servico) ??
+            null;
+          acessos.push({
+            servico,
+            contaId: convite?.contaId ?? null,
+            email: convite?.email ?? "",
+            senha: "",
+            status: convite?.status ?? "sem-email",
+            regiao: "BR",
+            aguardando: convite?.status !== "ativo",
+            nome: nomeServico,
+            appSlug: info.appSlug,
+            entrega: "convite",
+            convite: {
+              status: convite?.status ?? "sem-email",
+              email: convite?.email ?? "",
+              observacao: convite?.observacao ?? "",
+            },
+          });
+          continue;
+        }
+
         const { alocacao } = await garantirAlocacao(cliente.id, servico);
         if (!alocacao) {
           // sem estoque: registra a espera para o admin ver e ser cobrado
@@ -382,6 +439,10 @@ export const usuarios = {
             status: "aguardando",
             regiao: "BR",
             aguardando: true,
+            nome: nomeServico,
+            appSlug: info?.appSlug ?? servico,
+            entrega: "vaga",
+            convite: null,
           });
           continue;
         }
@@ -400,6 +461,10 @@ export const usuarios = {
           status: conta.status,
           regiao: conta.regiao,
           aguardando: false,
+          nome: nomeServico,
+          appSlug: info?.appSlug ?? servico,
+          entrega: "vaga",
+          convite: null,
         });
       }
 

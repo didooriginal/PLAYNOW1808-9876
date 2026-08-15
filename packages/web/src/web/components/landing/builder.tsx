@@ -25,6 +25,7 @@ import {
   type ServiceId,
 } from "@/lib/mock-data";
 import { useAplicativos } from "@/queries/aplicativos";
+import { useCatalogoOpcoes } from "@/queries/planos-apps";
 import { useTabelaCiclos, type Ciclo } from "@/queries/ciclos";
 import { SeletorCiclo } from "../seletor-ciclo";
 
@@ -43,6 +44,47 @@ export function Builder() {
 
   // catalogo real do banco (tabela oficial de precos avulsos)
   const { data: catalogo } = useAplicativos();
+
+  /**
+   * OPÇÕES POR APP (variantes).
+   * Alguns apps são vendidos em versões com preços diferentes — Globoplay
+   * comum / Premium / Premium + Telecine. A grade continua com UM card por
+   * app; a versão é escolhida aqui na calculadora, item a item.
+   */
+  const { data: comOpcoes } = useCatalogoOpcoes();
+
+  /** appSlug -> slug da opção escolhida (vazio = app sem opções) */
+  const [opcaoPorApp, setOpcaoPorApp] = useState<Record<string, string>>({});
+
+  /** opções ATIVAS de um app, na ordem do admin */
+  const opcoesDe = (appSlug: string) =>
+    (comOpcoes?.find((a) => a.slug === appSlug)?.opcoes ?? []).filter((o) => o.ativo);
+
+  /** slug que vai para o checkout: a opção escolhida, a padrão, ou o próprio app */
+  const slugVendido = (appSlug: string) => {
+    const opcoes = opcoesDe(appSlug);
+    if (opcoes.length === 0) return appSlug;
+    const escolhida = opcaoPorApp[appSlug];
+    if (escolhida && opcoes.some((o) => o.slug === escolhida)) return escolhida;
+    return (opcoes.find((o) => o.padrao) ?? opcoes[0]).slug;
+  };
+
+  /** preço do item já considerando a versão escolhida */
+  const precoDe = (appSlug: string) => {
+    const opcoes = opcoesDe(appSlug);
+    const alvo = slugVendido(appSlug);
+    const opcao = opcoes.find((o) => o.slug === alvo);
+    if (opcao) return opcao.preco;
+    return serviceById(appSlug).price;
+  };
+
+  /** preço "de mercado" do item, base do comparativo de economia */
+  const avulsoDe = (appSlug: string) => {
+    const alvo = slugVendido(appSlug);
+    const opcao = opcoesDe(appSlug).find((o) => o.slug === alvo);
+    if (opcao) return opcao.precoAvulso || opcao.preco;
+    return serviceById(appSlug).retail;
+  };
 
   /**
    * Apps ativos do catálogo, na ORDEM DEFINIDA NO ADMIN.
@@ -68,13 +110,18 @@ export function Builder() {
   );
 
   const subtotal = useMemo(
-    () => selected.reduce((sum, id) => sum + serviceById(id).price, 0),
-    [selected],
+    () => selected.reduce((sum, id) => sum + precoDe(id), 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selected, opcaoPorApp, comOpcoes],
   );
   const tier = builderDiscount(selected.length);
   const discount = tier ? subtotal * tier.off : 0;
   const total = subtotal - discount;
-  const retail = retailOf(selected);
+  const retail = useMemo(
+    () => selected.reduce((sum, id) => sum + avulsoDe(id), 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selected, opcaoPorApp, comOpcoes],
+  );
   const saving = retail - total;
 
   /** o ciclo incide DEPOIS do desconto por volume — os dois se somam */
@@ -132,24 +179,58 @@ export function Builder() {
         )}
         {selected.map((id) => {
           const s = serviceById(id);
+          const opcoes = opcoesDe(id);
+          const escolhido = slugVendido(id);
           return (
             <div
               key={id}
-              className="flex items-center gap-2.5 rounded-xl border border-white/8 bg-white/[0.03] p-2 pr-2.5"
+              className="rounded-xl border border-white/8 bg-white/[0.03] p-2 pr-2.5"
             >
-              <AppIcon id={id} size="xs" />
-              <span className="min-w-0 flex-1 truncate font-sans text-xs text-white/70">
-                {s.name}
-              </span>
-              <span className="font-display text-xs font-bold text-white">{brl(s.price)}</span>
-              <button
-                type="button"
-                onClick={() => toggle(id)}
-                className="flex size-5 items-center justify-center rounded-full text-white/25 transition-colors hover:bg-neon-red/15 hover:text-neon-red"
-                aria-label={`Remover ${s.name}`}
-              >
-                <X className="size-3" />
-              </button>
+              <div className="flex items-center gap-2.5">
+                <AppIcon id={id} size="xs" />
+                <span className="min-w-0 flex-1 truncate font-sans text-xs text-white/70">
+                  {s.name}
+                </span>
+                <span className="font-display text-xs font-bold text-white">
+                  {brl(precoDe(id))}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => toggle(id)}
+                  className="flex size-5 items-center justify-center rounded-full text-white/25 transition-colors hover:bg-neon-red/15 hover:text-neon-red"
+                  aria-label={`Remover ${s.name}`}
+                >
+                  <X className="size-3" />
+                </button>
+              </div>
+
+              {/* versões deste app: só aparece quando existe mais de uma */}
+              {opcoes.length > 1 && (
+                <div className="mt-1.5 flex flex-wrap gap-1 pl-7">
+                  {opcoes.map((o) => {
+                    const ativa = o.slug === escolhido;
+                    return (
+                      <button
+                        key={o.slug}
+                        type="button"
+                        aria-label={`${s.name}: escolher ${o.nome} por ${brl(o.preco)} por mês`}
+                        aria-pressed={ativa}
+                        onClick={() =>
+                          setOpcaoPorApp((prev) => ({ ...prev, [id]: o.slug }))
+                        }
+                        className={cn(
+                          "rounded-full border px-2 py-0.5 font-sans text-[10px] transition-all",
+                          ativa
+                            ? "border-neon-purple/60 bg-neon-purple/15 text-neon-purple"
+                            : "border-white/10 text-white/35 hover:border-white/25 hover:text-white/65",
+                        )}
+                      >
+                        {o.nome} · {brl(o.preco)}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           );
         })}
@@ -246,7 +327,9 @@ export function Builder() {
 
       {/* checkout na plataforma: o servidor refaz a conta e gera o Pix */}
       <Link
-        to={`/checkout?apps=${selected.join(",")}${ciclo === "mensal" ? "" : `&ciclo=${ciclo}`}`}
+        to={`/checkout?apps=${selected.map(slugVendido).join(",")}${
+          ciclo === "mensal" ? "" : `&ciclo=${ciclo}`
+        }`}
         className="mt-4 block"
       >
         <NeonButton accent="red" size="lg" className="w-full" disabled={selected.length === 0}>

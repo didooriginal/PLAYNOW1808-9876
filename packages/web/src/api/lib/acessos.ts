@@ -19,6 +19,7 @@ import {
 } from "../database/schema";
 import { notificar } from "../routes/notificacoes";
 import { linkWhats, numeroAdmin } from "./whats";
+import { resolverServico } from "./planos";
 
 const hojeIso = () => new Date().toISOString().slice(0, 10);
 
@@ -278,6 +279,8 @@ export type ResultadoSincronizacao = {
   alocados: { servico: string; contaId: number }[];
   jaTinham: string[];
   semVaga: string[];
+  /** opções entregues por convite do provedor — não usam vaga */
+  convites: string[];
 };
 
 /**
@@ -290,10 +293,21 @@ export async function sincronizarAcessosDoCliente(
   motivo = "compra",
 ): Promise<ResultadoSincronizacao> {
   const [cliente] = await db.select().from(usuarios).where(eq(usuarios.id, clienteId));
-  const resultado: ResultadoSincronizacao = { alocados: [], jaTinham: [], semVaga: [] };
+  const resultado: ResultadoSincronizacao = { alocados: [], jaTinham: [], semVaga: [], convites: [] };
   if (!cliente) return resultado;
 
   for (const servico of await direitosDoCliente(clienteId)) {
+    // opções entregues por CONVITE (ex.: Netflix individual, onde o admin
+    // cadastra o e-mail do cliente como membro extra) não consomem vaga de
+    // conta matriz: quem manda o acesso é o próprio provedor. Elas aparecem
+    // na fila de convites do admin, não na fila de vagas.
+    const resolvido = await resolverServico(servico);
+    if (resolvido?.entrega === "convite") {
+      resultado.convites.push(servico);
+      await sairDaFila(clienteId, servico);
+      continue;
+    }
+
     const { alocacao, motivo: resposta } = await garantirAlocacao(clienteId, servico);
 
     if (alocacao && resposta === "ja_tinha") {

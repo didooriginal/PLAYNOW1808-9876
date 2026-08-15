@@ -1097,3 +1097,91 @@ export const marketingTexts = sqliteTable("marketing_texts", {
 
 export type MarketingText = typeof marketingTexts.$inferSelect;
 export type NovoMarketingText = typeof marketingTexts.$inferInsert;
+
+/* ------------------------------------------------------------------ */
+/* PLANOS DE APP (VARIANTES) — "Globoplay comum / Premium / +Telecine" */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Um app pode ser vendido em mais de uma versão, com preços diferentes.
+ * Em vez de poluir a vitrine com três cards de Globoplay, o app continua sendo
+ * UM card e as versões viram opções escolhidas na hora da contratação avulsa.
+ *
+ * Regras que valem para todo app (é genérico de propósito):
+ *  - app SEM nenhum plano cadastrado continua funcionando como sempre
+ *    (preço único vindo de `aplicativos.preco`) — nada quebra;
+ *  - app COM planos passa a exigir a escolha de uma opção no avulso;
+ *  - PACOTES são fechados: sempre entregam o plano `padrao` e ignoram o resto.
+ *
+ * `slug` é o identificador de estoque: cada opção tem a SUA conta matriz
+ * (`contas_matrizes.servico = planos_apps.slug`), porque cada combinação é um
+ * login diferente na prática. Ex.: "globoplay-premium-telecine".
+ */
+export const planosApps = sqliteTable("planos_apps", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  aplicativoId: integer("aplicativo_id")
+    .notNull()
+    .references(() => aplicativos.id, { onDelete: "cascade" }),
+  /** identificador de estoque — casa com `contas_matrizes.servico` */
+  slug: text("slug").notNull().unique(),
+  /** rótulo curto exibido ao cliente: "Premium + Telecine" */
+  nome: text("nome").notNull(),
+  /** uma linha explicando o que muda nesta opção */
+  descricao: text("descricao").notNull().default(""),
+  /** preço de venda mensal desta opção — editável no ADM */
+  preco: real("preco").notNull().default(0),
+  /** preço de mercado, usado no comparativo de economia */
+  precoAvulso: real("preco_avulso").notNull().default(0),
+  /**
+   * como o acesso é entregue:
+   *  - `vaga`    → aloca numa conta matriz do estoque (fluxo padrão);
+   *  - `convite` → não usa vaga: o admin cadastra o e-mail do cliente como
+   *                membro extra no painel do provedor e QUEM manda o acesso é
+   *                o próprio provedor (caso "Netflix individual").
+   */
+  entrega: text("entrega").notNull().default("vaga"),
+  /** opção marcada por padrão e usada pelos pacotes fechados */
+  padrao: integer("padrao", { mode: "boolean" }).notNull().default(false),
+  ordem: integer("ordem").notNull().default(0),
+  ativo: integer("ativo", { mode: "boolean" }).notNull().default(true),
+  criadoEm: integer("criado_em", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+export type PlanoApp = typeof planosApps.$inferSelect;
+export type NovoPlanoApp = typeof planosApps.$inferInsert;
+
+/* ------------------------------------------------------------------ */
+/* CONVITES DE APP — fila do "membro extra" (Netflix individual)       */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Fila de cadastro manual para planos com `entrega = "convite"`.
+ * O cliente informa o e-mail dele na contratação, o pedido cai aqui e o admin
+ * adiciona esse e-mail como membro extra no painel do provedor. O convite de
+ * acesso é enviado pelo PRÓPRIO provedor ao e-mail informado — por isso o
+ * cliente vê "aguardando cadastro" no painel até o admin marcar como enviado.
+ */
+export const convitesApps = sqliteTable("convites_apps", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  clienteId: integer("cliente_id")
+    .notNull()
+    .references(() => usuarios.id, { onDelete: "cascade" }),
+  /** slug do plano escolhido (ex.: "netflix-individual") */
+  servico: text("servico").notNull(),
+  /** e-mail que o cliente quer usar no provedor */
+  email: text("email").notNull(),
+  /** pendente | enviado | ativo | recusado */
+  status: text("status").notNull().default("pendente"),
+  /** conta matriz de onde o convite saiu (quando o admin registra) */
+  contaId: integer("conta_id"),
+  observacao: text("observacao").notNull().default(""),
+  criadoEm: integer("criado_em", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  atendidoEm: integer("atendido_em", { mode: "timestamp" }),
+});
+
+export type ConviteApp = typeof convitesApps.$inferSelect;
+export type NovoConviteApp = typeof convitesApps.$inferInsert;

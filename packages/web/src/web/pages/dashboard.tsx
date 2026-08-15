@@ -64,6 +64,7 @@ import { AlterarSenhaView } from "../components/cliente/alterar-senha";
 import { ContadorEconomia } from "../components/cliente/economia";
 import { PagarPix } from "../components/cliente/pagar-pix";
 import { AreaPagamento } from "../components/cliente/pagamento";
+import { AcessoConvite } from "../components/cliente/acesso-convite";
 
 /** dados vindos do banco (usuarios.painel) */
 type PainelCliente = NonNullable<ReturnType<typeof usePainelCliente>["data"]>;
@@ -74,8 +75,16 @@ type PacoteContratado = PainelCliente["pacote"];
 /* ------------------------------------------------------------------ */
 
 function AccessCard({ cred }: { cred: Acesso }) {
-  const service = serviceById(cred.servico);
-  const info = servicoInfo(cred.servico, service.name);
+  /**
+   * Ícone, cor e guia continuam vindo do app "pai" (netflix), mesmo quando o
+   * slug vendido é uma opção (netflix-individual).
+   */
+  const appSlug = cred.appSlug || cred.servico;
+  const service = serviceById(appSlug);
+  const nomeExibido = cred.nome || service.name;
+  const info = servicoInfo(appSlug, service.name);
+  /** acesso entregue por convite do provedor, não por login compartilhado */
+  const convite = cred.entrega === "convite" ? cred.convite : null;
   const [revealed, setRevealed] = useState(false);
   const [guia, setGuia] = useState(false);
   const [copied, setCopied] = useState<"email" | "password" | null>(null);
@@ -102,17 +111,17 @@ function AccessCard({ cred }: { cred: Acesso }) {
 
       <div className="relative flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
-          <AppIcon id={cred.servico} size="md" active={!aguardando} />
+          <AppIcon id={appSlug} size="md" active={!aguardando} />
           <div>
             <button
               type="button"
               onClick={() => setGuia(true)}
               className="text-left font-display text-base font-bold text-white transition-colors hover:text-neon-cyan"
             >
-              {service.name}
+              {nomeExibido}
             </button>
             <div className="mt-0.5 font-sans text-[11px] text-white/35">
-              Acesso individual · {cred.regiao}
+              {convite ? "Perfil próprio por convite" : "Acesso individual"} · {cred.regiao}
             </div>
           </div>
         </div>
@@ -129,12 +138,27 @@ function AccessCard({ cred }: { cred: Acesso }) {
           ) : (
             <BadgeCheck className="size-3" />
           )}
-          {aguardando ? "liberando" : down ? "manutenção" : "ativo"}
+          {convite && aguardando
+            ? convite.status === "enviado"
+              ? "convite enviado"
+              : "aguardando"
+            : aguardando
+              ? "liberando"
+              : down
+                ? "manutenção"
+                : "ativo"}
         </span>
       </div>
 
       {/* credenciais */}
-      {aguardando ? (
+      {convite ? (
+        <AcessoConvite
+          servico={cred.servico}
+          status={convite.status}
+          email={convite.email}
+          observacao={convite.observacao}
+        />
+      ) : aguardando ? (
         <div className="relative mt-5 rounded-xl border border-amber-400/35 bg-amber-400/10 p-4 text-center">
           <p className="font-display text-xs font-bold text-amber-200">
             Estamos preparando o seu acesso
@@ -237,7 +261,7 @@ function AccessCard({ cred }: { cred: Acesso }) {
         </NeonButton>
       </div>
 
-      {cred.servico.startsWith("netflix") && (
+      {appSlug.startsWith("netflix") && !convite && (
         <button
           type="button"
           data-testid="atalho-netflix"
@@ -255,8 +279,8 @@ function AccessCard({ cred }: { cred: Acesso }) {
 
       {guia && (
         <ComoAcessarModal
-          slug={cred.servico}
-          nome={service.name}
+          slug={appSlug}
+          nome={nomeExibido}
           cor={service.color}
           onClose={() => setGuia(false)}
         />

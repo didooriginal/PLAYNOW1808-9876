@@ -29,6 +29,8 @@ import {
   TrendingUp,
   Trophy,
   KeyRound,
+  Lock,
+  Mail,
   BookOpen,
   Ticket,
   Tv,
@@ -60,6 +62,8 @@ import { JogosView } from "../components/admin/jogos-view";
 import { SaudeView } from "../components/admin/saude-view";
 import { RecuperacaoView } from "../components/admin/recuperacao-view";
 import { SenhasView } from "../components/admin/senhas-view";
+import { ConvitesView } from "../components/admin/convites-view";
+import { AlterarSenhaView } from "../components/cliente/alterar-senha";
 import { ComissoesView } from "../components/admin/comissoes-view";
 import { PixView } from "../components/admin/pix-view";
 import { BarraSalvamento, useAutoSalvar } from "../components/admin/salvamento";
@@ -92,6 +96,7 @@ import { useMapaAlocacoes } from "../queries/alocacoes";
 import { useAplicativos } from "../queries/aplicativos";
 import { useResumoSuporte } from "../queries/suporte";
 import { useResumoRecompensas } from "../queries/recompensas";
+import { useFilaConvites } from "../queries/planos-apps";
 import { useCodigos } from "../queries/codigos";
 import { useResumoEstoqueGift } from "../queries/estoque-gift";
 import { useFilaTvNetflix } from "../queries/netflix";
@@ -2549,6 +2554,8 @@ export default function AdminPage() {
   const gamificacao = useResumoRecompensas();
   const codigos = useCodigos();
   const filaTv = useFilaTvNetflix();
+  const convites = useFilaConvites();
+  const convitesPendentes = (convites.data ?? []).filter((c) => c.status === "pendente").length;
   const alertas = useAlertasAdmin();
   const estoqueGift = useResumoEstoqueGift();
 
@@ -2632,7 +2639,14 @@ export default function AdminPage() {
       icon: BellRing,
       badge: alertas.data?.naoLidas ? String(alertas.data.naoLidas) : undefined,
     },
+    {
+      id: "convites",
+      label: "Convites (membro extra)",
+      icon: Mail,
+      badge: convitesPendentes ? String(convitesPendentes) : undefined,
+    },
     { id: "senhas", label: "Senhas & Acesso", icon: KeyRound },
+    { id: "minhasenha", label: "Minha Senha", icon: Lock },
     { id: "manual", label: "Manual do Admin", icon: BookOpen },
   ];
 
@@ -2705,9 +2719,17 @@ export default function AdminPage() {
       title: "Central de Alertas",
       sub: "Fila automática de tudo que exige ação: códigos pedidos, desbloqueio de TV, vencimentos próximos e clientes atrasados.",
     },
+    convites: {
+      title: "Convites (membro extra)",
+      sub: "Clientes que contrataram uma opção entregue por convite do provedor — cadastre o e-mail informado como membro extra e marque o andamento.",
+    },
     senhas: {
       title: "Senhas & Acesso",
       sub: "Pedidos de 'esqueci minha senha'. O cliente recebe o link por e-mail automaticamente — aqui você acompanha e gera link manual quando precisar.",
+    },
+    minhasenha: {
+      title: "Minha Senha",
+      sub: "Troque a senha desta conta de administrador. Ao confirmar, todas as outras sessões são desconectadas.",
     },
     manual: {
       title: "Manual do Admin",
@@ -2797,7 +2819,13 @@ export default function AdminPage() {
           {active === "codigos" && <CodigosView />}
           {active === "netflixtv" && <NetflixTvView />}
           {active === "alertas" && <AlertasView onIr={setActive} />}
+          {active === "convites" && <ConvitesView />}
           {active === "senhas" && <SenhasView />}
+          {active === "minhasenha" && (
+            <div className="max-w-2xl">
+              <AlterarSenhaView />
+            </div>
+          )}
           {active === "manual" && <ManualView />}
         </div>
       </PanelShell>

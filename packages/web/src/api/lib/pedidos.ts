@@ -9,6 +9,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { enviarEmail } from "../services/email";
 import { templates } from "./emails/templates";
 import { db } from "../database";
+import { resolverServicos, slugsDePacote } from "./planos";
 import {
   aplicativos,
   combos,
@@ -126,7 +127,9 @@ export async function precificarPedido(entrada: EntradaPedido): Promise<PedidoPr
       titulo: `${rotularPacote(pacote.nome)}${ciclo === "mensal" ? "" : ` · ${preco.rotulo.toLowerCase()}`}`,
       pacoteId: pacote.id,
       comboId: null,
-      apps: pacote.servicos ?? [],
+      // pacote é fechado: cada app entra na sua opção padrão (o cliente não
+      // escolhe versão dentro do pacote — só no avulso)
+      apps: await slugsDePacote(pacote.servicos ?? []),
       ciclo,
       valor: preco.total,
       itens: [
@@ -170,7 +173,7 @@ export async function precificarPedido(entrada: EntradaPedido): Promise<PedidoPr
       titulo: `Combo ${combo.nome}`,
       pacoteId: null,
       comboId: combo.id,
-      apps: combo.apps ?? [],
+      apps: await slugsDePacote(combo.apps ?? []),
       ciclo: cicloCombo,
       valor,
       itens: [{ rotulo: `${combo.nome} · ${(combo.apps ?? []).length} apps`, valor }],
@@ -186,20 +189,18 @@ export async function precificarPedido(entrada: EntradaPedido): Promise<PedidoPr
   const slugs = [...new Set(entrada.apps ?? [])].filter(Boolean);
   if (slugs.length === 0) throw new Error("Escolha pelo menos um app para continuar");
 
-  const catalogo = await db
-    .select()
-    .from(aplicativos)
-    .where(and(inArray(aplicativos.slug, slugs), eq(aplicativos.ativo, true)));
-  if (catalogo.length !== slugs.length) throw new Error("Um dos apps escolhidos saiu do catálogo");
+  // aceita slug de app puro OU de opção ("globoplay-premium-telecine"):
+  // o resolvedor devolve nome e preço certos nos dois casos
+  const catalogo = await resolverServicos(slugs);
 
-  const subtotal = cent(catalogo.reduce((s, a) => s + (a.preco || a.precoAvulso), 0));
+  const subtotal = cent(catalogo.reduce((s, a) => s + a.preco, 0));
   const faixa = FAIXAS.find((f) => catalogo.length >= f.min);
   const desconto = cent(faixa ? subtotal * faixa.off : 0);
   /** mensalidade do combo montado, já com o desconto por volume */
   const mensalMontado = cent(subtotal - desconto);
   // o ciclo escolhido incide DEPOIS do desconto por volume: os dois se somam
   const preco = precificarCiclo(mensalMontado, ciclo);
-  const avulso = cent(catalogo.reduce((s, a) => s + (a.precoAvulso || a.preco), 0));
+  const avulso = cent(catalogo.reduce((s, a) => s + a.precoAvulso, 0));
   const cheio = cent(avulso * preco.meses);
 
   return {
@@ -213,7 +214,7 @@ export async function precificarPedido(entrada: EntradaPedido): Promise<PedidoPr
     ciclo,
     valor: preco.total,
     itens: [
-      ...catalogo.map((a) => ({ rotulo: a.nome, valor: cent(a.preco || a.precoAvulso) })),
+      ...catalogo.map((a) => ({ rotulo: a.nome, valor: cent(a.preco) })),
       ...(desconto > 0
         ? [{ rotulo: `Desconto por volume (${Math.round((faixa?.off ?? 0) * 100)}%)`, valor: -desconto }]
         : []),
@@ -239,8 +240,15 @@ export async function precificarPedido(entrada: EntradaPedido): Promise<PedidoPr
 
 async function somaAvulsos(slugs: string[]) {
   if (slugs.length === 0) return 0;
-  const linhas = await db.select().from(aplicativos).where(inArray(aplicativos.slug, slugs));
-  return cent(linhas.reduce((s, a) => s + (a.precoAvulso || a.preco), 0));
+  try {
+    const linhas = await resolverServicos(await slugsDePacote(slugs));
+    return cent(linhas.reduce((s, a) => s + a.precoAvulso, 0));
+  } catch {
+    // catálogo mudou no meio do caminho: não derruba a precificação por causa
+    // do valor riscado — cai no cálculo antigo, só com os apps que existem
+    const linhas = await db.select().from(aplicativos).where(inArray(aplicativos.slug, slugs));
+    return cent(linhas.reduce((s, a) => s + (a.precoAvulso || a.preco), 0));
+  }
 }
 
 /** guarda o pedido na cobrança (JSON) sem as linhas de exibição */

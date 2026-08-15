@@ -7,6 +7,7 @@ import { usuarios } from "./routes/usuarios";
 import { renovacao } from "./routes/renovacao";
 import { seed } from "./routes/seed";
 import { aplicativos } from "./routes/aplicativos";
+import { planosDeApps } from "./routes/planos-apps";
 import { alocacoes } from "./routes/alocacoes";
 import { suporte } from "./routes/suporte";
 import { recompensas } from "./routes/recompensas";
@@ -50,6 +51,7 @@ export const router = {
   contas,
   usuarios,
   aplicativos,
+  planosDeApps,
   alocacoes,
   suporte,
   recompensas,
