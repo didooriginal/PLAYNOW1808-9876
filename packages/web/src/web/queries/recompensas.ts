@@ -40,6 +40,22 @@ export function useEntregarPremio() {
   return useMutation(orpc.recompensas.entregarPremio.mutationOptions({ onSuccess: invalidar }));
 }
 
+/**
+ * Vincula o cliente logado a quem o indicou, a partir do código digitado.
+ * Usado quando a pessoa não entrou pelo link `?ref=` e recebeu só o código.
+ */
+export function useRegistrarIndicacao() {
+  const qc = useQueryClient();
+  return useMutation(
+    orpc.recompensas.registrarIndicacao.mutationOptions({
+      onSuccess: () => {
+        void qc.invalidateQueries({ queryKey: orpc.recompensas.key() });
+        void qc.invalidateQueries({ queryKey: orpc.afiliados.key() });
+      },
+    }),
+  );
+}
+
 export function useMarcarNotificacaoLida() {
   const invalidar = useInvalidarRecompensas();
   return useMutation(

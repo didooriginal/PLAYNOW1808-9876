@@ -64,11 +64,16 @@ export default function SignupPage() {
   const temPedido = Boolean(
     params.get("plano") || params.get("combo") || params.get("apps") || params.get("jogos"),
   );
-  /** codigo de indicacao vindo do link `?ref=CODIGO` */
-  const ref = (params.get("ref") ?? "").trim().toUpperCase();
+  /**
+   * Codigo de indicacao. Vem pronto do link `?ref=CODIGO`, mas tambem pode ser
+   * digitado a mao por quem recebeu so o codigo (WhatsApp, print, boca a boca).
+   */
+  const refDoLink = (params.get("ref") ?? "").trim().toUpperCase();
+  const [codigoIndicacao, setCodigoIndicacao] = useState(refDoLink);
+  const ref = codigoIndicacao.trim().toUpperCase();
   const { data: indicacao } = useQuery({
     queryKey: ["indicacao", ref],
-    enabled: Boolean(ref),
+    enabled: ref.length >= 3,
     staleTime: 60_000,
     queryFn: () => client.recompensas.validarCodigo({ codigo: ref }),
   });
@@ -315,6 +320,34 @@ export default function SignupPage() {
             placeholder="Ex.: TV LG, iPhone 15"
             className={inputClass}
           />
+        </AuthField>
+
+        <AuthField
+          label="Código de indicação (opcional)"
+          hint="Recebeu um código de quem já é cliente? Digite aqui para entrar vinculado à indicação."
+        >
+          <input
+            type="text"
+            value={codigoIndicacao}
+            onChange={(e) => setCodigoIndicacao(e.target.value.toUpperCase().replace(/\s/g, ""))}
+            placeholder="Ex.: DIEGO4K2"
+            autoCapitalize="characters"
+            autoComplete="off"
+            maxLength={24}
+            aria-label="Código de indicação"
+            className={inputClass}
+          />
+          {ref.length >= 3 && indicacao && (
+            <p
+              className={`mt-2 font-sans text-[11px] ${
+                indicacao.valido ? "text-neon-cyan" : "text-neon-red"
+              }`}
+            >
+              {indicacao.valido
+                ? `Código válido — você foi indicado por ${indicacao.nome}.`
+                : "Código não encontrado. Confira com quem te indicou."}
+            </p>
+          )}
         </AuthField>
 
         <AuthField label="Senha" hint="Mínimo de 8 caracteres.">

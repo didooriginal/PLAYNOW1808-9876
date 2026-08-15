@@ -273,8 +273,22 @@ export const afiliados = {
     const base = (process.env.WEBSITE_URL || "").replace(/\/+$/, "");
     const redeEmDia = carteira?.redeEmDia ?? 0;
 
+    /**
+     * Quem indicou ESTE cliente. Serve para a tela decidir entre mostrar o
+     * campo "informar código de indicação" ou o selo de vínculo já feito.
+     */
+    let padrinho: { nome: string; codigo: string } | null = null;
+    if (cliente.indicadoPor) {
+      const [p] = await db
+        .select({ nome: usuarios.nome, codigo: usuarios.referralCode })
+        .from(usuarios)
+        .where(eq(usuarios.id, cliente.indicadoPor));
+      if (p) padrinho = { nome: p.nome, codigo: p.codigo ?? "" };
+    }
+
     return {
       codigo,
+      padrinho,
       link: `${base}/signup?ref=${codigo}`,
       carteira: carteira ?? null,
       nivel: cliente.nivel,

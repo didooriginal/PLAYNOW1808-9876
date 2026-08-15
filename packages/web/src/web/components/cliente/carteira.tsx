@@ -11,6 +11,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { GlassCard, NeonButton, Pill, ProgressBar } from "../ui/kit";
+import { QuemMeIndicou } from "./quem-me-indicou";
 import {
   brlCarteira as brl,
   useBannersAfiliados,
@@ -172,7 +173,15 @@ export function CarteiraAfiliado() {
               {copiado ? "Copiado" : "Copiar"}
             </NeonButton>
           </div>
+          <p className="mt-3 font-sans text-[11px] text-white/40">
+            Ou passe só o código{" "}
+            <strong className="font-mono text-neon-cyan">{data?.codigo}</strong> — quem já se
+            cadastrou pode informá-lo em “Alguém te indicou?”, e quem ainda vai se cadastrar digita
+            no campo “Código de indicação” do cadastro.
+          </p>
         </GlassCard>
+
+        <QuemMeIndicou padrinho={data?.padrinho ?? null} />
 
         <GlassCard className="p-8 text-center">
           <TrendingUp className="mx-auto size-10 text-white/20" />
@@ -216,7 +225,15 @@ export function CarteiraAfiliado() {
             {copiado ? "Copiado" : "Copiar"}
           </NeonButton>
         </div>
+        <p className="mt-3 font-sans text-[11px] text-white/40">
+          Ou passe só o código{" "}
+          <strong className="font-mono text-neon-cyan">{data?.codigo}</strong> — quem já se cadastrou
+          informa em “Alguém te indicou?”, e quem ainda vai se cadastrar digita no campo “Código de
+          indicação” do cadastro.
+        </p>
       </GlassCard>
+
+      <QuemMeIndicou padrinho={data?.padrinho ?? null} />
 
       {/* -------- saldos -------- */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
