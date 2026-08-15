@@ -106,6 +106,13 @@ export const contasMatrizes = sqliteTable("contas_matrizes", {
   /** conta de reserva: só recebe clientes remanejados de contas problemáticas */
   reserva: integer("reserva", { mode: "boolean" }).notNull().default(false),
 
+  /**
+   * LIGA/DESLIGA da conta. Diferente de `aceitaNovos` (que só bloqueia
+   * entradas novas): desligar tira a conta de circulação e remaneja quem já
+   * estava nela, com o mesmo mecanismo do delete — sem apagar nada.
+   */
+  ativa: integer("ativa", { mode: "boolean" }).notNull().default(true),
+
   /* ---- FUTEBOL AO VIVO ---- */
   /** conta do pool exclusivo de dias de jogo (descartável//alta rotatividade) */
   poolJogos: integer("pool_jogos", { mode: "boolean" }).notNull().default(false),
@@ -255,6 +262,78 @@ export const alocacoes = sqliteTable("alocacoes", {
 
 export type Alocacao = typeof alocacoes.$inferSelect;
 export type NovaAlocacao = typeof alocacoes.$inferInsert;
+
+/* ------------------------------------------------------------------ */
+/* ASSINATURAS DE APPS — o que o cliente tem direito de acessar        */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Uma linha por app que o cliente tem direito de usar, venha de onde vier
+ * (pacote, combo, compra avulsa no montador ou prêmio da gamificação).
+ *
+ * Por que existe: até aqui só quem comprava PACOTE ganhava vaga em conta
+ * matriz — quem comprava app avulso pagava e não recebia acesso. Além disso,
+ * um avulso comprado no dia 20 tem ciclo próprio, que não é o do pacote; sem
+ * esta tabela não havia onde guardar esse vencimento separado.
+ *
+ * `alocacoes` continua sendo o vínculo físico (cliente × conta matriz); aqui é
+ * o DIREITO. Direito sem vaga = cliente na `fila_vagas`.
+ */
+export const assinaturasApps = sqliteTable("assinaturas_apps", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  clienteId: integer("cliente_id")
+    .notNull()
+    .references(() => usuarios.id, { onDelete: "cascade" }),
+  /** slug do app (casa com `aplicativos.slug` e `contas_matrizes.servico`) */
+  servico: text("servico").notNull(),
+  /** pacote | combo | avulso | premio */
+  origem: text("origem").notNull().default("avulso"),
+  /** mensal | trimestral | semestral | anual — só faz sentido para avulsos */
+  ciclo: text("ciclo").notNull().default("mensal"),
+  /** quanto esse app custa por mês para este cliente (0 quando vem do pacote) */
+  valor: real("valor").notNull().default(0),
+  inicioEm: text("inicio_em").notNull().default(""),
+  /** ISO YYYY-MM-DD — vencimento próprio do avulso/prêmio */
+  proximaCobranca: text("proxima_cobranca").notNull().default(""),
+  /** prêmios e cortesias somem sozinhos nesta data */
+  expiraEm: text("expira_em").notNull().default(""),
+  /** ativo | cancelado | expirado */
+  status: text("status").notNull().default("ativo"),
+  criadoEm: integer("criado_em", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+export type AssinaturaApp = typeof assinaturasApps.$inferSelect;
+export type NovaAssinaturaApp = typeof assinaturasApps.$inferInsert;
+
+/* ------------------------------------------------------------------ */
+/* FILA DE VAGAS — cliente pago sem estoque de conta matriz            */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Rede de segurança da regra "cliente nunca fica sem acesso": quando o direito
+ * existe mas não há vaga, entra aqui e o admin é avisado na hora (alerta
+ * crítico + link de WhatsApp). Some sozinho assim que a vaga aparece.
+ */
+export const filaVagas = sqliteTable("fila_vagas", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  clienteId: integer("cliente_id")
+    .notNull()
+    .references(() => usuarios.id, { onDelete: "cascade" }),
+  servico: text("servico").notNull(),
+  /** compra | reposicao | conta_desligada | premio | manual */
+  motivo: text("motivo").notNull().default("compra"),
+  /** aguardando | atendido | cancelado */
+  status: text("status").notNull().default("aguardando"),
+  criadoEm: integer("criado_em", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  atendidoEm: integer("atendido_em", { mode: "timestamp" }),
+});
+
+export type FilaVaga = typeof filaVagas.$inferSelect;
+export type NovaFilaVaga = typeof filaVagas.$inferInsert;
 
 /* ------------------------------------------------------------------ */
 /* CHAMADOS DE SUPORTE                                                 */

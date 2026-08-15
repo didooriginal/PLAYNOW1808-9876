@@ -44,6 +44,14 @@ export const AJUDA: Record<string, string> = {
     "Aparelhos que o cliente informou no cadastro. Serve de referência no suporte — o plano libera 2 aparelhos, 1 tela por vez.",
   "cliente.adminSelo":
     "Indica que esta conta também tem acesso ao painel administrativo. Contas com selo não entram nas contagens de faturamento de cliente.",
+  "cliente.apps":
+    "Todos os apps deste cliente: de onde veio cada um (pacote, avulso, combo ou prêmio), em qual conta matriz está alocado e quando vence. Quem aparece como \u0022aguardando vaga\u0022 pagou e ainda não tem conta — resolva primeiro.",
+  "cliente.adicionarApp":
+    "Adiciona um app a este cliente: cria o direito de uso (com vencimento próprio) e já coloca numa vaga livre. Sem vaga, o cliente entra na fila e você recebe um alerta.",
+  "cliente.removerApp":
+    "Tira o app deste cliente e devolve a vaga ao estoque. O histórico da alocação é preservado.",
+  "conta.ativa":
+    "Liga ou desliga esta conta matriz. Ao desligar, os clientes que estavam nela são remanejados automaticamente para outras contas — nada é apagado. Quem não encontrar vaga entra na fila e gera alerta.",
   "cliente.alocarApp":
     "Coloca este cliente em uma vaga livre de conta matriz do serviço escolhido. Se não houver vaga, o sistema avisa em vez de alocar.",
   "cliente.admin":
@@ -197,6 +205,8 @@ export const AJUDA: Record<string, string> = {
   "codigos.filtroStatus": "Filtra a fila por situação do código: entregue, aguardando ou expirado.",
   "comissoes.resgates": "Pedidos de saque dos afiliados. Aprovar debita o saldo dele e registra o pagamento; recusar devolve o saldo.",
   "comissoes.antifraude": "Indicações vindas do mesmo IP ou dispositivo do afiliado ficam retidas aqui até você liberar.",
+  "saude.fila":
+    "Clientes que pagaram mas ficaram sem vaga — normalmente depois de repor ou desligar uma matriz. Assim que uma vaga abre no serviço, o sistema aloca sozinho; o WhatsApp serve para avisar antes disso.",
   "saude.estoquePorServico": "Ocupação das vagas por serviço. Serviço perto de 100% precisa de conta matriz nova antes da próxima venda.",
   "saude.contasFalhas": "Contas que acumularam falhas de login. Passando do limite dos parâmetros, elas param de receber cliente novo.",
   "saude.ultimasFalhas": "Últimas falhas relatadas por clientes ou pela varredura automática, com data e conta envolvida.",

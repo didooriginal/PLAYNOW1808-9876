@@ -44,3 +44,28 @@ export function useAlocarPorServico() {
   const invalidar = useInvalidarAlocacoes();
   return useMutation(orpc.alocacoes.alocarPorServico.mutationOptions({ onSuccess: invalidar }));
 }
+
+/** apps que o cliente tem direito + onde cada um está alocado (popup do admin) */
+export function useAppsDoCliente(clienteId: number | null, enabled = true) {
+  return useQuery(
+    orpc.alocacoes.appsDoCliente.queryOptions({
+      input: { clienteId: clienteId ?? 0 },
+      enabled: enabled && Boolean(clienteId),
+      staleTime: 10_000,
+    }),
+  );
+}
+
+/** grava o direito do app E aloca a vaga (sem vaga: entra na fila e avisa) */
+export function useAdicionarAppAoCliente() {
+  const invalidar = useInvalidarAlocacoes();
+  return useMutation(
+    orpc.alocacoes.adicionarAppAoCliente.mutationOptions({ onSuccess: invalidar }),
+  );
+}
+
+/** tira o app do cliente e devolve a vaga ao estoque */
+export function useRemoverAppDoCliente() {
+  const invalidar = useInvalidarAlocacoes();
+  return useMutation(orpc.alocacoes.removerAppDoCliente.mutationOptions({ onSuccess: invalidar }));
+}

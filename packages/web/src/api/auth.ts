@@ -47,6 +47,15 @@ export const auth = betterAuth({
   },
   secret: process.env.BETTER_AUTH_SECRET,
   /**
+   * Sessão de 30 dias, renovada a cada 24h de uso. Antes a sessão morria em
+   * poucos dias e o cliente achava que "o site desloga sozinho" — com o
+   * "manter conectado" do login isso vira uma coisa só: quem marca, fica.
+   */
+  session: {
+    expiresIn: 60 * 60 * 24 * 30,
+    updateAge: 60 * 60 * 24,
+  },
+  /**
    * Origens confiáveis: em produção só o domínio configurado (WEBSITE_URL) e o
    * host da própria requisição. Nunca `["*"]` — isso liberava CSRF de qualquer site.
    * Em dev libera localhost/preview para o fluxo de desenvolvimento continuar.

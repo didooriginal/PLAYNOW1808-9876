@@ -52,3 +52,14 @@ export function useRemoverConta() {
   const invalidar = useInvalidarContas();
   return useMutation(orpc.contas.remover.mutationOptions({ onSuccess: invalidar }));
 }
+
+/** liga/desliga a conta matriz — desligar remaneja os clientes automaticamente */
+export function useAlternarContaAtiva() {
+  const invalidar = useInvalidarContas();
+  return useMutation(orpc.contas.alternarAtiva.mutationOptions({ onSuccess: invalidar }));
+}
+
+/** clientes aguardando vaga (fila de espera do estoque) */
+export function useFilaVagas() {
+  return useQuery(orpc.contas.fila.queryOptions({ staleTime: 15_000 }));
+}

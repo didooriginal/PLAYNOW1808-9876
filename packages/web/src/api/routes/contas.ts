@@ -3,8 +3,9 @@ import { and, asc, eq, sql } from "drizzle-orm";
 import { ORPCError } from "@orpc/server";
 import { adminOnly } from "../middleware/auth";
 import { db } from "../database";
-import { alocacoes, contasMatrizes } from "../database/schema";
-import { sincronizarVagas } from "./alocacoes";
+import { alocacoes, contasMatrizes, filaVagas, usuarios } from "../database/schema";
+import { atenderFila, realocarClientes, sincronizarVagas } from "../lib/acessos";
+import { linkWhats } from "../lib/whats";
 
 /** contagem de vagas realmente ocupadas (alocações ativas) */
 async function ativasDaConta(contaId: number) {
@@ -116,11 +117,13 @@ export const contas = {
     const [conta] = await db.select().from(contasMatrizes).where(eq(contasMatrizes.id, input.id));
     if (!conta) throw new ORPCError("NOT_FOUND", { message: "Conta matriz não encontrada" });
 
-    const liberadas = await db
-      .update(alocacoes)
-      .set({ status: "liberado", motivo: "reposicao", liberadoEm: new Date() })
-      .where(and(eq(alocacoes.contaId, input.id), eq(alocacoes.status, "ativo")))
-      .returning({ id: alocacoes.id });
+    /**
+     * Repor deixava todo mundo solto: as vagas viravam `liberado` e os
+     * clientes ficavam SEM ACESSO até alguém realocar na mão. Agora cada um é
+     * recolocado em outra conta na mesma operação; quem não couber entra na
+     * fila e gera alerta crítico com link de WhatsApp para o admin.
+     */
+    const remanejo = await realocarClientes(input.id, "reposicao");
 
     const [row] = await db
       .update(contasMatrizes)
@@ -128,7 +131,70 @@ export const contas = {
       .where(eq(contasMatrizes.id, input.id))
       .returning();
 
-    return { ...row, vagasLiberadas: liberadas.length };
+    return {
+      ...row,
+      vagasLiberadas: remanejo.liberadas,
+      realocados: remanejo.realocados,
+      semVaga: remanejo.semVaga,
+    };
+  }),
+
+  /**
+   * LIGA/DESLIGA da conta matriz.
+   * Desligar usa o mesmo mecanismo do delete lógico — solta as vagas e
+   * remaneja os clientes — mas sem apagar a conta nem o histórico. Religar
+   * apenas devolve a conta ao alocador e tenta atender quem está na fila.
+   */
+  alternarAtiva: adminOnly
+    .input(z.object({ id: z.number().int(), ativa: z.boolean() }))
+    .handler(async ({ input }) => {
+      const [conta] = await db.select().from(contasMatrizes).where(eq(contasMatrizes.id, input.id));
+      if (!conta) throw new ORPCError("NOT_FOUND", { message: "Conta matriz não encontrada" });
+
+      const [row] = await db
+        .update(contasMatrizes)
+        .set({ ativa: input.ativa })
+        .where(eq(contasMatrizes.id, input.id))
+        .returning();
+
+      if (!input.ativa) {
+        const remanejo = await realocarClientes(input.id, "conta_desligada");
+        return {
+          ...row,
+          desligada: true,
+          realocados: remanejo.realocados,
+          semVaga: remanejo.semVaga,
+        };
+      }
+
+      const atendidos = await atenderFila(conta.servico);
+      return { ...row, desligada: false, realocados: [], semVaga: [], filaAtendida: atendidos.length };
+    }),
+
+  /** quem está esperando vaga, por serviço — aba Saúde & Estoque */
+  fila: adminOnly.handler(async () => {
+    const rows = await db
+      .select({
+        id: filaVagas.id,
+        clienteId: filaVagas.clienteId,
+        servico: filaVagas.servico,
+        motivo: filaVagas.motivo,
+        criadoEm: filaVagas.criadoEm,
+        nome: usuarios.nome,
+        telefone: usuarios.telefone,
+      })
+      .from(filaVagas)
+      .innerJoin(usuarios, eq(filaVagas.clienteId, usuarios.id))
+      .where(eq(filaVagas.status, "aguardando"))
+      .orderBy(asc(filaVagas.criadoEm));
+
+    return rows.map((r) => ({
+      ...r,
+      linkWhats: linkWhats(
+        r.telefone ?? "",
+        `Oi ${r.nome}! Já estamos liberando seu acesso ao ${r.servico}. Em instantes te mando os dados.`,
+      ),
+    }));
   }),
 
   /** recalcula `vagasOcupadas` de todas as contas a partir das alocações ativas */
@@ -139,8 +205,11 @@ export const contas = {
   }),
 
   remover: adminOnly.input(z.object({ id: z.number().int() })).handler(async ({ input }) => {
+    // remaneja ANTES de apagar: o delete em cascata levaria as alocações
+    // junto e os clientes ficariam sem acesso sem ninguém saber
+    const remanejo = await realocarClientes(input.id, "conta_desligada");
     await db.delete(contasMatrizes).where(eq(contasMatrizes.id, input.id));
-    return { ok: true };
+    return { ok: true, realocados: remanejo.realocados, semVaga: remanejo.semVaga };
   }),
 
   /** resumo de lotação usado nos KPIs do admin */

@@ -1,9 +1,7 @@
 import { ORPCError } from "@orpc/server";
-import { eq } from "drizzle-orm";
 import { base } from "../__core/app";
 import { auth } from "../auth";
-import { db } from "../database";
-import { usuarios } from "../database/schema";
+import { ehAdmin } from "../lib/sessao";
 
 /** Auth opcional — `context.user` é o usuário da sessão ou null. */
 export const withUser = base.use(async ({ context, next }) => {
@@ -26,12 +24,8 @@ export const authed = base.use(async ({ context, next }) => {
  * todas as escritas.
  */
 export const adminOnly = authed.use(async ({ context, next }) => {
-  const [registro] = await db
-    .select({ admin: usuarios.admin })
-    .from(usuarios)
-    .where(eq(usuarios.authUserId, context.user.id));
-
-  if (!registro?.admin) {
+  // mesmo lookup do `usuarios.eu` (api/lib/sessao.ts) — nunca duas versões
+  if (!(await ehAdmin(context.user))) {
     throw new ORPCError("FORBIDDEN", { message: "Acesso restrito ao administrador" });
   }
   return next();

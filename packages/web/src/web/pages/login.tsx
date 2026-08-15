@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
 import { Link, useLocation, useSearch } from "wouter";
-import { Eye, EyeOff, LogIn, TriangleAlert } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { Check, Eye, EyeOff, LogIn, TriangleAlert } from "lucide-react";
 import { AuthField, AuthShell, inputClass } from "../components/auth-shell";
 import { NeonButton } from "../components/ui/kit";
-import { authClient } from "../lib/auth";
+import { authClient, setToken } from "../lib/auth";
 import { client } from "../lib/api";
 
 /** mensagens da API do Better Auth traduzidas */
@@ -35,6 +36,9 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [verSenha, setVerSenha] = useState(false);
+  const [manterConectado, setManterConectado] = useState(true);
+  const qc = useQueryClient();
+  const trocandoDeConta = params.get("trocar") === "1";
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(false);
 
@@ -42,15 +46,30 @@ export default function LoginPage() {
     e.preventDefault();
     setErro(null);
     setCarregando(true);
-    const { error } = await authClient.signIn.email({
+    const { data, error } = await authClient.signIn.email({
       email: email.trim().toLowerCase(),
       password: senha,
+      rememberMe: manterConectado,
     });
     if (error) {
       setCarregando(false);
       setErro(traduzErro(error.code, error.message));
       return;
     }
+
+    /**
+     * Por que gravar o token na mão aqui: o `onSuccess` global do authClient só
+     * roda depois que a promessa resolve, e a chamada de `usuarios.eu` logo
+     * abaixo saía SEM Bearer. Resultado: o perfil falhava, a guarda da rota
+     * mandava de volta para o /login e o cliente precisava digitar a senha
+     * duas vezes. Guardamos o token da própria resposta e só então seguimos.
+     */
+    const token = (data as { token?: string } | null)?.token;
+    if (token) setToken(token);
+
+    /** cache da sessão anterior (inclusive de "sem sessão") não pode vazar */
+    qc.clear();
+    await authClient.getSession({ query: { disableCookieCache: true } });
 
     // administrador cai direto no painel de gestão; cliente na área de acessos
     let destino = voltarParaCheckout ?? "/dashboard";
@@ -76,6 +95,12 @@ export default function LoginPage() {
       }
       subtitle="Entre para ver as credenciais de cada streaming do seu pacote, pagar por Pix na hora e acompanhar a próxima cobrança."
     >
+      {trocandoDeConta && (
+        <div className="mb-5 rounded-xl border border-neon-cyan/25 bg-neon-cyan/5 px-4 py-3 font-sans text-sm text-white/70">
+          Sessão encerrada. Entre com a outra conta.
+        </div>
+      )}
+
       <form onSubmit={entrar} className="space-y-5">
         <AuthField label="E-mail">
           <input
@@ -111,7 +136,26 @@ export default function LoginPage() {
           </div>
         </AuthField>
 
-        <div className="-mt-2 text-right">
+        <div className="-mt-2 flex items-center justify-between gap-3">
+          <button
+            type="button"
+            role="checkbox"
+            aria-checked={manterConectado}
+            data-testid="manter-conectado"
+            onClick={() => setManterConectado((v) => !v)}
+            className="flex items-center gap-2 font-sans text-xs text-white/50 transition-colors hover:text-white/80"
+          >
+            <span
+              className={`flex size-4 items-center justify-center rounded border transition-colors ${
+                manterConectado
+                  ? "border-neon-cyan bg-neon-cyan/20 text-neon-cyan"
+                  : "border-white/20 text-transparent"
+              }`}
+            >
+              <Check className="size-3" />
+            </span>
+            Manter conectado (30 dias)
+          </button>
           <Link
             to="/esqueci-senha"
             className="font-sans text-xs font-semibold text-neon-cyan/80 transition-colors hover:text-neon-cyan hover:underline"

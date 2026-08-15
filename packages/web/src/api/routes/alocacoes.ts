@@ -3,7 +3,28 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { ORPCError } from "@orpc/server";
 import { adminOnly } from "../middleware/auth";
 import { db } from "../database";
-import { alocacoes as tabelaAlocacoes, contasMatrizes, usuarios } from "../database/schema";
+import {
+  alocacoes as tabelaAlocacoes,
+  assinaturasApps,
+  contasMatrizes,
+  filaVagas,
+  usuarios,
+} from "../database/schema";
+import {
+  atenderFila,
+  direitosDoCliente,
+  encerrarAssinaturaApp,
+  garantirAlocacao,
+  registrarAssinaturaApp,
+  sincronizarAcessosDoCliente,
+  sincronizarVagas,
+} from "../lib/acessos";
+
+/**
+ * O alocador vive em `api/lib/acessos.ts` (junto da fila de espera e da
+ * realocação). Reexportado aqui porque várias rotas já importavam daqui.
+ */
+export { garantirAlocacao, sincronizarVagas } from "../lib/acessos";
 
 /**
  * ALOCAÇÕES — vínculo real entre cliente e conta matriz.
@@ -13,55 +34,6 @@ import { alocacoes as tabelaAlocacoes, contasMatrizes, usuarios } from "../datab
  * Regra de ouro: liberar NUNCA apaga a linha nem o cadastro do cliente —
  * apenas marca `status = liberado` e carimba `liberadoEm`.
  */
-
-/** recalcula `vagasOcupadas` da conta a partir das alocações ativas */
-export async function sincronizarVagas(contaId: number) {
-  const ativas = await db
-    .select({ id: tabelaAlocacoes.id })
-    .from(tabelaAlocacoes)
-    .where(and(eq(tabelaAlocacoes.contaId, contaId), eq(tabelaAlocacoes.status, "ativo")));
-  await db
-    .update(contasMatrizes)
-    .set({ vagasOcupadas: ativas.length })
-    .where(eq(contasMatrizes.id, contaId));
-  return ativas.length;
-}
-
-/**
- * Garante que o cliente tenha uma vaga ativa no serviço informado.
- * Idempotente: se já existe alocação ativa, devolve a existente.
- * Retorna `null` quando não há nenhuma conta com vaga livre.
- */
-export async function garantirAlocacao(clienteId: number, servico: string) {
-  const [existente] = await db
-    .select()
-    .from(tabelaAlocacoes)
-    .where(
-      and(
-        eq(tabelaAlocacoes.clienteId, clienteId),
-        eq(tabelaAlocacoes.servico, servico),
-        eq(tabelaAlocacoes.status, "ativo"),
-      ),
-    );
-  if (existente) return existente;
-
-  const contas = await db
-    .select()
-    .from(contasMatrizes)
-    .where(and(eq(contasMatrizes.servico, servico), eq(contasMatrizes.status, "ativo")));
-
-  const livre = contas
-    .filter((c) => c.vagasOcupadas < c.totalVagas)
-    .sort((a, b) => b.totalVagas - b.vagasOcupadas - (a.totalVagas - a.vagasOcupadas))[0];
-  if (!livre) return null;
-
-  const [row] = await db
-    .insert(tabelaAlocacoes)
-    .values({ clienteId, contaId: livre.id, servico })
-    .returning();
-  await sincronizarVagas(livre.id);
-  return row;
-}
 
 export const alocacoes = {
   /** clientes vinculados a uma conta matriz (item "vínculo cliente × conta") */
@@ -243,12 +215,147 @@ export const alocacoes = {
   alocarPorServico: adminOnly
     .input(z.object({ clienteId: z.number().int(), servico: z.string().min(1) }))
     .handler(async ({ input }) => {
-      const row = await garantirAlocacao(input.clienteId, input.servico);
-      if (!row) {
+      const { alocacao, motivo } = await garantirAlocacao(input.clienteId, input.servico);
+      if (!alocacao) {
         throw new ORPCError("BAD_REQUEST", {
-          message: `Nenhuma conta matriz disponível para o serviço "${input.servico}"`,
+          message:
+            motivo === "sem_conta"
+              ? `Nenhuma conta matriz cadastrada para "${input.servico}"`
+              : `Sem vaga livre para "${input.servico}" — libere uma vaga ou cadastre outra conta`,
         });
       }
-      return row;
+      return alocacao;
+    }),
+
+  /**
+   * ADICIONAR APP AO CLIENTE (painel do admin).
+   * Diferente do `alocarPorServico`: além da vaga, grava o DIREITO em
+   * `assinaturas_apps`, então o app passa a aparecer no dashboard do cliente e
+   * a ter vencimento próprio. Sem vaga, não falha: entra na fila e avisa.
+   */
+  adicionarAppAoCliente: adminOnly
+    .input(
+      z.object({
+        clienteId: z.number().int(),
+        servico: z.string().min(1),
+        origem: z.enum(["avulso", "combo", "premio", "pacote"]).default("avulso"),
+        ciclo: z.enum(["mensal", "trimestral", "semestral", "anual"]).default("mensal"),
+        valor: z.number().nonnegative().default(0),
+        /** ISO YYYY-MM-DD — vencimento próprio deste app */
+        proximaCobranca: z.string().default(""),
+        expiraEm: z.string().default(""),
+      }),
+    )
+    .handler(async ({ input }) => {
+      const [cliente] = await db.select().from(usuarios).where(eq(usuarios.id, input.clienteId));
+      if (!cliente) throw new ORPCError("NOT_FOUND", { message: "Cliente não encontrado" });
+
+      await registrarAssinaturaApp(input);
+      const resultado = await sincronizarAcessosDoCliente(input.clienteId, "manual");
+
+      return {
+        servico: input.servico,
+        alocado: !resultado.semVaga.includes(input.servico),
+        aguardando: resultado.semVaga.includes(input.servico),
+      };
+    }),
+
+  /** remove o direito do app e libera a vaga (mantém o histórico) */
+  removerAppDoCliente: adminOnly
+    .input(z.object({ clienteId: z.number().int(), servico: z.string().min(1) }))
+    .handler(async ({ input }) => {
+      await encerrarAssinaturaApp(input.clienteId, input.servico, "cancelado");
+      // vaga que acabou de vagar pode atender quem está na fila
+      const atendidos = await atenderFila(input.servico);
+      return { ok: true, filaAtendida: atendidos.length };
+    }),
+
+  /**
+   * APPS DESTE CLIENTE — alimenta o popup do painel admin.
+   * Junta as três verdades numa lista só: o direito (`assinaturas_apps` +
+   * pacote), a vaga (`alocacoes` + conta matriz) e a espera (`fila_vagas`).
+   */
+  appsDoCliente: adminOnly
+    .input(z.object({ clienteId: z.number().int() }))
+    .handler(async ({ input }) => {
+      const [cliente] = await db.select().from(usuarios).where(eq(usuarios.id, input.clienteId));
+      if (!cliente) throw new ORPCError("NOT_FOUND", { message: "Cliente não encontrado" });
+
+      const servicos = await direitosDoCliente(input.clienteId);
+
+      const assinaturas = await db
+        .select()
+        .from(assinaturasApps)
+        .where(eq(assinaturasApps.clienteId, input.clienteId));
+
+      const vagas = await db
+        .select()
+        .from(tabelaAlocacoes)
+        .where(
+          and(
+            eq(tabelaAlocacoes.clienteId, input.clienteId),
+            eq(tabelaAlocacoes.status, "ativo"),
+          ),
+        );
+
+      const contas = vagas.length
+        ? await db
+            .select()
+            .from(contasMatrizes)
+            .where(
+              inArray(
+                contasMatrizes.id,
+                vagas.map((v) => v.contaId),
+              ),
+            )
+        : [];
+
+      const espera = await db
+        .select()
+        .from(filaVagas)
+        .where(
+          and(eq(filaVagas.clienteId, input.clienteId), eq(filaVagas.status, "aguardando")),
+        );
+
+      const itens = servicos.map((servico) => {
+        const assinatura = assinaturas.find((a) => a.servico === servico && a.status === "ativo");
+        const vaga = vagas.find((v) => v.servico === servico);
+        const conta = vaga ? (contas.find((c) => c.id === vaga.contaId) ?? null) : null;
+        const naFila = espera.some((f) => f.servico === servico);
+
+        return {
+          servico,
+          origem: assinatura?.origem ?? "pacote",
+          ciclo: assinatura?.ciclo ?? cliente.ciclo,
+          valor: assinatura?.valor ?? 0,
+          proximaCobranca: assinatura?.proximaCobranca || cliente.proximaCobranca,
+          expiraEm: assinatura?.expiraEm ?? "",
+          alocacaoId: vaga?.id ?? null,
+          desde: vaga?.criadoEm ?? null,
+          conta: conta
+            ? {
+                id: conta.id,
+                rotulo: conta.rotulo,
+                email: mascararEmail(conta.email),
+                ativa: conta.ativa,
+                status: conta.status,
+              }
+            : null,
+          /** ativo | aguardando */
+          status: vaga ? "ativo" : naFila ? "aguardando" : "sem_vaga",
+        };
+      });
+
+      return {
+        cliente: { id: cliente.id, nome: cliente.nome, telefone: cliente.telefone ?? "" },
+        itens,
+      };
     }),
 };
+
+/** `joao@gmail.com` → `jo•••@gmail.com` — o admin identifica sem expor a conta */
+function mascararEmail(email: string) {
+  const [nome, dominio] = email.split("@");
+  if (!dominio) return email;
+  return `${nome.slice(0, 2)}•••@${dominio}`;
+}

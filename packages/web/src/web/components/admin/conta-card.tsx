@@ -9,6 +9,7 @@ import {
   Loader2,
   RefreshCw,
   SlidersHorizontal,
+  Power,
   Trash2,
   UserMinus,
   UserPlus,
@@ -22,6 +23,7 @@ import { SeloSalvo, useSeloTransitorio } from "./salvamento";
 import { Rotulo, Tooltip } from "../ui/tooltip";
 import { brl, serviceById } from "@/lib/mock-data";
 import {
+  useAlternarContaAtiva,
   useContas,
   useEditarVagas,
   useRemoverConta,
@@ -340,7 +342,19 @@ export function ContaMatrizCard({
 
   const repor = useReporConta();
   const remover = useRemoverConta();
-  const busy = repor.isPending || remover.isPending;
+  const alternar = useAlternarContaAtiva();
+  const busy = repor.isPending || remover.isPending || alternar.isPending;
+
+  /**
+   * Aviso pós-remanejo: quem foi realocado em outra matriz e quem ficou sem
+   * vaga. Sem isso o admin desligava uma conta sem saber que deixou cliente
+   * na mão — o dado existe no retorno, só faltava aparecer na tela.
+   */
+  const remanejo = alternar.data?.realocados?.length || alternar.data?.semVaga?.length
+    ? { realocados: alternar.data.realocados, semVaga: alternar.data.semVaga }
+    : repor.data?.realocados?.length || repor.data?.semVaga?.length
+      ? { realocados: repor.data.realocados, semVaga: repor.data.semVaga }
+      : null;
 
   /** selo "Salvo" do card: vagas editadas ou vagas repostas */
   const [salvos, setSalvos] = useState(0);
@@ -497,7 +511,7 @@ export function ContaMatrizCard({
 
       {aberto && <ClientesVinculados conta={acc} vinculos={vinculos} />}
 
-      <div className="relative mt-4 flex gap-2">
+      <div className="relative mt-4 flex flex-wrap gap-2">
         <NeonButton
           accent="purple"
           variant="outline"
@@ -507,7 +521,7 @@ export function ContaMatrizCard({
           onClick={() => setEditando((v) => !v)}
         >
           <SlidersHorizontal className="size-3.5 shrink-0" />
-          Editar vagas
+          Vagas
         </NeonButton>
         <Tooltip
           texto="conta.liberarTodas"
@@ -520,9 +534,15 @@ export function ContaMatrizCard({
             size="sm"
             className="w-full whitespace-nowrap px-2"
             disabled={busy || ocupadas === 0}
-            onClick={() =>
-              repor.mutate({ id: acc.id }, { onSuccess: marcarSalvo })
-            }
+            onClick={() => {
+              if (
+                confirm(
+                  `Repor as vagas de ${acc.rotulo}? ${ocupadas} cliente(s) serão remanejados para outras contas matrizes do mesmo serviço. Quem não couber entra na fila e o ADM é avisado.`,
+                )
+              ) {
+                repor.mutate({ id: acc.id }, { onSuccess: marcarSalvo });
+              }
+            }}
           >
             {repor.isPending ? (
               <Loader2 className="size-3.5 animate-spin" />
@@ -531,6 +551,39 @@ export function ContaMatrizCard({
             )}
             Repor
           </NeonButton>
+        </Tooltip>
+        <Tooltip
+          texto="conta.ativa"
+          titulo={acc.ativa ? "Desligar conta matriz" : "Religar conta matriz"}
+        >
+          <button
+            type="button"
+            data-testid={`conta-ativa-${acc.id}`}
+            className={cn(
+              "flex size-9 shrink-0 items-center justify-center rounded-full border transition-colors",
+              acc.ativa
+                ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-300 hover:border-neon-red/50 hover:text-neon-red"
+                : "border-neon-red/45 bg-neon-red/10 text-neon-red hover:border-emerald-400/50 hover:text-emerald-300",
+            )}
+            aria-label={
+              acc.ativa
+                ? `Desligar a conta matriz ${acc.rotulo}`
+                : `Religar a conta matriz ${acc.rotulo}`
+            }
+            disabled={busy}
+            onClick={() => {
+              const msg = acc.ativa
+                ? `Desligar ${acc.rotulo}? ${ocupadas} cliente(s) serão remanejados para outra matriz do mesmo serviço e a conta para de receber novos.`
+                : `Religar ${acc.rotulo}? A conta volta a receber clientes e a fila de espera é atendida automaticamente.`;
+              if (confirm(msg)) alternar.mutate({ id: acc.id, ativa: !acc.ativa });
+            }}
+          >
+            {alternar.isPending ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <Power className="size-3.5" />
+            )}
+          </button>
         </Tooltip>
         <Tooltip texto="conta.copiarLogin" titulo="Copiar login">
           <button
@@ -558,6 +611,33 @@ export function ContaMatrizCard({
           </button>
         </Tooltip>
       </div>
+
+      {remanejo && (
+        <div
+          className={cn(
+            "relative mt-3 rounded-xl border p-3 font-sans text-[11px]",
+            remanejo.semVaga.length
+              ? "border-neon-red/25 bg-neon-red/5 text-neon-red"
+              : "border-emerald-400/25 bg-emerald-400/5 text-emerald-300",
+          )}
+        >
+          {remanejo.realocados.length > 0 && (
+            <div>{remanejo.realocados.length} cliente(s) realocados em outra matriz.</div>
+          )}
+          {remanejo.semVaga.length > 0 && (
+            <div className="mt-0.5">
+              {remanejo.semVaga.length} cliente(s) sem vaga — entraram na fila e o ADM foi
+              avisado.
+            </div>
+          )}
+        </div>
+      )}
+
+      {!acc.ativa && (
+        <div className="relative mt-3 rounded-xl border border-white/12 bg-white/[0.03] p-3 font-sans text-[11px] text-white/45">
+          Conta desligada — não recebe novos clientes.
+        </div>
+      )}
     </GlassCard>
   );
 }

@@ -10,7 +10,7 @@ export function getToken(): string {
   }
 }
 
-function setToken(token: string) {
+export function setToken(token: string) {
   try {
     localStorage.setItem(TOKEN_KEY, token);
   } catch {

@@ -18,7 +18,11 @@ import {
   usuarios,
 } from "../database/schema";
 import { lerParametros } from "./config";
-import { garantirAlocacao } from "../routes/alocacoes";
+import {
+  type OrigemAssinatura,
+  registrarAssinaturaApp,
+  sincronizarAcessosDoCliente,
+} from "./acessos";
 import {
   type Ciclo,
   DEFINICOES,
@@ -317,11 +321,36 @@ export async function aplicarPedido(clienteId: number, pedido: Pedido) {
 
   if (soAdiantamento) return;
 
-  // libera uma vaga de cada app comprado (silencioso quando o estoque acabou —
-  // o admin vê o cliente aguardando vaga na aba Saúde & Estoque)
+  /**
+   * REGISTRA O DIREITO antes de alocar. Apps que não vêm de pacote (montador,
+   * combo) ganham linha própria em `assinaturas_apps` com ciclo e vencimento
+   * separados — é o que faz o avulso comprado no dia 20 não ser cobrado junto
+   * com o pacote do dia 5.
+   */
+  const origem: OrigemAssinatura = pedido.pacoteId
+    ? "pacote"
+    : pedido.comboId
+      ? "combo"
+      : "avulso";
+  const venceEm = proximaData(pedido.ciclo, base);
+  const porApp = pedido.apps.length
+    ? cent(pedido.valor / mesesDoCiclo(pedido.ciclo) / pedido.apps.length)
+    : 0;
+
   for (const servico of pedido.apps) {
-    await garantirAlocacao(clienteId, servico);
+    await registrarAssinaturaApp({
+      clienteId,
+      servico,
+      origem,
+      ciclo: pedido.ciclo,
+      valor: origem === "pacote" ? 0 : porApp,
+      proximaCobranca: venceEm,
+    });
   }
+
+  // aloca vaga real para TUDO a que o cliente tem direito; quem não couber
+  // entra na fila e gera alerta crítico com link de WhatsApp para o admin
+  await sincronizarAcessosDoCliente(clienteId, "compra");
 
   // e-mail de entrega de acesso — nunca derruba a ativação se o envio falhar
   try {

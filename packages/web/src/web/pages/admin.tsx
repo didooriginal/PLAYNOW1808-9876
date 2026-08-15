@@ -45,6 +45,7 @@ import {
   diasParaVencer,
 } from "../components/admin/conta-card";
 import { AppsView } from "../components/admin/apps-view";
+import { ModalAppsCliente } from "../components/admin/modal-apps-cliente";
 import { AfiliadosView } from "../components/admin/afiliados-view";
 import { CodigosView } from "../components/admin/codigos-view";
 import { SuporteView } from "../components/admin/suporte-view";
@@ -87,7 +88,7 @@ import {
   type ServiceId,
 } from "@/lib/mock-data";
 import { useContas, useCriarConta, useResumoEstoque } from "../queries/contas";
-import { useAlocarPorServico, useMapaAlocacoes } from "../queries/alocacoes";
+import { useMapaAlocacoes } from "../queries/alocacoes";
 import { useAplicativos } from "../queries/aplicativos";
 import { useResumoSuporte } from "../queries/suporte";
 import { useResumoRecompensas } from "../queries/recompensas";
@@ -2063,14 +2064,15 @@ function ClientsTable({ compact = false }: { compact?: boolean }) {
                 </td>
                 <td className="px-5 py-3.5">
                   <div className="flex items-center justify-end gap-2">
-                    <Tooltip texto="cliente.alocarApp" titulo="Adicionar app manualmente" lado="left">
+                    <Tooltip texto="cliente.apps" titulo="Apps deste cliente" lado="left">
                       <button
                         type="button"
-                        aria-label={`Adicionar app para ${c.nome}`}
+                        aria-label={`Ver apps de ${c.nome}`}
+                        data-testid={`apps-cliente-${c.id}`}
                         onClick={() => setAdicionandoApp(c)}
                         className="flex size-8 items-center justify-center rounded-lg border border-white/10 text-white/30 transition-colors hover:border-neon-cyan/50 hover:text-neon-cyan"
                       >
-                        <Plus className="size-3.5" />
+                        <Layers className="size-3.5" />
                       </button>
                     </Tooltip>
                     <Tooltip
@@ -2183,7 +2185,7 @@ function ClientsTable({ compact = false }: { compact?: boolean }) {
       )}
 
       {adicionandoApp && (
-        <ModalAdicionarAppCliente
+        <ModalAppsCliente
           cliente={adicionandoApp}
           onClose={() => setAdicionandoApp(null)}
         />
@@ -2195,93 +2197,6 @@ function ClientsTable({ compact = false }: { compact?: boolean }) {
         />
       )}
     </GlassCard>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-
-/**
- * ALOCAÇÃO MANUAL — coloca o cliente em uma vaga livre de conta matriz do
- * serviço escolhido. Sem vaga, o servidor devolve erro em vez de alocar.
- */
-function ModalAdicionarAppCliente({
-  cliente,
-  onClose,
-}: {
-  cliente: Cliente;
-  onClose: () => void;
-}) {
-  const alocar = useAlocarPorServico();
-  const { data: apps } = useAplicativos();
-  const ativos = (apps ?? []).filter((a) => a.ativo);
-
-  return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
-      <div className="w-full max-w-md overflow-hidden rounded-3xl border border-white/12 bg-[#0b0b0f] p-6 shadow-2xl">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="font-sans text-[10px] uppercase tracking-[0.22em] text-white/35">
-              Alocação manual
-            </div>
-            <h3 className="mt-1 font-display text-xl font-extrabold text-white">
-              Adicionar app · {cliente.nome}
-            </h3>
-            <p className="mt-1 font-sans text-xs text-white/40">
-              Escolha o serviço — o sistema procura uma vaga livre nas contas matrizes.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Fechar"
-            className="flex size-8 shrink-0 items-center justify-center rounded-lg text-white/40 hover:text-white"
-          >
-            <X className="size-4" />
-          </button>
-        </div>
-
-        <div className="mt-6 grid max-h-[50vh] gap-2 overflow-y-auto">
-          {ativos.map((app) => (
-            <button
-              key={app.id}
-              type="button"
-              disabled={alocar.isPending}
-              onClick={() =>
-                alocar.mutate(
-                  { clienteId: cliente.id, servico: app.slug },
-                  { onSuccess: onClose },
-                )
-              }
-              className="flex items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.03] p-3 text-left transition-all hover:border-neon-cyan/50 hover:bg-white/[0.06] disabled:opacity-40"
-            >
-              <AppIcon id={app.slug as ServiceId} size="sm" active />
-              <div className="min-w-0 flex-1">
-                <div className="font-display text-sm font-bold text-white">{app.nome}</div>
-                <div className="font-sans text-[10px] text-white/30">
-                  Alocar em uma matriz disponível
-                </div>
-              </div>
-              {alocar.isPending && alocar.variables?.servico === app.slug ? (
-                <Loader2 className="size-4 animate-spin text-neon-cyan" />
-              ) : (
-                <Plus className="size-4 text-white/20" />
-              )}
-            </button>
-          ))}
-          {ativos.length === 0 && (
-            <p className="py-8 text-center font-sans text-sm text-white/30">
-              Nenhum aplicativo ativo no catálogo.
-            </p>
-          )}
-        </div>
-
-        {alocar.isError && (
-          <div className="mt-4 rounded-xl border border-neon-red/20 bg-neon-red/5 p-3 font-sans text-[11px] text-neon-red">
-            {alocar.error.message}
-          </div>
-        )}
-      </div>
-    </div>
   );
 }
 

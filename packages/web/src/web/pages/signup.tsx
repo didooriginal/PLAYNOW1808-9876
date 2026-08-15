@@ -6,7 +6,7 @@ import { AuthField, AuthShell, inputClass } from "../components/auth-shell";
 import { AppIcon } from "../components/app-icon";
 import { NeonButton, accentHex } from "../components/ui/kit";
 import { serviceById, type ServiceId } from "@/lib/mock-data";
-import { authClient } from "../lib/auth";
+import { authClient, setToken } from "../lib/auth";
 import { client } from "../lib/api";
 import { usePacotes } from "../queries/pacotes";
 import { pacoteParaPlano } from "../lib/planos";
@@ -113,7 +113,7 @@ export default function SignupPage() {
       return;
     }
     setCarregando(true);
-    const { error } = await authClient.signUp.email({
+    const { data, error } = await authClient.signUp.email({
       name: nome.trim(),
       email: email.trim().toLowerCase(),
       password: senha,
@@ -124,6 +124,15 @@ export default function SignupPage() {
       setErro(traduzErro(error.code, error.message));
       return;
     }
+
+    /**
+     * Mesmo motivo do login: as chamadas abaixo (indicação e pacote) saíam sem
+     * Bearer porque o token só era gravado depois. Gravamos aqui e a sessão já
+     * nasce válida para o checkout.
+     */
+    const token = (data as { token?: string } | null)?.token;
+    if (token) setToken(token);
+    await authClient.getSession({ query: { disableCookieCache: true } });
 
     // vincula a indicacao (?ref=CODIGO) ao cadastro recem-criado
     if (ref) {

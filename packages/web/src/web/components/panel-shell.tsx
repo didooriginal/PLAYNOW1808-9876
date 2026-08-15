@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { ArrowLeft, LogOut, MessageCircle } from "lucide-react";
+import { ArrowLeft, LogOut, MessageCircle, UserCog } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "./logo";
 import { whatsappLink, type Accent } from "@/lib/mock-data";
 import { accentHex } from "./ui/kit";
+import { useQueryClient } from "@tanstack/react-query";
 import { authClient, clearToken } from "../lib/auth";
 
 export type NavItem = {
@@ -33,11 +34,23 @@ export function PanelShell({
 }) {
   const hex = accentHex[accent];
   const [, navigate] = useLocation();
+  const qc = useQueryClient();
 
-  async function sair() {
-    await authClient.signOut();
+  /**
+   * Sair de verdade: encerra a sessão no servidor, apaga o Bearer do
+   * localStorage E limpa o cache do React Query. Sem o `qc.clear()` a próxima
+   * conta que entrasse no mesmo navegador via dados da anterior por alguns
+   * segundos.
+   */
+  async function sair(destino = "/login") {
+    try {
+      await authClient.signOut();
+    } catch {
+      /* rede caiu — mesmo assim derrubamos a sessão local */
+    }
     clearToken();
-    navigate("/login");
+    qc.clear();
+    navigate(destino);
   }
 
   return (
@@ -70,7 +83,9 @@ export function PanelShell({
           </div>
         </div>
 
-        <nav className="mt-6 flex flex-1 flex-col gap-1">
+        {/* min-h-0 + overflow: com o menu cheio, "Trocar de conta"/"Sair"
+            ficavam empurrados para fora da tela e viravam inalcançáveis */}
+        <nav className="mt-6 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto pr-1">
           {nav.map((item) => {
             const isActive = item.id === active;
             return (
@@ -109,7 +124,8 @@ export function PanelShell({
           })}
         </nav>
 
-        <div className="mt-4 space-y-1 border-t border-white/8 pt-4">
+        {/* pb-14: o botão flutuante do copiloto cobria o "Sair da conta" */}
+        <div className="mt-4 space-y-1 border-t border-white/8 pb-14 pt-4">
           <Link
             to="/"
             className="flex items-center gap-3 rounded-xl px-3 py-2.5 font-sans text-sm text-white/40 transition-colors hover:bg-white/[0.04] hover:text-white"
@@ -117,6 +133,15 @@ export function PanelShell({
             <ArrowLeft className="size-4" />
             Voltar ao site
           </Link>
+          <button
+            type="button"
+            data-testid="trocar-de-conta"
+            onClick={() => void sair("/login?trocar=1")}
+            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 font-sans text-sm text-white/40 transition-colors hover:bg-white/[0.04] hover:text-white"
+          >
+            <UserCog className="size-4" />
+            Trocar de conta
+          </button>
           <button
             type="button"
             onClick={() => void sair()}

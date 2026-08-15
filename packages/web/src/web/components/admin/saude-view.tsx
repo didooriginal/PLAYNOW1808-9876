@@ -1,4 +1,4 @@
-import { Activity, ArrowRightLeft, HeartPulse, Loader2, PackageSearch, RefreshCw, ShieldAlert } from "lucide-react";
+import { Activity, ArrowRightLeft, Clock3, HeartPulse, Loader2, MessageCircle, PackageSearch, RefreshCw, ShieldAlert } from "lucide-react";
 import { AppIcon } from "../app-icon";
 import { GlassCard, NeonButton, Pill, ProgressBar } from "../ui/kit";
 import { Ajuda } from "../ui/tooltip";
@@ -10,6 +10,7 @@ import {
   useRemanejarConta,
   useVarrerSaude,
 } from "../../queries/saude";
+import { useFilaVagas } from "../../queries/contas";
 
 /**
  * SAÚDE DAS CONTAS + ESTOQUE INTELIGENTE.
@@ -33,6 +34,7 @@ export function SaudeView() {
   const alternarReserva = useAlternarReserva();
   const liberar = useLiberarEntrada();
   const remanejar = useRemanejarConta();
+  const fila = useFilaVagas();
 
   if (isLoading) return <p className="font-sans text-sm text-white/40">Analisando as contas…</p>;
 
@@ -73,6 +75,57 @@ export function SaudeView() {
           Reavaliar agora
         </NeonButton>
       </div>
+
+      {/* -------- fila de espera -------- */}
+      <GlassCard accent={fila.data?.length ? "red" : undefined} className="p-5">
+        <span className="font-display text-sm font-bold text-white">Fila de espera por vaga</span>
+        <Ajuda ajuda="saude.fila" lado="bottom" />
+        <div className="mt-4 space-y-2">
+          {(fila.data ?? []).map((f) => (
+            <div
+              key={f.id}
+              data-testid={`fila-vaga-${f.id}`}
+              className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white/[0.03] px-4 py-3"
+            >
+              <div className="flex min-w-0 items-center gap-3">
+                <AppIcon id={f.servico} size="xs" />
+                <div className="min-w-0">
+                  <div className="truncate font-display text-sm font-semibold text-white">
+                    {f.nome}
+                  </div>
+                  <div className="font-sans text-[11px] text-white/35">
+                    {f.servico} · aguardando desde{" "}
+                    {new Date(f.criadoEm).toLocaleDateString("pt-BR")}
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Pill accent="red">
+                  <Clock3 className="size-3" />
+                  na fila
+                </Pill>
+                {f.linkWhats && (
+                  <a
+                    href={f.linkWhats}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`Avisar ${f.nome} pelo WhatsApp`}
+                    className="flex items-center gap-1.5 rounded-lg border border-white/12 px-3 py-1.5 font-sans text-[11px] text-white/60 hover:bg-white/5"
+                  >
+                    <MessageCircle className="size-3.5" />
+                    WhatsApp
+                  </a>
+                )}
+              </div>
+            </div>
+          ))}
+          {!fila.data?.length && (
+            <p className="font-sans text-xs text-white/35">
+              Ninguém esperando vaga — todos os clientes pagos estão alocados.
+            </p>
+          )}
+        </div>
+      </GlassCard>
 
       {/* -------- estoque por serviço -------- */}
       <GlassCard className="p-5">

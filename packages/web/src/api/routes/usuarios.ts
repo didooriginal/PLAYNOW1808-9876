@@ -17,6 +17,8 @@ import {
   situacaoCobranca,
   statusEsperado,
 } from "../lib/cobranca";
+import { direitosDoCliente, entrarNaFila, sincronizarAcessosDoCliente } from "../lib/acessos";
+import { garantirFichaDaSessao } from "../lib/sessao";
 import { notificar, varrerVencimentos } from "./notificacoes";
 
 /**
@@ -338,7 +340,12 @@ export const usuarios = {
         ? await db.select().from(pacotes).where(eq(pacotes.id, cliente.pacoteId))
         : [];
 
-      const servicos = pacote?.servicos ?? [];
+      /**
+       * TUDO a que o cliente tem direito: os apps do pacote MAIS os avulsos,
+       * combos e prêmios de `assinaturas_apps`. Antes só o pacote entrava e o
+       * app avulso comprado no montador nunca aparecia no painel.
+       */
+      const servicos = await direitosDoCliente(cliente.id);
 
       /**
        * Um acesso por serviço do pacote. A credencial vem da ALOCAÇÃO do
@@ -363,8 +370,10 @@ export const usuarios = {
       const bloqueado = estaBloqueado(cliente.statusPagamento, cliente.confiancaAte);
 
       for (const servico of servicos) {
-        const alocacao = await garantirAlocacao(cliente.id, servico);
+        const { alocacao } = await garantirAlocacao(cliente.id, servico);
         if (!alocacao) {
+          // sem estoque: registra a espera para o admin ver e ser cobrado
+          await entrarNaFila(cliente.id, servico, "compra");
           acessos.push({
             servico,
             contaId: null,
@@ -468,46 +477,20 @@ export const usuarios = {
         })
         .where(eq(tabelaUsuarios.id, cliente.id))
         .returning();
-      return row;
+
+      /**
+       * Escolher o pacote passou a ALOCAR as vagas na hora. Antes o cadastro
+       * gravava o pacote e ninguém criava a alocação: o cliente entrava no
+       * painel e via "aguardando" mesmo com conta matriz sobrando.
+       */
+      const acessos = await sincronizarAcessosDoCliente(cliente.id, "compra");
+      return { ...row, acessos };
     }),
 
   /** Perfil da sessão atual + flag de admin, para proteger rotas no front. */
   eu: authed.handler(async ({ context }) => {
-    const [cliente] = await db
-      .select()
-      .from(tabelaUsuarios)
-      .where(eq(tabelaUsuarios.authUserId, context.user.id));
-    const email = context.user.email.toLowerCase();
-    const [porEmail] = cliente
-      ? []
-      : await db.select().from(tabelaUsuarios).where(eq(tabelaUsuarios.email, email));
-
-    let registro = cliente ?? porEmail ?? null;
-
-    // achou pelo e-mail mas sem vínculo: amarra o auth_user_id de uma vez
-    if (!cliente && porEmail) {
-      await db
-        .update(tabelaUsuarios)
-        .set({ authUserId: context.user.id })
-        .where(eq(tabelaUsuarios.id, porEmail.id));
-      registro = { ...porEmail, authUserId: context.user.id };
-    }
-
-    // conta de login sem ficha (ficha apagada ou criada antes do hook):
-    // recria automaticamente para não deixar a sessão órfã.
-    if (!registro) {
-      const [nova] = await db
-        .insert(tabelaUsuarios)
-        .values({
-          nome: context.user.name || email.split("@")[0],
-          email,
-          authUserId: context.user.id,
-          statusPagamento: "pendente",
-          clienteDesde: new Date().toISOString().slice(0, 10),
-        })
-        .returning();
-      registro = nova ?? null;
-    }
+    // lookup centralizado em api/lib/sessao.ts — o mesmo que o `adminOnly` usa
+    const registro = await garantirFichaDaSessao(context.user);
     return {
       authId: context.user.id,
       nome: registro?.nome ?? context.user.name,
