@@ -49,7 +49,15 @@ export const AJUDA: Record<string, string> = {
   "cliente.adicionarApp":
     "Adiciona um app a este cliente: cria o direito de uso (com vencimento próprio) e já coloca numa vaga livre. Sem vaga, o cliente entra na fila e você recebe um alerta.",
   "cliente.removerApp":
-    "Tira o app deste cliente e devolve a vaga ao estoque. O histórico da alocação é preservado.",
+    "Tira o app deste cliente e devolve a vaga ao estoque. O histórico da alocação é preservado. A mensalidade cai já e o abatimento aparece na próxima fatura — o que ele pagou neste mês não é estornado.",
+  "cliente.valorApp":
+    "Quanto este app soma na mensalidade do cliente, por mês. Vem do preço do catálogo, mas você pode ajustar aqui (cortesia, combinado antigo, desconto de fidelidade).",
+  "cliente.liberacaoApp":
+    "\u0022Liberar agora\u0022 solta o acesso na hora e a cobrança vai na fatura — use com cliente de confiança. \u0022Após o pagamento\u0022 deixa o app preso: ele aparece como aguardando pagamento, não ocupa vaga e é liberado sozinho quando o pagamento cair.",
+  "cliente.primeiroMesApp":
+    "App que entra no meio do ciclo cobra 1 mês cheio à parte, somado à fatura em aberto. Do mês seguinte em diante ele já vai dentro da mensalidade. Desmarque para dar o primeiro mês de cortesia.",
+  "cliente.valorManual":
+    "A mensalidade normalmente é calculada sozinha (pacote + apps avulsos). Quando você digita o valor à mão, ela trava e nenhum app adicionado ou removido mexe mais nesse número. \u0022Voltar ao automático\u0022 destrava e recalcula.",
   "conta.ativa":
     "Liga ou desliga esta conta matriz. Ao desligar, os clientes que estavam nela são remanejados automaticamente para outras contas — nada é apagado. Quem não encontrar vaga entra na fila e gera alerta.",
   "cliente.alocarApp":

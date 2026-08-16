@@ -26,6 +26,8 @@ function useInvalidarAlocacoes() {
     qc.invalidateQueries({ queryKey: orpc.alocacoes.key() });
     qc.invalidateQueries({ queryKey: orpc.contas.key() });
     qc.invalidateQueries({ queryKey: orpc.usuarios.key() });
+    // mexer em app avulso mexe em dinheiro: mensalidade e fatura em aberto
+    qc.invalidateQueries({ queryKey: orpc.faturas.key() });
   };
 }
 

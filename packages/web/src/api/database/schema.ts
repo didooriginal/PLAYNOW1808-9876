@@ -151,6 +151,16 @@ export const usuarios = sqliteTable("usuarios", {
   ciclo: text("ciclo").notNull().default("mensal"),
   /** valor efetivamente cobrado (pode divergir do preço de tabela) */
   valor: real("valor").notNull().default(0),
+  /**
+   * Mensalidade SEM os apps avulsos — normalmente o preço do pacote.
+   * `valor` = `valorBase` + soma dos apps avulsos ativos (convertida ao ciclo).
+   */
+  valorBase: real("valor_base").notNull().default(0),
+  /**
+   * Quando o admin digita a mensalidade à mão, o recálculo automático para de
+   * mexer no `valor` — o número dele manda até ele voltar para o automático.
+   */
+  valorManual: integer("valor_manual", { mode: "boolean" }).notNull().default(false),
   proximaCobranca: text("proxima_cobranca").notNull().default(""),
   clienteDesde: text("cliente_desde").notNull().default(""),
   admin: integer("admin", { mode: "boolean" }).notNull().default(false),
@@ -297,7 +307,12 @@ export const assinaturasApps = sqliteTable("assinaturas_apps", {
   proximaCobranca: text("proxima_cobranca").notNull().default(""),
   /** prêmios e cortesias somem sozinhos nesta data */
   expiraEm: text("expira_em").notNull().default(""),
-  /** ativo | cancelado | expirado */
+  /**
+   * ativo | aguardando_pagamento | cancelado | expirado
+   * `aguardando_pagamento` é um direito já contratado que ainda NÃO vale:
+   * não entra em `direitosDoCliente`, logo não ocupa vaga nem aparece como
+   * acesso. Vira `ativo` sozinho quando a cobrança dele é paga.
+   */
   status: text("status").notNull().default("ativo"),
   criadoEm: integer("criado_em", { mode: "timestamp" })
     .notNull()
@@ -306,6 +321,42 @@ export const assinaturasApps = sqliteTable("assinaturas_apps", {
 
 export type AssinaturaApp = typeof assinaturasApps.$inferSelect;
 export type NovaAssinaturaApp = typeof assinaturasApps.$inferInsert;
+
+/* ------------------------------------------------------------------ */
+/* COBRANÇAS EXTRAS — app adicionado no meio do ciclo                  */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Quando o admin adiciona um app avulso no meio do ciclo, o primeiro mês é
+ * cobrado à parte: entra aqui e é somado à fatura em aberto da competência.
+ * A partir do mês seguinte o app já está dentro da mensalidade recalculada,
+ * então a cobrança extra existe uma vez só, por app.
+ *
+ * Pagar a fatura que contém a cobrança quita o extra e, se o app foi
+ * adicionado como "liberar após o pagamento", é isso que solta o acesso.
+ */
+export const cobrancasExtras = sqliteTable("cobrancas_extras", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  clienteId: integer("cliente_id")
+    .notNull()
+    .references(() => usuarios.id, { onDelete: "cascade" }),
+  /** slug do app (ou da opção do app) que gerou a cobrança */
+  servico: text("servico").notNull().default(""),
+  descricao: text("descricao").notNull().default(""),
+  valor: real("valor").notNull().default(0),
+  /** "YYYY-MM" da fatura que carrega este extra */
+  competencia: text("competencia").notNull().default(""),
+  /** aberto | pago | cancelado */
+  status: text("status").notNull().default("aberto"),
+  /** true quando o acesso só é liberado depois que este extra for pago */
+  liberaAcesso: integer("libera_acesso", { mode: "boolean" }).notNull().default(false),
+  criadoEm: integer("criado_em", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  pagoEm: text("pago_em").notNull().default(""),
+});
+
+export type CobrancaExtra = typeof cobrancasExtras.$inferSelect;
 
 /* ------------------------------------------------------------------ */
 /* FILA DE VAGAS — cliente pago sem estoque de conta matriz            */
@@ -645,6 +696,12 @@ export const faturas = sqliteTable(
     desconto: integer("desconto").notNull().default(0),
     /** valor efetivamente cobrado, ja com desconto */
     valorFinal: real("valor_final").notNull().default(0),
+    /**
+     * Parte de `valor` que veio de cobrancas extras (1o mes de app avulso
+     * adicionado no meio do ciclo). Guardado a parte para o reajuste ser
+     * idempotente: mensalidade = valor - extras.
+     */
+    extras: real("extras").notNull().default(0),
     /** pago | aberto | vencido */
     status: text("status").notNull().default("aberto"),
     /** ISO YYYY-MM-DD */

@@ -5,6 +5,7 @@ import { adminOnly, authed } from "../middleware/auth";
 import { db } from "../database";
 import { faturas as tabelaFaturas, usuarios } from "../database/schema";
 import { recalcularProgresso } from "./recompensas";
+import { aplicarExtrasNaFatura, liberarAppsPagos } from "../lib/cobranca-apps";
 
 /**
  * FATURAS
@@ -144,6 +145,10 @@ export async function gerarFaturas(cliente: ClienteFatura, cupom = "", desconto 
         .where(eq(tabelaFaturas.clienteId, cliente.id))
         .orderBy(desc(tabelaFaturas.competencia))
     : existentes;
+
+  /* --- 1o mes dos apps avulsos entra na fatura em aberto ----------- */
+  const comExtras = await aplicarExtrasNaFatura(cliente.id);
+  if (comExtras) lista = lista.map((f) => (f.id === comExtras.id ? comExtras : f));
 
   /* --- cupom da Jornada na fatura em aberto ----------------------- */
   const emAberto = lista.find((f) => f.status !== "pago");
@@ -337,6 +342,14 @@ export const faturas = {
         .set({ statusPagamento: pendentes.length ? "atrasado" : "ativo" })
         .where(eq(usuarios.id, fatura.clienteId));
 
-      return { ok: true };
+      /* fatura paga quita os adicionais de app e solta o acesso que estava
+         preso esperando o pagamento — nada de liberação manual em separado */
+      let liberados: string[] = [];
+      if (input.pago) {
+        const solto = await liberarAppsPagos(fatura.clienteId);
+        liberados = solto.liberados;
+      }
+
+      return { ok: true, liberados };
     }),
 };

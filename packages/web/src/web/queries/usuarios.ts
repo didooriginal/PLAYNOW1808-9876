@@ -39,6 +39,20 @@ export function useAtualizarUsuario() {
   return useMutation(orpc.usuarios.atualizar.mutationOptions({ onSuccess: invalidar }));
 }
 
+/** desliga a trava manual e volta a mensalidade para o cálculo automático */
+export function useValorAutomatico() {
+  const qc = useQueryClient();
+  return useMutation(
+    orpc.usuarios.valorAutomatico.mutationOptions({
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: orpc.usuarios.key() });
+        qc.invalidateQueries({ queryKey: orpc.alocacoes.key() });
+        qc.invalidateQueries({ queryKey: orpc.faturas.key() });
+      },
+    }),
+  );
+}
+
 export function useRemoverUsuario() {
   const invalidar = useInvalidarUsuarios();
   return useMutation(orpc.usuarios.remover.mutationOptions({ onSuccess: invalidar }));

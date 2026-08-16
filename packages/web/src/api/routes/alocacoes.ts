@@ -19,6 +19,13 @@ import {
   sincronizarAcessosDoCliente,
   sincronizarVagas,
 } from "../lib/acessos";
+import {
+  cancelarExtrasDoApp,
+  cobrarAppExtra,
+  extrasEmAberto,
+  recalcularValorCliente,
+} from "../lib/cobranca-apps";
+import { resolverServico } from "../lib/planos";
 
 /**
  * O alocador vive em `api/lib/acessos.ts` (junto da fila de espera e da
@@ -244,19 +251,56 @@ export const alocacoes = {
         /** ISO YYYY-MM-DD — vencimento próprio deste app */
         proximaCobranca: z.string().default(""),
         expiraEm: z.string().default(""),
+        /**
+         * imediata: acesso sai na hora e a cobrança vai na fatura.
+         * apos_pagamento: o direito fica preso até o cliente pagar.
+         */
+        liberacao: z.enum(["imediata", "apos_pagamento"]).default("apos_pagamento"),
+        /** cobra 1 mês cheio agora, à parte, por entrar no meio do ciclo */
+        cobrarPrimeiroMes: z.boolean().default(true),
       }),
     )
     .handler(async ({ input }) => {
       const [cliente] = await db.select().from(usuarios).where(eq(usuarios.id, input.clienteId));
       if (!cliente) throw new ORPCError("NOT_FOUND", { message: "Cliente não encontrado" });
 
-      await registrarAssinaturaApp(input);
-      const resultado = await sincronizarAcessosDoCliente(input.clienteId, "manual");
+      const aguardaPagamento = input.liberacao === "apos_pagamento";
+      const cobra = input.cobrarPrimeiroMes && input.origem === "avulso" && input.valor > 0;
+
+      await registrarAssinaturaApp({
+        ...input,
+        status: aguardaPagamento ? "aguardando_pagamento" : "ativo",
+      });
+
+      /* dinheiro: 1 mês cheio à parte agora (fatura em aberto) e, do mês que
+         vem em diante, o app já vai dentro da mensalidade recalculada. */
+      const opcao = await resolverServico(input.servico);
+      const rotulo = opcao?.nome ?? input.servico;
+      if (cobra) {
+        await cobrarAppExtra({
+          clienteId: input.clienteId,
+          servico: input.servico,
+          descricao: `${rotulo} (1º mês)`,
+          valor: input.valor,
+          liberaAcesso: aguardaPagamento,
+        });
+      }
+      const conta = await recalcularValorCliente(input.clienteId);
+
+      /* só sincroniza vaga quando o acesso já pode sair; preso no pagamento,
+         o direito nem entra em `direitosDoCliente`. */
+      const resultado = aguardaPagamento
+        ? null
+        : await sincronizarAcessosDoCliente(input.clienteId, "manual");
 
       return {
         servico: input.servico,
-        alocado: !resultado.semVaga.includes(input.servico),
-        aguardando: resultado.semVaga.includes(input.servico),
+        aguardandoPagamento: aguardaPagamento,
+        cobrado: cobra ? input.valor : 0,
+        mensalidade: conta?.valorAtual ?? cliente.valor,
+        mensalidadeManual: conta?.manual ?? cliente.valorManual,
+        alocado: resultado ? !resultado.semVaga.includes(input.servico) : false,
+        aguardando: resultado ? resultado.semVaga.includes(input.servico) : false,
       };
     }),
 
@@ -265,9 +309,19 @@ export const alocacoes = {
     .input(z.object({ clienteId: z.number().int(), servico: z.string().min(1) }))
     .handler(async ({ input }) => {
       await encerrarAssinaturaApp(input.clienteId, input.servico, "cancelado");
+      /* abate na próxima fatura: a mensalidade cai já, e o que ele pagou
+         neste mês não é estornado (regra fechada com o dono). Se o app nem
+         chegou a ser pago, a cobrança extra em aberto some junto. */
+      await cancelarExtrasDoApp(input.clienteId, input.servico);
+      const conta = await recalcularValorCliente(input.clienteId);
       // vaga que acabou de vagar pode atender quem está na fila
       const atendidos = await atenderFila(input.servico);
-      return { ok: true, filaAtendida: atendidos.length };
+      return {
+        ok: true,
+        filaAtendida: atendidos.length,
+        mensalidade: conta?.valorAtual ?? 0,
+        mensalidadeManual: conta?.manual ?? false,
+      };
     }),
 
   /**
@@ -317,8 +371,21 @@ export const alocacoes = {
           and(eq(filaVagas.clienteId, input.clienteId), eq(filaVagas.status, "aguardando")),
         );
 
-      const itens = servicos.map((servico) => {
-        const assinatura = assinaturas.find((a) => a.servico === servico && a.status === "ativo");
+      /* apps presos no pagamento não estão em `direitosDoCliente` (de
+         propósito: direito preso não ocupa vaga), mas o admin precisa
+         vê-los na lista para saber que existem e cobrar. */
+      const presos = assinaturas
+        .filter((a) => a.status === "aguardando_pagamento")
+        .map((a) => a.servico);
+      const listados = [...new Set([...servicos, ...presos])];
+
+      const itens = listados.map((servico) => {
+        const assinatura =
+          assinaturas.find((a) => a.servico === servico && a.status === "ativo") ??
+          assinaturas.find(
+            (a) => a.servico === servico && a.status === "aguardando_pagamento",
+          );
+        const preso = assinatura?.status === "aguardando_pagamento";
         const vaga = vagas.find((v) => v.servico === servico);
         const conta = vaga ? (contas.find((c) => c.id === vaga.contaId) ?? null) : null;
         const naFila = espera.some((f) => f.servico === servico);
@@ -341,14 +408,34 @@ export const alocacoes = {
                 status: conta.status,
               }
             : null,
-          /** ativo | aguardando */
-          status: vaga ? "ativo" : naFila ? "aguardando" : "sem_vaga",
+          /** aguardando_pagamento | ativo | aguardando | sem_vaga */
+          status: preso
+            ? "aguardando_pagamento"
+            : vaga
+              ? "ativo"
+              : naFila
+                ? "aguardando"
+                : "sem_vaga",
         };
       });
+
+      /* o admin decide na hora de adicionar, então precisa ver aqui mesmo
+         quanto o cliente paga hoje e o que já está pendurado para pagar. */
+      const extras = await extrasEmAberto(input.clienteId);
 
       return {
         cliente: { id: cliente.id, nome: cliente.nome, telefone: cliente.telefone ?? "" },
         itens,
+        mensalidade: cliente.valor,
+        mensalidadeManual: cliente.valorManual,
+        valorBase: cliente.valorBase,
+        extras: extras.map((e) => ({
+          id: e.id,
+          servico: e.servico,
+          descricao: e.descricao,
+          valor: e.valor,
+        })),
+        totalExtras: Math.round(extras.reduce((s, e) => s + e.valor, 0) * 100) / 100,
       };
     }),
 };

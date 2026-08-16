@@ -1,10 +1,11 @@
 import { z } from "zod";
-import { asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { ORPCError } from "@orpc/server";
 import { base } from "../__core/app";
 import { adminOnly, authed } from "../middleware/auth";
 import { db } from "../database";
 import {
+  assinaturasApps,
   contasMatrizes,
   convitesApps,
   historicoVencimento,
@@ -13,6 +14,7 @@ import {
 } from "../database/schema";
 import { resolverServicos, type ServicoResolvido } from "../lib/planos";
 import { garantirAlocacao } from "./alocacoes";
+import { extrasEmAberto, recalcularValorCliente } from "../lib/cobranca-apps";
 import {
   FORMAS_PAGAMENTO,
   HORAS_CONFIANCA,
@@ -140,9 +142,40 @@ export const usuarios = {
         delete patch.proximaCobranca;
       }
 
+      /* TRAVA DA MENSALIDADE: o valor normalmente é derivado
+         (`valorBase` + apps avulsos). Quando o admin digita o valor na mão,
+         a trava liga e o recálculo automático para de mexer no número dele
+         até alguém clicar em "voltar ao automático". */
+      if (patch.valor !== undefined) {
+        const [atual] = await db
+          .select({ valor: tabelaUsuarios.valor })
+          .from(tabelaUsuarios)
+          .where(eq(tabelaUsuarios.id, id));
+        if (atual && patch.valor !== atual.valor) {
+          (patch as Record<string, unknown>).valorManual = true;
+        }
+      }
+
       const [row] = await db.update(tabelaUsuarios).set(patch).where(eq(tabelaUsuarios.id, id)).returning();
       if (!row) throw new ORPCError("NOT_FOUND", { message: "Usuário não encontrado" });
       return row;
+    }),
+
+  /**
+   * Desliga a trava manual e devolve a mensalidade para o cálculo automático
+   * (`valorBase` + apps avulsos ativos).
+   */
+  valorAutomatico: adminOnly
+    .input(z.object({ id: z.number().int() }))
+    .handler(async ({ input }) => {
+      await db
+        .update(tabelaUsuarios)
+        .set({ valorManual: false })
+        .where(eq(tabelaUsuarios.id, input.id));
+
+      const detalhe = await recalcularValorCliente(input.id);
+      if (!detalhe) throw new ORPCError("NOT_FOUND", { message: "Cliente não encontrado" });
+      return detalhe;
     }),
 
   /**
@@ -468,10 +501,47 @@ export const usuarios = {
         });
       }
 
+      /**
+       * APPS PRESOS NO PAGAMENTO — o admin adicionou como "liberar após o
+       * pagamento". Eles não entram em `direitosDoCliente` (direito preso não
+       * ocupa vaga), então o cliente precisa vê-los aqui, com o valor, para
+       * saber exatamente o que pagar para destravar o acesso.
+       */
+      const presos = await db
+        .select()
+        .from(assinaturasApps)
+        .where(
+          and(
+            eq(assinaturasApps.clienteId, cliente.id),
+            eq(assinaturasApps.status, "aguardando_pagamento"),
+          ),
+        );
+      const infosPresos = presos.length
+        ? await resolverServicos(presos.map((p) => p.servico)).catch(
+            () => [] as ServicoResolvido[],
+          )
+        : [];
+      const abertos = presos.length ? await extrasEmAberto(cliente.id) : [];
+      const aguardandoPagamento = presos.map((p) => {
+        const info = infosPresos.find((i) => i.slug === p.servico) ?? null;
+        const extra = abertos.find((c) => c.servico === p.servico) ?? null;
+        return {
+          servico: p.servico,
+          nome: info?.nome ?? p.servico,
+          appSlug: info?.appSlug ?? p.servico,
+          /** mensalidade do app */
+          valor: p.valor,
+          /** o que está pendurado na fatura em aberto por causa dele */
+          aPagar: extra?.valor ?? 0,
+        };
+      });
+
       return {
         cliente,
         pacote: pacote ?? null,
         acessos,
+        /** apps contratados que só liberam quando a fatura for paga */
+        aguardandoPagamento,
         /** contador regressivo + estado da cobranca, prontos para a UI */
         situacao: situacaoCobranca(cliente),
         bloqueado,

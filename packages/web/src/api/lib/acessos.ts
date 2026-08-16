@@ -123,6 +123,8 @@ export async function registrarAssinaturaApp(entrada: {
   valor?: number;
   proximaCobranca?: string;
   expiraEm?: string;
+  /** `aguardando_pagamento` segura o acesso até a cobrança ser paga */
+  status?: "ativo" | "aguardando_pagamento";
 }) {
   const [existente] = await db
     .select()
@@ -140,7 +142,7 @@ export async function registrarAssinaturaApp(entrada: {
     valor: entrada.valor ?? 0,
     proximaCobranca: entrada.proximaCobranca ?? "",
     expiraEm: entrada.expiraEm ?? "",
-    status: "ativo" as const,
+    status: entrada.status ?? "ativo",
   };
 
   if (existente) {

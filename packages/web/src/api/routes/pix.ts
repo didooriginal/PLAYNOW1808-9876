@@ -7,6 +7,7 @@ import { lerParametros } from "../lib/config";
 import { db } from "../database";
 import { cobrancasPix, faturas, usuarios } from "../database/schema";
 import { aplicarPedido, type Pedido } from "../lib/pedidos";
+import { liberarAppsPagos } from "../lib/cobranca-apps";
 import { apurarComissoes } from "./afiliados";
 import {
   ambienteMP,
@@ -285,6 +286,9 @@ export async function confirmarPagamento(
   if (cobranca.pedido) {
     await aplicarPedido(cobranca.clienteId, cobranca.pedido);
   }
+
+  // quita os adicionais de app avulso e libera o que estava preso no pagamento
+  await liberarAppsPagos(cobranca.clienteId);
 
   // pagamento confirmado gera comissao para quem indicou este cliente
   const [pagante] = await db

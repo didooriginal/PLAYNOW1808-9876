@@ -36,6 +36,7 @@ import { AssistenteIA } from "../components/cliente/assistente";
 import { SuporteClienteView } from "../components/cliente/suporte-view";
 import { JornadaCliente } from "../components/cliente/jornada";
 import { CodigoRecente } from "../components/cliente/codigo-recente";
+import { AppsAguardandoPagamento } from "../components/cliente/apps-aguardando";
 import { DesbloquearNetflix } from "../components/cliente/netflix-desbloqueio";
 import { CombosSugeridos } from "../components/cliente/combos-sugeridos";
 import { PanelShell, type NavItem } from "../components/panel-shell";
@@ -709,8 +710,16 @@ export default function DashboardPage() {
     );
   }
 
-  const { cliente, pacote, acessos, situacao, bloqueado, motivoBloqueio, precisaAceitarTermos } =
-    data;
+  const {
+    cliente,
+    pacote,
+    acessos,
+    situacao,
+    bloqueado,
+    motivoBloqueio,
+    precisaAceitarTermos,
+  } = data;
+  const aguardandoPagamento = data.aguardandoPagamento ?? [];
   const initials = cliente.nome
     .split(" ")
     .map((w) => w[0])
@@ -797,6 +806,10 @@ export default function DashboardPage() {
                 clienteDesde={cliente.clienteDesde}
               />
               <ActivePlanCard cliente={cliente} pacote={pacote} apps={acessos.length} />
+              <AppsAguardandoPagamento
+                itens={aguardandoPagamento}
+                onPagar={() => setActive("pagamento")}
+              />
               <CodigoRecente />
               {acessos.length > 0 ? (
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
