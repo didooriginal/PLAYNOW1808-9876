@@ -162,6 +162,10 @@ export const AJUDA: Record<string, string> = {
   "app.tipo": "Tipo de mídia do serviço (vídeo, música, leitura). Organiza o catálogo e a vitrine do cliente.",
   "app.categoria": "Categoria comercial do app. Define em qual bloco ele aparece na landing e nos filtros do painel.",
   "app.precoAvulso": "Quanto o serviço custa sozinho no site oficial. É a referência de 'economia' mostrada ao cliente — não é o seu custo.",
+  "app.precoVenda":
+    "Quanto a PLAYPLUSNOW cobra por este app avulso, por mês. É o número que aparece na vitrine e entra na conta do cliente. Digite e clique em Salvar — nada é gravado antes disso.",
+  "app.precoMercado":
+    "Preço de tabela do serviço oficial, usado só no comparativo 'Do jeito tradicional'. Quanto maior, maior a economia exibida. Se ficar igual ao seu preço, o cliente vê economia zero.",
   "app.ativo": "Desligado, o app sai da vitrine e não pode entrar em novos pacotes. Clientes que já têm continuam usando.",
 
   /* ---------------- combos e pacotes ---------------- */

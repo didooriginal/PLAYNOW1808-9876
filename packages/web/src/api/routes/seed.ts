@@ -85,21 +85,25 @@ const PACOTES = [
  * de economia do painel. `preco` é quanto a PLAYPLUSNOW cobra pelo app avulso.
  */
 const APLICATIVOS = [
-  { slug: "netflix", nome: "Netflix", mono: "N", cor: "#e50914", tipo: "video", categoria: "streaming", precoAvulso: 59.9, preco: 24.9 },
-  { slug: "disney", nome: "Disney+", mono: "D+", cor: "#4f8ef7", tipo: "video", categoria: "streaming", precoAvulso: 43.9, preco: 19.9 },
-  { slug: "hbomax", nome: "HBO Max", mono: "MAX", cor: "#8b5cf6", tipo: "video", categoria: "streaming", precoAvulso: 55.9, preco: 22.9 },
-  { slug: "prime", nome: "Amazon Prime Video", mono: "PV", cor: "#00a8e1", tipo: "video", categoria: "streaming", precoAvulso: 20, preco: 12.9 },
-  { slug: "spotify", nome: "Spotify", mono: "S", cor: "#1db954", tipo: "musica", categoria: "musica", precoAvulso: 21.9, preco: 14.9 },
-  { slug: "youtube", nome: "YouTube Premium", mono: "YT", cor: "#ff0033", tipo: "video", categoria: "streaming", precoAvulso: 25.9, preco: 16.9 },
-  { slug: "crunchyroll", nome: "Crunchyroll", mono: "CR", cor: "#f47521", tipo: "video", categoria: "asiatico", precoAvulso: 24.9, preco: 14.9 },
-  { slug: "paramount", nome: "Paramount+", mono: "P+", cor: "#0064ff", tipo: "video", categoria: "streaming", precoAvulso: 19.9, preco: 12.9 },
-  { slug: "appletv", nome: "Apple TV+", mono: "TV+", cor: "#d4d4d8", tipo: "video", categoria: "streaming", precoAvulso: 21.9, preco: 13.9 },
-  { slug: "globoplay", nome: "Globoplay", mono: "G", cor: "#ff5722", tipo: "video", categoria: "streaming", precoAvulso: 24.9, preco: 16.9 },
-  { slug: "deezer", nome: "Deezer", mono: "DZ", cor: "#a238ff", tipo: "musica", categoria: "musica", precoAvulso: 20.9, preco: 13.9 },
-  { slug: "canva", nome: "Canva Pro", mono: "C", cor: "#00c4cc", tipo: "extra", categoria: "produtividade", precoAvulso: 34.9, preco: 19.9 },
-  { slug: "looke", nome: "Looke", mono: "LK", cor: "#e8112d", tipo: "video", categoria: "streaming", precoAvulso: 19.9, preco: 12.9 },
-  { slug: "recordplus", nome: "Record Plus", mono: "R+", cor: "#00a3e0", tipo: "video", categoria: "streaming", precoAvulso: 14.9, preco: 9.9 },
-  { slug: "iptv", nome: "IPTV + Canais ao vivo", mono: "IP", cor: "#22d3ee", tipo: "video", categoria: "iptv", precoAvulso: 45, preco: 29.9 },
+  { slug: "netflix", nome: "Netflix", mono: "N", cor: "#e50914", tipo: "video", categoria: "streaming", precoAvulso: 59.9, preco: 20 },
+  { slug: "disney", nome: "Disney+", mono: "D+", cor: "#4f8ef7", tipo: "video", categoria: "streaming", precoAvulso: 43.9, preco: 20 },
+  { slug: "hbomax", nome: "HBO Max", mono: "MAX", cor: "#8b5cf6", tipo: "video", categoria: "streaming", precoAvulso: 55.9, preco: 15 },
+  { slug: "prime", nome: "Amazon Prime Video", mono: "PV", cor: "#00a8e1", tipo: "video", categoria: "streaming", precoAvulso: 20, preco: 15 },
+  { slug: "spotify", nome: "Spotify", mono: "S", cor: "#1db954", tipo: "musica", categoria: "musica", precoAvulso: 21.9, preco: 15 },
+  { slug: "youtube", nome: "YouTube Premium", mono: "YT", cor: "#ff0033", tipo: "video", categoria: "streaming", precoAvulso: 25.9, preco: 15 },
+  { slug: "crunchyroll", nome: "Crunchyroll", mono: "CR", cor: "#f47521", tipo: "video", categoria: "asiatico", precoAvulso: 24.9, preco: 15 },
+  { slug: "paramount", nome: "Paramount+", mono: "P+", cor: "#0064ff", tipo: "video", categoria: "streaming", precoAvulso: 19.9, preco: 15 },
+  { slug: "appletv", nome: "Apple TV+", mono: "TV+", cor: "#d4d4d8", tipo: "video", categoria: "streaming", precoAvulso: 21.9, preco: 15 },
+  { slug: "globoplay", nome: "Globoplay", mono: "G", cor: "#ff5722", tipo: "video", categoria: "streaming", precoAvulso: 24.9, preco: 20 },
+  { slug: "telecine", nome: "Telecine", mono: "TC", cor: "#e6b422", tipo: "video", categoria: "streaming", precoAvulso: 24.9, preco: 15 },
+  { slug: "deezer", nome: "Deezer", mono: "DZ", cor: "#a238ff", tipo: "musica", categoria: "musica", precoAvulso: 20.9, preco: 15 },
+  { slug: "canva", nome: "Canva Pro", mono: "C", cor: "#00c4cc", tipo: "extra", categoria: "produtividade", precoAvulso: 34.9, preco: 15 },
+  { slug: "looke", nome: "Looke", mono: "LK", cor: "#e8112d", tipo: "video", categoria: "streaming", precoAvulso: 19.9, preco: 15 },
+  { slug: "recordplus", nome: "Record Plus", mono: "R+", cor: "#00a3e0", tipo: "video", categoria: "streaming", precoAvulso: 14.9, preco: 15 },
+  { slug: "premiere", nome: "Premiere", mono: "PR", cor: "#0a7d3e", tipo: "video", categoria: "esportes", precoAvulso: 25, preco: 25 },
+  { slug: "iptv", nome: "PLAYPLUSNOW + Canais ao vivo", mono: "PPN", cor: "#22d3ee", tipo: "video", categoria: "iptv", precoAvulso: 45, preco: 35 },
+  { slug: "unitv", nome: "UniTV", mono: "UN", cor: "#1f6feb", tipo: "video", categoria: "iptv", precoAvulso: 19.9, preco: 19.9 },
+  { slug: "brasilparalelo", nome: "Brasil Paralelo", mono: "BP", cor: "#c9a227", tipo: "video", categoria: "streaming", precoAvulso: 15, preco: 15 },
   { slug: "jogos", nome: "Futebol Ao Vivo", mono: "FV", cor: "#ff1f3d", tipo: "extra", categoria: "streaming", precoAvulso: 39.9, preco: 9.9 },
 ];
 
@@ -108,16 +112,22 @@ const APLICATIVOS = [
  * seed limpe as sobras do banco (catálogo, contas matrizes e itens de pacote).
  * Star+ foi encerrado no Brasil — o acervo virou a aba Star dentro do Disney+.
  * Hulu não existe como assinatura separada: o catálogo é entregue dentro do
- * Disney+. Telecine encerrou o streaming próprio e virou área do Globoplay.
- * Em todos os casos o app "some" do catálogo porque quem entrega é outro app,
- * que já está nos pacotes — o cliente não perde acervo.
+ * Disney+. Nos dois casos o app "some" do catálogo porque quem entrega é outro
+ * app, que já está nos pacotes — o cliente não perde acervo.
+ *
+ * Telecine NÃO entra aqui: ele tem assinatura própria (vendida à parte, R$15) e
+ * só usa o aplicativo do Globoplay como player. Com a assinatura Telecine pura
+ * o cliente NÃO acessa o acervo Globoplay; já "Globoplay Premium + Telecine" é
+ * uma assinatura Globoplay com o Telecine incluso — por isso ela é uma variação
+ * do Globoplay (`planos_apps`) e o Telecine avulso é um app próprio.
  */
-const DESCONTINUADOS = ["star", "hulu", "telecine"];
+const DESCONTINUADOS = ["star", "hulu"];
 
 /**
- * Sincroniza o catálogo de apps. Roda SEMPRE (mesmo em banco já povoado):
- * é o que mantém o preço de tabela do comparativo de economia atualizado e o
- * que remove os serviços descontinuados de bancos antigos.
+ * Sincroniza o catálogo de apps. Roda SEMPRE (mesmo em banco já povoado), mas
+ * é ADITIVO: cria os apps que faltam e remove os serviços descontinuados.
+ * NUNCA altera preço, nome ou cor de um app que já está no banco — esses
+ * campos pertencem ao admin.
  */
 export async function semearAplicativos() {
   for (const slug of DESCONTINUADOS) {
@@ -142,24 +152,29 @@ export async function semearAplicativos() {
     }
   }
 
+  /**
+   * INSERE O QUE FALTA, NUNCA SOBRESCREVE O QUE JÁ EXISTE.
+   *
+   * Até agosto/2026 este bloco fazia `onConflictDoUpdate` gravando `preco` e
+   * `precoAvulso` da lista acima por cima do banco. Resultado: TODO deploy que
+   * rodasse o seed desfazia os preços editados no admin — foi exatamente o
+   * "mudou tudo de novo" relatado pelo dono da operação.
+   *
+   * Agora a lista `APLICATIVOS` é só o catálogo inicial de um banco novo.
+   * Em banco já povoado, o seed apenas cria os apps que ainda não existem;
+   * preço, nome, cor e status de quem já está lá é assunto exclusivo do admin.
+   */
+  let criados = 0;
   for (const app of APLICATIVOS) {
-    await db
-      .insert(aplicativos)
-      .values(app)
-      .onConflictDoUpdate({
-        target: aplicativos.slug,
-        set: {
-          nome: app.nome,
-          mono: app.mono,
-          cor: app.cor,
-          tipo: app.tipo,
-          categoria: app.categoria,
-          precoAvulso: app.precoAvulso,
-          preco: app.preco,
-        },
-      });
+    const [existe] = await db
+      .select({ id: aplicativos.id })
+      .from(aplicativos)
+      .where(eq(aplicativos.slug, app.slug));
+    if (existe) continue;
+    await db.insert(aplicativos).values(app);
+    criados++;
   }
-  return APLICATIVOS.length;
+  return criados;
 }
 
 const CONTAS = [

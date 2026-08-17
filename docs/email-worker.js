@@ -11,7 +11,8 @@
  *      ao cliente que clicou em "Pedi o código agora" naquela conta matriz.
  *
  * PASSOS NO CLOUDFLARE
- *   a) Painel → domínio playplusnow.com.br → Email → Email Routing → habilitar.
+ *   a) Painel → Compute → Email Service → Email Routing → escolher o domínio
+      playplusnow.com.br → Enable / Get started (cria os registros MX e SPF).
  *   b) Em "Destination addresses", verifique um e-mail seu (para os avisos).
  *   c) Crie a rota catch-all: Action = "Send to a Worker" → este Worker.
  *   d) Workers & Pages → criar Worker → colar este arquivo → Deploy.
@@ -62,7 +63,7 @@ export default {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        ...(env.WEBHOOK_TOKEN ? { authorization: `Bearer ${env.WEBHOOK_TOKEN}` } : {}),
+        ...(env.WEBHOOK_TOKEN ? { "x-webhook-token": env.WEBHOOK_TOKEN } : {}),
       },
       body: JSON.stringify(payload),
     })

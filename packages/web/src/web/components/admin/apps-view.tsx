@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
 import {
   AlertTriangle,
   ArrowDown,
@@ -32,7 +32,6 @@ import { useCatalogoOpcoes } from "../../queries/planos-apps";
 import {
   BarraSalvamento,
   SeloSalvo,
-  useAutoSalvar,
   type EstadoSalvamento,
 } from "./salvamento";
 
@@ -231,72 +230,154 @@ function NovoAppForm({ onClose }: { onClose: () => void }) {
  * mostra o selo do estado ao lado — sem o selo o admin não tem como saber se o
  * número novo pegou, já que o card não recarrega visivelmente.
  */
-function PrecoInline({
+function EditorPrecos({
   app,
 }: {
-  app: { id: number; nome: string; preco: number };
+  app: { id: number; nome: string; preco: number; precoAvulso: number };
 }) {
   const atualizar = useAtualizarAplicativo();
-  const [valor, setValor] = useState(String(app.preco));
+  const [venda, setVenda] = useState(String(app.preco));
+  const [mercado, setMercado] = useState(String(app.precoAvulso));
 
-  const preco = Number(valor);
-  const valido = Number.isFinite(preco) && preco >= 0;
-  const mudou = valido && preco !== app.preco;
-
-  const { estado, confirmar } = useAutoSalvar({
-    mudou,
-    salvando: atualizar.isPending,
-    erro: atualizar.isError
-      ? (atualizar.error?.message ?? "Falha ao salvar")
-      : null,
-    salvar: () => atualizar.mutate({ id: app.id, preco, precoAvulso: preco }),
-  });
-
-  /** o "Salvo" fica visível alguns segundos e sai: 20 cards com selo fixo viram ruído */
-  const [recemSalvo, setRecemSalvo] = useState(false);
+  /** o servidor é a verdade: quando o app recarrega, os campos acompanham */
   useEffect(() => {
-    if (!atualizar.isSuccess) return;
-    setRecemSalvo(true);
-    const t = setTimeout(() => setRecemSalvo(false), 2600);
-    return () => clearTimeout(t);
-  }, [atualizar.isSuccess, atualizar.data]);
+    setVenda(String(app.preco));
+    setMercado(String(app.precoAvulso));
+  }, [app.preco, app.precoAvulso]);
 
-  const salvarAgora = () => {
-    if (!valido) {
-      setValor(String(app.preco));
-      atualizar.reset();
-      return;
-    }
-    if (mudou) confirmar();
+  const nVenda = Number(venda);
+  const nMercado = Number(mercado);
+  const validoVenda = venda.trim() !== "" && Number.isFinite(nVenda) && nVenda >= 0;
+  const validoMercado = mercado.trim() !== "" && Number.isFinite(nMercado) && nMercado >= 0;
+  const valido = validoVenda && validoMercado;
+  const mudou = nVenda !== app.preco || nMercado !== app.precoAvulso;
+
+  const estado: EstadoSalvamento = atualizar.isError
+    ? "erro"
+    : atualizar.isPending
+      ? "salvando"
+      : mudou
+        ? "pendente"
+        : "salvo";
+
+  const salvar = () => {
+    if (!valido || !mudou) return;
+    atualizar.mutate({ id: app.id, preco: nVenda, precoAvulso: nMercado });
   };
 
+  const aoTeclar = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      salvar();
+    }
+    if (e.key === "Escape") {
+      atualizar.reset();
+      setVenda(String(app.preco));
+      setMercado(String(app.precoAvulso));
+    }
+  };
+
+  const campoCls =
+    "w-full rounded-lg border bg-white/[0.04] py-1.5 pl-7 pr-2 text-right font-mono text-xs text-white outline-none transition-colors focus:border-neon-cyan/60";
+
   return (
-    <span className="flex items-center gap-1 text-white/45">
-      R$
-      <input
-        type="number"
-        step="0.01"
-        min="0"
-        aria-label={`Preço avulso de ${app.nome}`}
-        value={valor}
-        onChange={(e) => {
-          atualizar.reset();
-          setValor(e.target.value);
-        }}
-        onBlur={salvarAgora}
-        onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-        className="w-14 rounded border border-white/10 bg-white/[0.04] px-1 py-0.5 text-right font-mono text-[10px] text-white outline-none transition-colors focus:border-neon-cyan/50"
-      />
-      <span className="text-white/20">/mês</span>
-      {(estado !== "salvo" || recemSalvo) && (
-        <SeloSalvo estado={estado} className="ml-1 px-1.5 py-0.5 text-[9px]" />
-      )}
-      {estado === "erro" && (
-        <span className="font-sans text-[9px] text-neon-red">
-          {atualizar.error?.message}
+    <div
+      className={
+        mudou
+          ? "rounded-xl border border-amber-400/40 bg-amber-400/[0.06] p-2.5"
+          : "rounded-xl border border-white/8 bg-white/[0.02] p-2.5"
+      }
+    >
+      <div className="flex items-end gap-2">
+        <label className="min-w-0 flex-1">
+          <span className="mb-1 flex items-center gap-1 font-sans text-[9px] font-semibold uppercase tracking-wider text-white/40">
+            Nosso preço
+            <Ajuda ajuda="app.precoVenda" lado="top" />
+          </span>
+          <span className="relative block">
+            <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 font-mono text-[10px] text-white/30">
+              R$
+            </span>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              aria-label={`Nosso preço de ${app.nome}`}
+              value={venda}
+              onChange={(e) => {
+                atualizar.reset();
+                const v = e.target.value;
+                setVenda(v);
+                /* espelha no mercado só quando ele ainda não foi definido —
+                   assim o comparativo de economia nunca zera sozinho */
+                if (Number(mercado) === 0) setMercado(v);
+              }}
+              onKeyDown={aoTeclar}
+              className={`${campoCls} ${validoVenda ? "border-white/12" : "border-neon-red/60"}`}
+            />
+          </span>
+        </label>
+
+        <label className="min-w-0 flex-1">
+          <span className="mb-1 flex items-center gap-1 font-sans text-[9px] font-semibold uppercase tracking-wider text-white/40">
+            Mercado
+            <Ajuda ajuda="app.precoMercado" lado="top" />
+          </span>
+          <span className="relative block">
+            <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 font-mono text-[10px] text-white/30">
+              R$
+            </span>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              aria-label={`Preço de mercado de ${app.nome}`}
+              value={mercado}
+              onChange={(e) => {
+                atualizar.reset();
+                setMercado(e.target.value);
+              }}
+              onKeyDown={aoTeclar}
+              className={`${campoCls} ${validoMercado ? "border-white/12" : "border-neon-red/60"}`}
+            />
+          </span>
+        </label>
+
+        <button
+          type="button"
+          onClick={salvar}
+          disabled={!mudou || !valido || atualizar.isPending}
+          aria-label={`Salvar preços de ${app.nome}`}
+          className={
+            !mudou || !valido || atualizar.isPending
+              ? "flex h-[30px] shrink-0 cursor-not-allowed items-center gap-1 rounded-lg border border-white/8 px-2.5 font-sans text-[11px] font-semibold text-white/25"
+              : "flex h-[30px] shrink-0 items-center gap-1 rounded-lg border border-emerald-400/50 bg-emerald-400/12 px-2.5 font-sans text-[11px] font-semibold text-emerald-300 transition-colors hover:bg-emerald-400/22"
+          }
+        >
+          {atualizar.isPending ? (
+            <Loader2 className="size-3 animate-spin" />
+          ) : (
+            <Check className="size-3" strokeWidth={3} />
+          )}
+          Salvar
+        </button>
+      </div>
+
+      <div className="mt-1.5 flex min-h-[16px] items-center gap-1.5">
+        <SeloSalvo estado={estado} className="px-1.5 py-0.5 text-[9px]" />
+        <span className="truncate font-sans text-[9px] text-white/30">
+          {estado === "erro"
+            ? (atualizar.error?.message ?? "Falha ao salvar")
+            : !valido
+              ? "Preço inválido."
+              : mudou
+                ? "Clique em Salvar (ou Enter) para gravar."
+                : nMercado > nVenda
+                  ? `Cliente economiza ${brl(nMercado - nVenda)}/mês.`
+                  : "Sem economia exibida na vitrine."}
         </span>
-      )}
-    </span>
+      </div>
+    </div>
   );
 }
 
@@ -654,17 +735,16 @@ export function AppsView() {
                 <GlassCard
                   key={app.id}
                   hover
-                  className="flex items-center gap-3 p-4"
+                  className="flex flex-col gap-3 p-4"
                 >
+                  <div className="flex items-center gap-3">
                   <AppIcon id={app.slug} size="sm" active={app.ativo} />
                   <div className="min-w-0 flex-1">
                     <div className="truncate font-display text-sm font-bold text-white">
                       {app.nome}
                     </div>
-                    <div className="flex items-center gap-1.5 font-mono text-[10px] text-white/30">
-                      <span className="truncate">{app.slug}</span>
-                      <span className="text-white/15">·</span>
-                      <PrecoInline app={app} />
+                    <div className="truncate font-mono text-[10px] text-white/30">
+                      {app.slug}
                     </div>
                   </div>
                   <button
@@ -739,6 +819,9 @@ export function AppsView() {
                   >
                     <Trash2 className="size-3.5" />
                   </button>
+                  </div>
+
+                  <EditorPrecos app={app} />
                 </GlassCard>
               ))}
             </div>
