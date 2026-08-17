@@ -18,6 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { CampoSenha } from "../ui/campo-senha";
 import { AppIcon } from "../app-icon";
 import { GlassCard, NeonButton, ProgressBar } from "../ui/kit";
 import { SeloSalvo, useSeloTransitorio } from "./salvamento";
@@ -447,11 +448,12 @@ function EditorConta({
           ajuda="contas.senha"
           htmlFor={`ec-senha-${conta.id}`}
         >
-          <input
+          <CampoSenha
             id={`ec-senha-${conta.id}`}
             className={input}
             value={form.senha}
-            onChange={(e) => set("senha", e.target.value)}
+            onChange={(v) => set("senha", v)}
+            copiavel
           />
         </Campo>
         <Campo

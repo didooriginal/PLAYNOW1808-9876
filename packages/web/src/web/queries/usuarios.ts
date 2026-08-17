@@ -34,6 +34,39 @@ export function useCriarUsuario() {
   return useMutation(orpc.usuarios.criar.mutationOptions({ onSuccess: invalidar }));
 }
 
+/**
+ * Perfil do proprio cliente (telefone, endereco, foto). Invalida o painel,
+ * entao os dados novos aparecem sem recarregar a pagina.
+ */
+export function useAtualizarMeuPerfil() {
+  const invalidar = useInvalidarUsuarios();
+  return useMutation(orpc.usuarios.atualizarMeuPerfil.mutationOptions({ onSuccess: invalidar }));
+}
+
+/** Confirma que o cliente trocou a senha provisoria criada pelo ADM. */
+export function useConfirmarTrocaSenha() {
+  const invalidar = useInvalidarUsuarios();
+  return useMutation(orpc.senha.confirmarTroca.mutationOptions({ onSuccess: invalidar }));
+}
+
+/**
+ * Liga o cliente a um pacote fechado (admin). Mexe em cadastro, direitos,
+ * alocacoes e fila de uma vez so, entao invalida tudo que depende disso.
+ */
+export function useDefinirPacote() {
+  const qc = useQueryClient();
+  return useMutation(
+    orpc.usuarios.definirPacote.mutationOptions({
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: orpc.usuarios.key() });
+        qc.invalidateQueries({ queryKey: orpc.alocacoes.key() });
+        qc.invalidateQueries({ queryKey: orpc.contas.key() });
+        qc.invalidateQueries({ queryKey: orpc.faturas.key() });
+      },
+    }),
+  );
+}
+
 export function useAtualizarUsuario() {
   const invalidar = useInvalidarUsuarios();
   return useMutation(orpc.usuarios.atualizar.mutationOptions({ onSuccess: invalidar }));

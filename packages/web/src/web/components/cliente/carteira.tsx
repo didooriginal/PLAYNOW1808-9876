@@ -20,6 +20,7 @@ import {
   useSimularResgate,
   useTornarAfiliado,
 } from "../../queries/afiliados";
+import { NIVEL_AFILIADO, podeSerAfiliado, tituloDoNivel } from "../../lib/niveis";
 
 /**
  * CARTEIRA DO AFILIADO (cliente).
@@ -47,6 +48,10 @@ export function CarteiraAfiliado() {
   const carteira = data?.carteira;
   const regras = data?.regras;
   const nivel = data?.nivel ?? 1;
+  const xp = data?.xp ?? 0;
+  const xpProximoNivel = data?.xpProximoNivel ?? 0;
+  const tituloNivel = data?.tituloNivel ?? tituloDoNivel(nivel);
+  const nivelAfiliado = data?.nivelAfiliado ?? NIVEL_AFILIADO;
   const afiliadoAtivo = data?.afiliadoAtivo ?? false;
   const numero = Number(valor.replace(",", ".")) || 0;
   const emDia = (data?.indicados ?? []).filter((i) => i.emDia).length;
@@ -63,7 +68,7 @@ export function CarteiraAfiliado() {
    * afiliado. Ele vê o convite (com banner promocional, quando existir) e só
    * destrava a carteira depois de ativar.
    */
-  if (nivel >= 3 && !afiliadoAtivo) {
+  if (podeSerAfiliado(nivel) && !afiliadoAtivo) {
     return (
       <div className="space-y-6">
         {banners.data?.map((banner) => (
@@ -152,9 +157,41 @@ export function CarteiraAfiliado() {
    * VISÃO RESTRITA — abaixo do nível 3 o cliente indica e ganha recompensas na
    * Jornada, mas ainda não tem carteira em dinheiro.
    */
-  if (nivel < 3) {
+  if (!podeSerAfiliado(nivel)) {
+    const faltamXp = Math.max(xpProximoNivel - xp, 0);
     return (
       <div className="space-y-5">
+        <GlassCard strong accent="purple" className="p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Award className="size-4 text-neon-purple" />
+              <span className="font-display text-sm font-bold text-white">
+                Nível {nivel} — {tituloNivel}
+              </span>
+            </div>
+            <Pill accent="purple">{xp} XP</Pill>
+          </div>
+          <div className="mt-4">
+            <ProgressBar value={xp} max={Math.max(xpProximoNivel, 1)} />
+          </div>
+          <p className="mt-3 font-sans text-xs text-white/50">
+            {faltamXp > 0 ? (
+              <>
+                Faltam <strong className="font-semibold text-white">{faltamXp} XP</strong> para o
+                Nível {nivel + 1} ({tituloDoNivel(nivel + 1)}). A carteira de afiliado, com saque em
+                Pix e crédito na mensalidade, abre no Nível {nivelAfiliado} (
+                {tituloDoNivel(nivelAfiliado)}).
+              </>
+            ) : (
+              <>Seu próximo nível já está a caminho — atualize a página em instantes.</>
+            )}
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Pill accent="cyan">{total} indicados</Pill>
+            <Pill accent="red">{emDia} em dia</Pill>
+          </div>
+        </GlassCard>
+
         <GlassCard strong accent="cyan" className="p-6">
           <div className="flex items-center gap-2">
             <Network className="size-4 text-neon-cyan" />

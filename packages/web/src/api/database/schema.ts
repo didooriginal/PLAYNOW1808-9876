@@ -140,6 +140,20 @@ export const usuarios = sqliteTable("usuarios", {
   nome: text("nome").notNull(),
   email: text("email").notNull().unique(),
   telefone: text("telefone"),
+  /** dados de contato que o proprio cliente edita no painel */
+  endereco: text("endereco"),
+  cidade: text("cidade"),
+  estado: text("estado"),
+  cep: text("cep"),
+  /** URL publica da foto de perfil (upload direto para o object storage) */
+  avatarUrl: text("avatar_url"),
+  /**
+   * Conta criada pelo ADM com senha provisoria: o painel do cliente fica
+   * bloqueado na tela de troca de senha ate ele definir a propria senha.
+   */
+  precisaTrocarSenha: integer("precisa_trocar_senha", { mode: "boolean" })
+    .notNull()
+    .default(false),
   /** ativo (finalizado/em dia) | pendente | atrasado | suspenso */
   statusPagamento: text("status_pagamento").notNull().default("ativo"),
   /** pix | cartao | dinheiro | boleto | transferencia | outro */
@@ -171,7 +185,7 @@ export const usuarios = sqliteTable("usuarios", {
   proximaCobranca: text("proxima_cobranca").notNull().default(""),
   clienteDesde: text("cliente_desde").notNull().default(""),
   admin: integer("admin", { mode: "boolean" }).notNull().default(false),
-  /** 1 | 2 | 3 — define acesso a funcionalidades como o painel de afiliados */
+  /** 1–7 — nivel do cliente; a partir do 3 o painel de afiliados destrava */
   nivel: integer("nivel").notNull().default(1),
   /** se o cliente ja aceitou se tornar um afiliado (apenas nivel 3) */
   afiliadoAtivo: integer("afiliado_ativo", { mode: "boolean" })

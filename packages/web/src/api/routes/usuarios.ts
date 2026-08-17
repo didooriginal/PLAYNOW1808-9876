@@ -12,8 +12,15 @@ import {
   pacotes,
   usuarios as tabelaUsuarios,
 } from "../database/schema";
-import { resolverServicos, type ServicoResolvido } from "../lib/planos";
-import { paraIso } from "../lib/ciclos";
+import { resolverServicos, slugsDePacote, type ServicoResolvido } from "../lib/planos";
+import {
+  CICLOS,
+  mesesDoCiclo,
+  normalizarCiclo,
+  paraIso,
+  precificarCiclo,
+  somarMeses,
+} from "../lib/ciclos";
 import { garantirAlocacao } from "./alocacoes";
 import { extrasEmAberto, recalcularValorCliente } from "../lib/cobranca-apps";
 import {
@@ -27,9 +34,35 @@ import {
   situacaoCobranca,
   statusEsperado,
 } from "../lib/cobranca";
-import { direitosDoCliente, entrarNaFila, sincronizarAcessosDoCliente } from "../lib/acessos";
+import {
+  direitosDoCliente,
+  encerrarAssinaturaApp,
+  entrarNaFila,
+  liberarAlocacoesDoServico,
+  registrarAssinaturaApp,
+  sairDaFila,
+  sincronizarAcessosDoCliente,
+} from "../lib/acessos";
 import { garantirFichaDaSessao } from "../lib/sessao";
 import { notificar, varrerVencimentos } from "./notificacoes";
+import { auth } from "../auth";
+
+/**
+ * Senha provisoria legivel: sem 0/O/1/l/I para o ADM conseguir ditar por
+ * telefone sem confusao. 10 caracteres, com letra maiuscula, minuscula,
+ * numero e simbolo para passar em qualquer politica de senha.
+ */
+function gerarSenhaProvisoria() {
+  const maiusculas = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const minusculas = "abcdefghijkmnpqrstuvwxyz";
+  const numeros = "23456789";
+  const simbolos = "@#$%&*";
+  const todos = maiusculas + minusculas + numeros + simbolos;
+  const sorteia = (fonte: string) => fonte[Math.floor(Math.random() * fonte.length)];
+  const base = [sorteia(maiusculas), sorteia(minusculas), sorteia(numeros), sorteia(simbolos)];
+  while (base.length < 10) base.push(sorteia(todos));
+  return base.sort(() => Math.random() - 0.5).join("");
+}
 
 /**
  * Patch de edicao: TODOS os campos opcionais e SEM default, para que uma
@@ -48,8 +81,13 @@ const usuarioPatch = z.object({
   proximaCobranca: z.string().optional(),
   clienteDesde: z.string().optional(),
   admin: z.boolean().optional(),
-  nivel: z.number().int().min(1).max(3).optional(),
+  nivel: z.number().int().min(1).max(7).optional(),
   aparelhos: z.string().optional(),
+  endereco: z.string().nullable().optional(),
+  cidade: z.string().nullable().optional(),
+  estado: z.string().nullable().optional(),
+  cep: z.string().nullable().optional(),
+  avatarUrl: z.string().nullable().optional(),
 });
 
 const usuarioInput = z.object({
@@ -86,6 +124,11 @@ const listarComPacote = () =>
       admin: tabelaUsuarios.admin,
       nivel: tabelaUsuarios.nivel,
       aparelhos: tabelaUsuarios.aparelhos,
+      endereco: tabelaUsuarios.endereco,
+      cidade: tabelaUsuarios.cidade,
+      estado: tabelaUsuarios.estado,
+      cep: tabelaUsuarios.cep,
+      avatarUrl: tabelaUsuarios.avatarUrl,
       confiancaAte: tabelaUsuarios.confiancaAte,
       confiancaMotivo: tabelaUsuarios.confiancaMotivo,
       confiancaTotal: tabelaUsuarios.confiancaTotal,
@@ -112,14 +155,99 @@ export const usuarios = {
     return row;
   }),
 
+  /**
+   * Cria o cliente E a conta de login (Better Auth) numa tacada so.
+   * A senha provisoria e gerada aqui, devolvida UMA UNICA VEZ para o ADM
+   * repassar e nunca fica gravada em claro. O cliente cai na troca
+   * obrigatoria no primeiro acesso (`precisaTrocarSenha`).
+   */
   criar: adminOnly.input(usuarioInput).handler(async ({ input }) => {
+    const email = input.email.trim().toLowerCase();
+    const [jaExiste] = await db
+      .select({ id: tabelaUsuarios.id })
+      .from(tabelaUsuarios)
+      .where(eq(tabelaUsuarios.email, email));
+    if (jaExiste) {
+      throw new ORPCError("CONFLICT", {
+        message: `Já existe um cliente cadastrado com o e-mail ${email}.`,
+      });
+    }
+
+    const senhaProvisoria = gerarSenhaProvisoria();
+    let loginCriado = true;
+    let avisoLogin = "";
+
+    // O hook `user.create.after` (api/auth.ts) vincula a ficha pelo e-mail —
+    // por isso a ficha entra primeiro e o Better Auth so amarra o authUserId.
     const [row] = await db
       .insert(tabelaUsuarios)
       // `clienteDesde` alimenta ordenação e comparação em SQL: sempre ISO.
-      .values({ ...input, clienteDesde: paraIso(input.clienteDesde) || input.clienteDesde })
+      .values({
+        ...input,
+        email,
+        clienteDesde: paraIso(input.clienteDesde) || input.clienteDesde,
+        precisaTrocarSenha: true,
+      })
       .returning();
-    return row;
+
+    try {
+      await auth.api.signUpEmail({
+        body: { email, password: senhaProvisoria, name: input.nome },
+      });
+    } catch (erro) {
+      loginCriado = false;
+      avisoLogin =
+        erro instanceof Error && erro.message
+          ? erro.message
+          : "Não foi possível criar o login automaticamente.";
+      // ficha criada mesmo assim: o cliente ainda pode se cadastrar com o
+      // mesmo e-mail que o hook vincula tudo.
+      await db
+        .update(tabelaUsuarios)
+        .set({ precisaTrocarSenha: false })
+        .where(eq(tabelaUsuarios.id, row.id));
+    }
+
+    return {
+      ...row,
+      /** aparece uma unica vez na tela do ADM — nao e gravada em claro */
+      senhaProvisoria: loginCriado ? senhaProvisoria : "",
+      loginCriado,
+      avisoLogin,
+    };
   }),
+
+  /**
+   * Perfil do proprio cliente. So dados de contato — nada de valor, pacote,
+   * vencimento ou e-mail (isso continua sendo do ADM).
+   */
+  atualizarMeuPerfil: authed
+    .input(
+      z.object({
+        telefone: z.string().max(30).nullable().optional(),
+        endereco: z.string().max(180).nullable().optional(),
+        cidade: z.string().max(80).nullable().optional(),
+        estado: z.string().max(40).nullable().optional(),
+        cep: z.string().max(12).nullable().optional(),
+        avatarUrl: z.string().url().nullable().optional(),
+      }),
+    )
+    .handler(async ({ input, context }) => {
+      const ficha = await garantirFichaDaSessao(context.user);
+      if (!ficha) throw new ORPCError("NOT_FOUND", { message: "Ficha do cliente não encontrada." });
+
+      const patch = Object.fromEntries(
+        Object.entries(input).filter(([, v]) => v !== undefined),
+      ) as Partial<typeof input>;
+      if (Object.keys(patch).length === 0) return ficha;
+
+      const [row] = await db
+        .update(tabelaUsuarios)
+        .set(patch)
+        .where(eq(tabelaUsuarios.id, ficha.id))
+        .returning();
+      return row;
+    }),
 
   atualizar: adminOnly
     .input(usuarioPatch.extend({ id: z.number().int() }))
@@ -628,6 +756,129 @@ export const usuarios = {
        */
       const acessos = await sincronizarAcessosDoCliente(cliente.id, "compra");
       return { ...row, acessos };
+    }),
+
+
+  /**
+   * DEFINIR PACOTE (admin).
+   *
+   * Caminho manual para dizer "esse cliente e do pacote X" e ja deixar tudo
+   * pronto: grava pacote/ciclo, recalcula o preco NO SERVIDOR (o admin so pode
+   * sobrescrever com `valorManual` explicito), encerra o que sobrou do pacote
+   * anterior, registra um direito por app (com a variacao padrao de cada um) e
+   * chama a sincronizacao de acessos. Devolve o que foi alocado e o que caiu
+   * na fila por falta de vaga.
+   */
+  definirPacote: adminOnly
+    .input(
+      z.object({
+        clienteId: z.number().int(),
+        pacoteId: z.number().int(),
+        ciclo: z.enum(CICLOS).default("mensal"),
+        /** sobrescreve a mensalidade calculada (negociacao pontual) */
+        valorManual: z.number().nonnegative().nullable().optional(),
+      }),
+    )
+    .handler(async ({ input }) => {
+      const [cliente] = await db
+        .select()
+        .from(tabelaUsuarios)
+        .where(eq(tabelaUsuarios.id, input.clienteId));
+      if (!cliente) throw new ORPCError("NOT_FOUND", { message: "Cliente nao encontrado." });
+
+      const [pacote] = await db.select().from(pacotes).where(eq(pacotes.id, input.pacoteId));
+      if (!pacote) throw new ORPCError("NOT_FOUND", { message: "Pacote nao encontrado." });
+
+      const ciclo = normalizarCiclo(input.ciclo);
+      const preco = precificarCiclo(
+        pacote.preco,
+        ciclo,
+        ciclo === "anual" ? pacote.precoAnual : null,
+      );
+      // mensalidade equivalente: e sempre isso que fica em `valorBase`
+      const mensalidade =
+        input.valorManual != null && input.valorManual > 0
+          ? Math.round(input.valorManual * 100) / 100
+          : preco.mensal;
+
+      // variacao padrao de cada app do pacote (pacote e fechado: cliente nao escolhe)
+      const servicos = await slugsDePacote(pacote.servicos ?? []);
+
+      /**
+       * Limpa o pacote anterior: tudo que veio de pacote e nao esta na lista
+       * nova perde o direito, a vaga e o lugar na fila. Avulsos e premios
+       * (outras origens) nao sao tocados.
+       */
+      const anteriores = await db
+        .select({ servico: assinaturasApps.servico })
+        .from(assinaturasApps)
+        .where(
+          and(
+            eq(assinaturasApps.clienteId, cliente.id),
+            eq(assinaturasApps.origem, "pacote"),
+            eq(assinaturasApps.status, "ativo"),
+          ),
+        );
+      const encerrados: string[] = [];
+      for (const { servico } of anteriores) {
+        if (servicos.includes(servico)) continue;
+        await encerrarAssinaturaApp(cliente.id, servico, "cancelado");
+        await liberarAlocacoesDoServico(cliente.id, servico, 0);
+        await sairDaFila(cliente.id, servico);
+        encerrados.push(servico);
+      }
+
+      const hoje = new Date().toISOString().slice(0, 10);
+      const venceEm = somarMeses(cliente.proximaCobranca || hoje, mesesDoCiclo(ciclo));
+
+      await db
+        .update(tabelaUsuarios)
+        .set({
+          pacoteId: pacote.id,
+          ciclo,
+          valorBase: mensalidade,
+          valor: mensalidade,
+          clienteDesde: cliente.clienteDesde || hoje,
+          proximaCobranca: cliente.proximaCobranca || venceEm,
+        })
+        .where(eq(tabelaUsuarios.id, cliente.id));
+
+      // direito por app; o valor fica zerado porque quem cobra e o pacote
+      for (const servico of servicos) {
+        await registrarAssinaturaApp({
+          clienteId: cliente.id,
+          servico,
+          origem: "pacote",
+          ciclo,
+          valor: 0,
+          proximaCobranca: cliente.proximaCobranca || venceEm,
+        });
+      }
+
+      // `valor` e derivado: pacote + avulsos ativos convertidos ao ciclo
+      await recalcularValorCliente(cliente.id);
+
+      const acessos = await sincronizarAcessosDoCliente(cliente.id, "troca_de_pacote");
+
+      const [atualizado] = await db
+        .select()
+        .from(tabelaUsuarios)
+        .where(eq(tabelaUsuarios.id, cliente.id));
+
+      return {
+        cliente: atualizado ?? cliente,
+        pacote: { id: pacote.id, nome: pacote.nome },
+        ciclo,
+        mensalidade,
+        totalDoCiclo: preco.total,
+        meses: preco.meses,
+        servicos,
+        encerrados,
+        alocados: acessos.alocados.map((a) => a.servico),
+        jaTinham: acessos.jaTinham,
+        semVaga: acessos.semVaga,
+        convites: acessos.convites,
+      };
     }),
 
   /** Perfil da sessão atual + flag de admin, para proteger rotas no front. */

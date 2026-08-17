@@ -39,7 +39,15 @@ export const AJUDA: Record<string, string> = {
   "marketing.copiloto":
     "Abre o Copiloto Admin (a IA do painel) já com o seu pedido escrito. A resposta vem no chat — copie e salve aqui como texto.",
   "cliente.nivel":
-    "Nível do cliente no programa de indicação (1 a 3). Define a comissão que ele recebe por indicação aprovada.",
+    "Nível do cliente na Jornada (1 a 7: Iniciante, Bronze, Prata, Ouro, Platina, Diamante, Lenda PPN). Ele sobe sozinho por XP; o que você define aqui é só um piso — o sistema nunca rebaixa. A carteira de afiliado, com saque em Pix, abre no nível 3.",
+  "cliente.definirPacote":
+    "Liga o cliente a um pacote fechado: grava pacote e ciclo, recalcula a mensalidade no servidor, cria o direito de cada app (na versão padrão do pacote) e já tenta alocar as vagas. Quem não couber entra na fila.",
+  "cliente.cicloPacote":
+    "De quanto em quanto tempo o cliente paga. O desconto por ciclo é aplicado pelo servidor: 5% no trimestral, 10% no semestral, 20% no anual.",
+  "cliente.valorManualPacote":
+    "Deixe em branco para usar o preço da tabela. Preencha só quando houver negociação: o valor digitado vira a mensalidade equivalente deste cliente.",
+  "cliente.enderecoPerfil":
+    "Endereço informado pelo próprio cliente na aba “Meus Dados”. Serve para envio de brindes e conferência no suporte — o ADM não precisa preencher.",
   "cliente.aparelhos":
     "Aparelhos que o cliente informou no cadastro. Serve de referência no suporte — o plano libera 2 aparelhos, 1 tela por vez.",
   "cliente.adminSelo":

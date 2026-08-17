@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
 import { Link, useLocation, useSearch } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
-import { Check, Eye, EyeOff, LogIn, TriangleAlert } from "lucide-react";
+import { Check, LogIn, TriangleAlert } from "lucide-react";
 import { AuthField, AuthShell, inputClass } from "../components/auth-shell";
 import { NeonButton } from "../components/ui/kit";
+import { CampoSenha } from "../components/ui/campo-senha";
 import { authClient, setToken } from "../lib/auth";
 import { client } from "../lib/api";
 
@@ -35,7 +36,6 @@ export default function LoginPage() {
   }, [params]);
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
-  const [verSenha, setVerSenha] = useState(false);
   const [manterConectado, setManterConectado] = useState(true);
   const qc = useQueryClient();
   const trocandoDeConta = params.get("trocar") === "1";
@@ -115,25 +115,14 @@ export default function LoginPage() {
         </AuthField>
 
         <AuthField label="Senha">
-          <div className="relative">
-            <input
-              type={verSenha ? "text" : "password"}
-              required
-              autoComplete="current-password"
-              value={senha}
-              onChange={(e) => setSenha(e.target.value)}
-              placeholder="••••••••"
-              className={`${inputClass} pr-12`}
-            />
-            <button
-              type="button"
-              onClick={() => setVerSenha((v) => !v)}
-              aria-label={verSenha ? "Ocultar senha" : "Mostrar senha"}
-              className="absolute inset-y-0 right-0 flex w-12 items-center justify-center text-white/35 transition-colors hover:text-white/70"
-            >
-              {verSenha ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-            </button>
-          </div>
+          <CampoSenha
+            value={senha}
+            onChange={setSenha}
+            required
+            autoComplete="current-password"
+            placeholder="••••••••"
+            className={inputClass}
+          />
         </AuthField>
 
         <div className="-mt-2 flex items-center justify-between gap-3">

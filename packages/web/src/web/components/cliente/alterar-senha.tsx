@@ -2,6 +2,7 @@ import { useState } from "react";
 import { AlertCircle, CheckCircle2, Loader2, Lock, ShieldCheck } from "lucide-react";
 import { GlassCard, NeonButton } from "../ui/kit";
 import { authClient } from "../../lib/auth";
+import { CampoSenha } from "../ui/campo-senha";
 
 /**
  * SEGURANÇA DA CONTA (cliente).
@@ -13,7 +14,14 @@ import { authClient } from "../../lib/auth";
 const inputBase =
   "w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 font-sans text-sm text-white placeholder:text-white/20 focus:outline-none focus:ring-1";
 
-export function AlterarSenhaView() {
+export function AlterarSenhaView({
+  /** true quando a conta foi criada pelo ADM e a troca e obrigatoria */
+  obrigatorio = false,
+  onTrocada,
+}: {
+  obrigatorio?: boolean;
+  onTrocada?: () => void;
+} = {}) {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [confirmando, setConfirmando] = useState(false);
@@ -47,6 +55,7 @@ export function AlterarSenhaView() {
       if (authError) throw new Error(authError.message || "Erro ao alterar senha.");
       setSuccess(true);
       setForm({ atual: "", nova: "", confirmacao: "" });
+      onTrocada?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ocorreu um erro inesperado.");
     } finally {
@@ -65,9 +74,11 @@ export function AlterarSenhaView() {
           Sua senha foi alterada com sucesso. Por segurança, todas as outras sessões foram
           encerradas.
         </p>
-        <NeonButton accent="cyan" className="mt-8 min-w-[200px]" onClick={() => setSuccess(false)}>
-          Entendido
-        </NeonButton>
+        {!obrigatorio && (
+          <NeonButton accent="cyan" className="mt-8 min-w-[200px]" onClick={() => setSuccess(false)}>
+            Entendido
+          </NeonButton>
+        )}
       </GlassCard>
     );
   }
@@ -86,11 +97,11 @@ export function AlterarSenhaView() {
               <Lock className="size-3" />
               Senha atual
             </label>
-            <input
-              type="password"
-              required
+            <CampoSenha
               value={form.atual}
-              onChange={(e) => setForm({ ...form, atual: e.target.value })}
+              onChange={(v) => setForm({ ...form, atual: v })}
+              required
+              autoComplete="current-password"
               className={`${inputBase} focus:border-neon-red/50 focus:ring-neon-red/50`}
               placeholder="Digite sua senha atual"
             />
@@ -102,11 +113,11 @@ export function AlterarSenhaView() {
                 <ShieldCheck className="size-3" />
                 Nova senha
               </label>
-              <input
-                type="password"
-                required
+              <CampoSenha
                 value={form.nova}
-                onChange={(e) => setForm({ ...form, nova: e.target.value })}
+                onChange={(v) => setForm({ ...form, nova: v })}
+                required
+                autoComplete="new-password"
                 className={`${inputBase} focus:border-neon-cyan/50 focus:ring-neon-cyan/50`}
                 placeholder="Mínimo 8 caracteres"
               />
@@ -117,11 +128,11 @@ export function AlterarSenhaView() {
                 <ShieldCheck className="size-3" />
                 Confirmar nova senha
               </label>
-              <input
-                type="password"
-                required
+              <CampoSenha
                 value={form.confirmacao}
-                onChange={(e) => setForm({ ...form, confirmacao: e.target.value })}
+                onChange={(v) => setForm({ ...form, confirmacao: v })}
+                required
+                autoComplete="new-password"
                 className={`${inputBase} focus:border-neon-cyan/50 focus:ring-neon-cyan/50`}
                 placeholder="Repita a nova senha"
               />

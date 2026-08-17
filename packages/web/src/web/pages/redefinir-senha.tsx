@@ -2,13 +2,12 @@ import { useMemo, useState } from "react";
 import { Link, useLocation, useSearch } from "wouter";
 import {
   CheckCircle2,
-  Eye,
-  EyeOff,
   LockKeyhole,
   TriangleAlert,
 } from "lucide-react";
 import { AuthField, AuthShell, inputClass } from "../components/auth-shell";
 import { NeonButton } from "../components/ui/kit";
+import { CampoSenha } from "../components/ui/campo-senha";
 import { authClient } from "../lib/auth";
 import { client } from "../lib/api";
 
@@ -46,7 +45,6 @@ export default function RedefinirSenhaPage() {
 
   const [senha, setSenha] = useState("");
   const [confirma, setConfirma] = useState("");
-  const [verSenha, setVerSenha] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(false);
   const [pronto, setPronto] = useState(false);
@@ -139,38 +137,26 @@ export default function RedefinirSenhaPage() {
       ) : (
         <form onSubmit={trocar} className="space-y-5">
           <AuthField label="Nova senha" hint="Mínimo de 8 caracteres, com letras e números.">
-            <div className="relative">
-              <input
-                type={verSenha ? "text" : "password"}
-                required
-                autoComplete="new-password"
-                value={senha}
-                onChange={(e) => setSenha(e.target.value)}
-                placeholder="••••••••"
-                className={`${inputClass} pr-12`}
-                data-testid="nova-senha"
-              />
-              <button
-                type="button"
-                onClick={() => setVerSenha((v) => !v)}
-                aria-label={verSenha ? "Ocultar senha" : "Mostrar senha"}
-                className="absolute inset-y-0 right-0 flex w-12 items-center justify-center text-white/35 transition-colors hover:text-white/70"
-              >
-                {verSenha ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-              </button>
-            </div>
+            <CampoSenha
+              value={senha}
+              onChange={setSenha}
+              required
+              autoComplete="new-password"
+              placeholder="••••••••"
+              className={inputClass}
+              testId="nova-senha"
+            />
           </AuthField>
 
           <AuthField label="Repita a nova senha">
-            <input
-              type={verSenha ? "text" : "password"}
+            <CampoSenha
+              value={confirma}
+              onChange={setConfirma}
               required
               autoComplete="new-password"
-              value={confirma}
-              onChange={(e) => setConfirma(e.target.value)}
               placeholder="••••••••"
               className={inputClass}
-              data-testid="confirma-senha"
+              testId="confirma-senha"
             />
           </AuthField>
 

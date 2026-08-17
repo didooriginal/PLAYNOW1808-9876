@@ -10,6 +10,7 @@ import {
   Megaphone,
   Wallet,
   CircleDollarSign,
+  Check,
   Copy,
   Database,
   Layers,
@@ -17,6 +18,7 @@ import {
   MessageCircle,
   Smartphone,
   Loader2,
+  Package,
   Plus,
   LifeBuoy,
   Receipt,
@@ -62,6 +64,7 @@ import { JogosView } from "../components/admin/jogos-view";
 import { SaudeView } from "../components/admin/saude-view";
 import { RecuperacaoView } from "../components/admin/recuperacao-view";
 import { SenhasView } from "../components/admin/senhas-view";
+import { CampoSenha } from "../components/ui/campo-senha";
 import { ConvitesView } from "../components/admin/convites-view";
 import { AlterarSenhaView } from "../components/cliente/alterar-senha";
 import { ComissoesView } from "../components/admin/comissoes-view";
@@ -132,6 +135,8 @@ import {
   ROTULO_STATUS_CLIENTE,
 } from "../queries/usuarios";
 import { useAlertasAdmin } from "../queries/notificacoes";
+import { OPCOES_NIVEL, tituloDoNivel } from "../lib/niveis";
+import { useDefinirPacote } from "../queries/usuarios";
 import { useRodarSeed, useSeedStatus } from "../queries/seed";
 
 type Conta = NonNullable<ReturnType<typeof useContas>["data"]>[number];
@@ -390,12 +395,13 @@ function NovaContaForm({ onClose }: { onClose: () => void }) {
           htmlFor="nc-senha"
           obrigatorio
         >
-          <input
+          <CampoSenha
             id="nc-senha"
             className={input}
             placeholder="Senha da conta"
             value={form.senha}
-            onChange={(e) => set("senha", e.target.value)}
+            onChange={(v) => set("senha", v)}
+            copiavel
           />
         </Campo>
         <Campo
@@ -1931,6 +1937,225 @@ function ModalConfianca({
   );
 }
 
+/**
+ * Espelho enxuto de `api/lib/ciclos.ts` so para a PREVIA de preco do modal.
+ * O valor que vale e o que o servidor calcula ao salvar.
+ */
+const MESES_CICLO = { mensal: 1, trimestral: 3, semestral: 6, anual: 12 } as const;
+const DESCONTO_CICLO = { mensal: 0, trimestral: 0.05, semestral: 0.1, anual: 0.2 } as const;
+
+/**
+ * DEFINIR PACOTE — caminho manual do ADM para ligar um cliente a um pacote
+ * fechado. O preco mostrado aqui e so previa: quem fecha o valor e o servidor
+ * (`usuarios.definirPacote`). Depois de salvar, o modal vira um resumo com o
+ * que foi alocado e o que caiu na fila por falta de vaga.
+ */
+function ModalDefinirPacote({
+  cliente,
+  onClose,
+}: {
+  cliente: Cliente;
+  onClose: () => void;
+}) {
+  const { data: pacotes } = usePacotes();
+  const definir = useDefinirPacote();
+  const [pacoteId, setPacoteId] = useState<number>(cliente.pacoteId ?? 0);
+  const [ciclo, setCiclo] = useState<"mensal" | "trimestral" | "semestral" | "anual">(
+    (cliente.ciclo as "mensal" | "anual") ?? "mensal",
+  );
+  const [valorManual, setValorManual] = useState("");
+  const [resultado, setResultado] = useState<
+    Awaited<ReturnType<typeof definir.mutateAsync>> | null
+  >(null);
+
+  const input =
+    "w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 font-sans text-sm text-white placeholder:text-white/25 focus:border-neon-purple/50 focus:outline-none";
+
+  const escolhido = (pacotes ?? []).find((p) => p.id === pacoteId);
+  const meses = MESES_CICLO[ciclo];
+  const mensalPrevia = escolhido
+    ? ciclo === "anual" && escolhido.precoAnual
+      ? escolhido.precoAnual
+      : Math.round(escolhido.preco * (1 - DESCONTO_CICLO[ciclo]) * 100) / 100
+    : 0;
+  const manual = Number(valorManual.replace(",", ".")) || 0;
+  const mensalFinal = manual > 0 ? manual : mensalPrevia;
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
+      <div
+        className="max-h-[88vh] w-full max-w-lg overflow-y-auto rounded-3xl border border-white/12 bg-[#0b0b0f] p-6"
+        data-testid="modal-definir-pacote"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="font-sans text-[10px] uppercase tracking-[0.22em] text-white/35">
+              Pacote do cliente
+            </div>
+            <h3 className="mt-1 font-display text-xl font-extrabold text-white">
+              Definir pacote · {cliente.nome}
+            </h3>
+            <p className="mt-1 font-sans text-[12px] text-white/40">
+              Grava o pacote, cria o direito de cada app e já tenta alocar as vagas.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Fechar"
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg text-white/40 hover:text-white"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+
+        {resultado ? (
+          <div className="mt-5 space-y-3">
+            <GlassCard accent="cyan" className="p-4">
+              <p className="font-display text-sm font-bold text-white">
+                {resultado.pacote.nome} · {resultado.ciclo}
+              </p>
+              <p className="mt-1 font-sans text-xs text-white/50">
+                Mensalidade {brl(resultado.mensalidade)} · total do ciclo{" "}
+                {brl(resultado.totalDoCiclo)} ({resultado.meses} meses)
+              </p>
+            </GlassCard>
+            <ListaResumo titulo="Alocados agora" itens={resultado.alocados} accent="cyan" />
+            <ListaResumo titulo="Já tinham acesso" itens={resultado.jaTinham} accent="purple" />
+            <ListaResumo titulo="Na fila (sem vaga)" itens={resultado.semVaga} accent="red" />
+            <ListaResumo titulo="Entregues por convite" itens={resultado.convites} accent="purple" />
+            <ListaResumo titulo="Encerrados do pacote anterior" itens={resultado.encerrados} accent="red" />
+            <NeonButton accent="cyan" size="sm" onClick={onClose}>
+              <Check className="size-4" />
+              Fechar
+            </NeonButton>
+          </div>
+        ) : (
+          <div className="mt-5 space-y-3">
+            <Campo label="Pacote" ajuda="cliente.definirPacote" htmlFor="dp-pacote" obrigatorio>
+              <select
+                id="dp-pacote"
+                className={input}
+                value={pacoteId}
+                onChange={(e) => setPacoteId(Number(e.target.value))}
+              >
+                <option value={0} className="bg-[#09090b]">
+                  Selecione…
+                </option>
+                {(pacotes ?? []).map((p) => (
+                  <option key={p.id} value={p.id} className="bg-[#09090b]">
+                    {p.nome} — {brl(p.preco)}/mês ({(p.servicos ?? []).length} apps)
+                  </option>
+                ))}
+              </select>
+            </Campo>
+
+            <Campo label="Ciclo" ajuda="cliente.cicloPacote" htmlFor="dp-ciclo">
+              <select
+                id="dp-ciclo"
+                className={input}
+                value={ciclo}
+                onChange={(e) => setCiclo(e.target.value as typeof ciclo)}
+              >
+                {(["mensal", "trimestral", "semestral", "anual"] as const).map((c) => (
+                  <option key={c} value={c} className="bg-[#09090b]">
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </Campo>
+
+            <Campo label="Valor negociado (opcional)" ajuda="cliente.valorManualPacote" htmlFor="dp-valor">
+              <input
+                id="dp-valor"
+                className={input}
+                placeholder={`Padrão: ${brl(mensalPrevia)}/mês`}
+                value={valorManual}
+                onChange={(e) => setValorManual(e.target.value)}
+              />
+            </Campo>
+
+            {escolhido && (
+              <GlassCard className="p-4">
+                <p className="font-sans text-[11px] uppercase tracking-widest text-white/35">
+                  Prévia
+                </p>
+                <p className="mt-1 font-display text-lg font-extrabold text-white">
+                  {brl(mensalFinal)}/mês
+                </p>
+                <p className="font-sans text-xs text-white/40">
+                  {brl(Math.round(mensalFinal * meses * 100) / 100)} no ciclo de {meses}{" "}
+                  {meses === 1 ? "mês" : "meses"} · o servidor recalcula na hora de salvar.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {(escolhido.servicos ?? []).map((s) => (
+                    <Pill key={s} accent="cyan">
+                      {s}
+                    </Pill>
+                  ))}
+                </div>
+              </GlassCard>
+            )}
+
+            {definir.isError && (
+              <p className="font-sans text-xs text-neon-red">{definir.error?.message}</p>
+            )}
+
+            <NeonButton
+              accent="purple"
+              size="sm"
+              data-testid="salvar-definir-pacote"
+              disabled={definir.isPending || !pacoteId}
+              onClick={() =>
+                definir.mutate(
+                  {
+                    clienteId: cliente.id,
+                    pacoteId,
+                    ciclo,
+                    valorManual: manual > 0 ? manual : null,
+                  },
+                  { onSuccess: (r) => setResultado(r) },
+                )
+              }
+            >
+              {definir.isPending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Package className="size-4" />
+              )}
+              Definir pacote
+            </NeonButton>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ListaResumo({
+  titulo,
+  itens,
+  accent,
+}: {
+  titulo: string;
+  itens: string[];
+  accent: "cyan" | "purple" | "red";
+}) {
+  if (!itens.length) return null;
+  return (
+    <div>
+      <p className="font-sans text-[11px] uppercase tracking-widest text-white/35">{titulo}</p>
+      <div className="mt-1.5 flex flex-wrap gap-1.5">
+        {itens.map((s) => (
+          <Pill key={s} accent={accent}>
+            {s}
+          </Pill>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ClientsTable({ compact = false }: { compact?: boolean }) {
   const { data, isPending, isError, error } = useUsuarios();
   const remover = useRemoverUsuario();
@@ -1941,6 +2166,7 @@ function ClientsTable({ compact = false }: { compact?: boolean }) {
   );
   const [dandoConfianca, setDandoConfianca] = useState<Cliente | null>(null);
   const [adicionandoApp, setAdicionandoApp] = useState<Cliente | null>(null);
+  const [definindoPacote, setDefinindoPacote] = useState<Cliente | null>(null);
   const revogar = useRevogarConfianca();
 
   if (isPending) return <Loading label="Carregando clientes..." />;
@@ -2020,13 +2246,21 @@ function ClientsTable({ compact = false }: { compact?: boolean }) {
               >
                 <td className="px-5 py-3.5">
                   <div className="flex items-center gap-3">
-                    <span className="flex size-8 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.05] font-display text-[10px] font-bold text-white/60">
-                      {c.nome
-                        .split(" ")
-                        .map((w) => w[0])
-                        .slice(0, 2)
-                        .join("")}
-                    </span>
+                    {c.avatarUrl ? (
+                      <img
+                        src={c.avatarUrl}
+                        alt={`Foto de ${c.nome}`}
+                        className="size-8 shrink-0 rounded-xl border border-white/10 object-cover"
+                      />
+                    ) : (
+                      <span className="flex size-8 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.05] font-display text-[10px] font-bold text-white/60">
+                        {c.nome
+                          .split(" ")
+                          .map((w) => w[0])
+                          .slice(0, 2)
+                          .join("")}
+                      </span>
+                    )}
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 truncate font-display text-xs font-semibold text-white">
                         {c.nome}
@@ -2039,6 +2273,12 @@ function ClientsTable({ compact = false }: { compact?: boolean }) {
                       <div className="truncate font-mono text-[10px] text-white/30">
                         {c.email}
                       </div>
+                      {(c.endereco || c.cidade) && (
+                        <div className="truncate font-sans text-[10px] text-white/25">
+                          {[c.endereco, c.cidade, c.estado].filter(Boolean).join(" — ")}
+                          {c.cep ? ` · CEP ${c.cep}` : ""}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </td>
@@ -2049,12 +2289,15 @@ function ClientsTable({ compact = false }: { compact?: boolean }) {
                     value={c.nivel ?? 1}
                     onChange={(e) => atualizar.mutate({ id: c.id, nivel: Number(e.target.value) })}
                   >
-                    {[1, 2, 3].map((n) => (
-                      <option key={n} value={n} className="bg-[#09090b]">
-                        Nível {n}
+                    {OPCOES_NIVEL.map((o) => (
+                      <option key={o.valor} value={o.valor} className="bg-[#09090b]">
+                        {o.rotulo}
                       </option>
                     ))}
                   </select>
+                  <div className="mt-1 font-sans text-[10px] text-white/30">
+                    {tituloDoNivel(c.nivel ?? 1)}
+                  </div>
                 </td>
                 <td className="px-3 py-3.5">
                   <div className="flex flex-col gap-1">
@@ -2158,6 +2401,17 @@ function ClientsTable({ compact = false }: { compact?: boolean }) {
                 </td>
                 <td className="px-5 py-3.5">
                   <div className="flex items-center justify-end gap-2">
+                    <Tooltip texto="cliente.definirPacote" titulo="Definir pacote" lado="left">
+                      <button
+                        type="button"
+                        aria-label={`Definir pacote de ${c.nome}`}
+                        data-testid={`definir-pacote-${c.id}`}
+                        onClick={() => setDefinindoPacote(c)}
+                        className="flex size-8 items-center justify-center rounded-lg border border-white/10 text-white/30 transition-colors hover:border-neon-purple/50 hover:text-neon-purple"
+                      >
+                        <Package className="size-3.5" />
+                      </button>
+                    </Tooltip>
                     <Tooltip texto="cliente.apps" titulo="Apps deste cliente" lado="left">
                       <button
                         type="button"
@@ -2284,6 +2538,12 @@ function ClientsTable({ compact = false }: { compact?: boolean }) {
           onClose={() => setAdicionandoApp(null)}
         />
       )}
+      {definindoPacote && (
+        <ModalDefinirPacote
+          cliente={definindoPacote}
+          onClose={() => setDefinindoPacote(null)}
+        />
+      )}
       {dandoConfianca && (
         <ModalConfianca
           cliente={dandoConfianca}
@@ -2299,6 +2559,16 @@ function ClientsTable({ compact = false }: { compact?: boolean }) {
 function NovoClienteForm() {
   const { data: pacotes } = usePacotes();
   const criar = useCriarUsuario();
+  /**
+   * Credenciais do cliente recem-criado. Aparecem UMA UNICA VEZ: a senha nao
+   * fica gravada em claro em lugar nenhum, entao o ADM precisa copiar agora.
+   */
+  const [credenciais, setCredenciais] = useState<{
+    nome: string;
+    email: string;
+    senha: string;
+    aviso: string;
+  } | null>(null);
   const [form, setForm] = useState({
     nome: "",
     email: "",
@@ -2419,14 +2689,22 @@ function NovoClienteForm() {
               admin: false,
             },
             {
-              onSuccess: () =>
+              onSuccess: (criado) => {
+                setCredenciais({
+                  nome: form.nome,
+                  email: form.email.trim().toLowerCase(),
+                  senha: criado.senhaProvisoria,
+                  aviso: criado.loginCriado ? "" : criado.avisoLogin,
+                });
                 setForm({
                   nome: "",
                   email: "",
                   pacoteId: 0,
                   valor: 0,
                   proximaCobranca: "",
-                }),
+                  admin: false,
+                });
+              },
             },
           )
         }
@@ -2438,7 +2716,103 @@ function NovoClienteForm() {
         )}
         Cadastrar no banco
       </NeonButton>
+
+      {credenciais && (
+        <CredenciaisNovoCliente
+          dados={credenciais}
+          onFechar={() => setCredenciais(null)}
+        />
+      )}
     </GlassCard>
+  );
+}
+
+/**
+ * Cartao de credenciais do cliente recem-criado. A senha provisoria so existe
+ * aqui: o cliente e obrigado a trocar no primeiro acesso e o banco guarda
+ * apenas o hash do Better Auth.
+ */
+function CredenciaisNovoCliente({
+  dados,
+  onFechar,
+}: {
+  dados: { nome: string; email: string; senha: string; aviso: string };
+  onFechar: () => void;
+}) {
+  const [copiado, setCopiado] = useState(false);
+  const texto = `Acesso PLAYPLUSNOW\nSite: https://playplusnow.com.br/login\nE-mail: ${dados.email}\nSenha provisória: ${dados.senha}\n\nNo primeiro acesso o sistema pede para você criar a sua própria senha.`;
+
+  if (!dados.senha) {
+    return (
+      <div className="mt-4 rounded-2xl border border-amber-400/30 bg-amber-400/10 p-4">
+        <p className="font-sans text-sm text-amber-200">
+          Cliente cadastrado, mas o login automático não foi criado
+          {dados.aviso ? `: ${dados.aviso}` : "."} Peça para ele se cadastrar em
+          /signup com o mesmo e-mail — a ficha é vinculada sozinha.
+        </p>
+        <button
+          type="button"
+          onClick={onFechar}
+          className="mt-3 font-sans text-xs font-semibold text-white/50 underline underline-offset-4 hover:text-white"
+        >
+          Entendi, fechar
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-4 rounded-2xl border border-neon-cyan/30 bg-neon-cyan/[0.07] p-4">
+      <p className="font-sans text-[11px] font-semibold uppercase tracking-wider text-neon-cyan">
+        Acesso criado — anote agora
+      </p>
+      <p className="mt-1 font-sans text-xs text-white/55">
+        Esta senha aparece <strong className="text-white/80">só desta vez</strong>. {dados.nome} vai
+        precisar trocá-la no primeiro acesso.
+      </p>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        <div className="rounded-xl border border-white/10 bg-black/30 px-3 py-2">
+          <span className="font-sans text-[10px] uppercase tracking-wider text-white/35">E-mail</span>
+          <p className="font-mono text-sm text-white">{dados.email}</p>
+        </div>
+        <div className="rounded-xl border border-white/10 bg-black/30 px-3 py-2">
+          <span className="font-sans text-[10px] uppercase tracking-wider text-white/35">
+            Senha provisória
+          </span>
+          <p className="font-mono text-sm text-white">{dados.senha}</p>
+        </div>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <NeonButton
+          accent="cyan"
+          size="sm"
+          onClick={() => {
+            navigator.clipboard?.writeText(texto);
+            setCopiado(true);
+            setTimeout(() => setCopiado(false), 1600);
+          }}
+        >
+          {copiado ? <Check className="size-4" /> : <Copy className="size-4" />}
+          {copiado ? "Copiado" : "Copiar acesso"}
+        </NeonButton>
+        <a
+          href={`https://wa.me/?text=${encodeURIComponent(texto)}`}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-2 rounded-xl border border-white/12 bg-white/[0.04] px-3 py-2 font-sans text-xs font-semibold text-white/70 transition-colors hover:text-white"
+        >
+          <MessageCircle className="size-4" />
+          Enviar no WhatsApp
+        </a>
+        <button
+          type="button"
+          onClick={onFechar}
+          className="font-sans text-xs font-semibold text-white/45 underline underline-offset-4 hover:text-white"
+        >
+          Já copiei, fechar
+        </button>
+      </div>
+    </div>
   );
 }
 

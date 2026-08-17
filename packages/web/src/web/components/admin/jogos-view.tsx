@@ -11,6 +11,7 @@ import {
 } from "../../queries/jogos";
 import { useAplicativos } from "../../queries/aplicativos";
 import { AppIcon } from "../app-icon";
+import { CampoSenha } from "../ui/campo-senha";
 
 /**
  * FUTEBOL AO VIVO (admin) — o admin só abastece o pool.
@@ -90,12 +91,13 @@ function NovaConta() {
           />
         </Campo>
         <Campo label="Senha" ajuda="jogos.senha" htmlFor="jogos-senha" obrigatorio>
-          <input
+          <CampoSenha
             id="jogos-senha"
             className={inputCls}
             placeholder="Senha da conta"
             value={form.senha}
-            onChange={set("senha")}
+            onChange={(v) => setForm((f) => ({ ...f, senha: v }))}
+            copiavel
           />
         </Campo>
         <Campo label="Vagas" ajuda="jogos.vagas" htmlFor="jogos-vagas">

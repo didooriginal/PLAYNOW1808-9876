@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation, useSearch } from "wouter";
-import { Check, Eye, EyeOff, MessageCircle, TriangleAlert, UserPlus } from "lucide-react";
+import { Check, MessageCircle, TriangleAlert, UserPlus } from "lucide-react";
 import { AuthField, AuthShell, inputClass } from "../components/auth-shell";
 import { AppIcon } from "../components/app-icon";
 import { NeonButton, accentHex } from "../components/ui/kit";
@@ -101,8 +101,6 @@ export default function SignupPage() {
   const [aparelhos, setAparelhos] = useState("");
   const [senha, setSenha] = useState("");
   const [confirmarSenha, setConfirmarSenha] = useState("");
-  const [verSenha, setVerSenha] = useState(false);
-  const [verConfirmarSenha, setVerConfirmarSenha] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(false);
 
@@ -351,47 +349,25 @@ export default function SignupPage() {
         </AuthField>
 
         <AuthField label="Senha" hint="Mínimo de 8 caracteres.">
-          <div className="relative">
-            <input
-              type={verSenha ? "text" : "password"}
-              required
-              autoComplete="new-password"
-              value={senha}
-              onChange={(e) => setSenha(e.target.value)}
-              placeholder="••••••••"
-              className={`${inputClass} pr-12`}
-            />
-            <button
-              type="button"
-              onClick={() => setVerSenha((v) => !v)}
-              aria-label={verSenha ? "Ocultar senha" : "Mostrar senha"}
-              className="absolute inset-y-0 right-0 flex w-12 items-center justify-center text-white/35 transition-colors hover:text-white/70"
-            >
-              {verSenha ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-            </button>
-          </div>
+          <CampoSenha
+            value={senha}
+            onChange={setSenha}
+            required
+            autoComplete="new-password"
+            placeholder="••••••••"
+            className={inputClass}
+          />
         </AuthField>
 
         <AuthField label="Confirmar senha">
-          <div className="relative">
-            <input
-              type={verConfirmarSenha ? "text" : "password"}
-              required
-              autoComplete="new-password"
-              value={confirmarSenha}
-              onChange={(e) => setConfirmarSenha(e.target.value)}
-              placeholder="••••••••"
-              className={`${inputClass} pr-12`}
-            />
-            <button
-              type="button"
-              onClick={() => setVerConfirmarSenha((v) => !v)}
-              aria-label={verConfirmarSenha ? "Ocultar senha" : "Mostrar senha"}
-              className="absolute inset-y-0 right-0 flex w-12 items-center justify-center text-white/35 transition-colors hover:text-white/70"
-            >
-              {verConfirmarSenha ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-            </button>
-          </div>
+          <CampoSenha
+            value={confirmarSenha}
+            onChange={setConfirmarSenha}
+            required
+            autoComplete="new-password"
+            placeholder="••••••••"
+            className={inputClass}
+          />
         </AuthField>
 
         {erro && (

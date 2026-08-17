@@ -12,6 +12,10 @@ import {
   usuarios,
 } from "../database/schema";
 import { lerParametros } from "../lib/config";
+import { recalcularProgresso, tituloDoNivel, xpParaProximoNivel } from "./recompensas";
+
+/** nivel minimo para a area de afiliados (carteira, comissao e saque) */
+export const NIVEL_AFILIADO = 3;
 
 /**
  * MÓDULO AFILIADO
@@ -210,6 +214,32 @@ async function euCliente(authUserId: string, email: string) {
   return porEmail;
 }
 
+/**
+ * NIVEL EFETIVO — o `usuarios.nivel` e so o piso dado a mao pelo ADM; quem
+ * manda de verdade e o XP da trilha de recompensas. Recalcula na hora (a
+ * funcao e idempotente) e devolve o maior dos dois, junto com o XP para a UI.
+ */
+async function nivelDoCliente(clienteId: number) {
+  const { progresso, nivelEfetivo } = await recalcularProgresso(clienteId);
+  return {
+    nivel: nivelEfetivo,
+    xp: progresso.xp,
+    titulo: tituloDoNivel(nivelEfetivo),
+    xpProximoNivel: xpParaProximoNivel(progresso.xp),
+  };
+}
+
+/** Trava de servidor: carteira e saque sao exclusivos do nivel 3+. */
+async function exigirAfiliado(clienteId: number) {
+  const info = await nivelDoCliente(clienteId);
+  if (info.nivel < NIVEL_AFILIADO) {
+    throw new ORPCError("FORBIDDEN", {
+      message: `A área de afiliados abre no nível ${NIVEL_AFILIADO}. Você está no nível ${info.nivel} (${info.titulo}).`,
+    });
+  }
+  return info;
+}
+
 /** garante que o cliente tenha um código de indicação */
 async function garantirCodigo(cliente: typeof usuarios.$inferSelect) {
   if (cliente.referralCode) return cliente.referralCode;
@@ -232,6 +262,7 @@ export const afiliados = {
   meuPainel: authed.handler(async ({ context }) => {
     const cliente = await euCliente(context.user.id, context.user.email);
     const codigo = await garantirCodigo(cliente);
+    const nivelInfo = await nivelDoCliente(cliente.id);
     const resultado = await apurarComissoes(cliente.id);
     const params = resultado?.params ?? (await lerParametros());
     const carteira = resultado?.carteira;
@@ -291,7 +322,12 @@ export const afiliados = {
       padrinho,
       link: `${base}/signup?ref=${codigo}`,
       carteira: carteira ?? null,
-      nivel: cliente.nivel,
+      nivel: nivelInfo.nivel,
+      xp: nivelInfo.xp,
+      xpProximoNivel: nivelInfo.xpProximoNivel,
+      tituloNivel: nivelInfo.titulo,
+      nivelAfiliado: NIVEL_AFILIADO,
+      podeSerAfiliado: nivelInfo.nivel >= NIVEL_AFILIADO,
       afiliadoAtivo: cliente.afiliadoAtivo,
       indicados: indicados.map((i) => ({
         ...i,
@@ -318,11 +354,7 @@ export const afiliados = {
   /** ativa o status de afiliado — exclusivo de clientes nível 3 ou superior */
   tornarAfiliado: authed.handler(async ({ context }) => {
     const cliente = await euCliente(context.user.id, context.user.email);
-    if (cliente.nivel < 3) {
-      throw new ORPCError("FORBIDDEN", {
-        message: "Apenas clientes nível 3 ou superior podem se tornar afiliados.",
-      });
-    }
+    await exigirAfiliado(cliente.id);
     const [row] = await db
       .update(usuarios)
       .set({ afiliadoAtivo: true })
@@ -344,6 +376,7 @@ export const afiliados = {
     .input(z.object({ valor: z.number().positive() }))
     .handler(async ({ context, input }) => {
       const cliente = await euCliente(context.user.id, context.user.email);
+      await exigirAfiliado(cliente.id);
       const { carteira, params } = (await recalcularCarteira(cliente.id))!;
       const performance = carteira.redeEmDia >= params.metaRedeEmDia;
 
@@ -386,6 +419,7 @@ export const afiliados = {
     )
     .handler(async ({ context, input }) => {
       const cliente = await euCliente(context.user.id, context.user.email);
+      await exigirAfiliado(cliente.id);
       const { carteira, params } = (await recalcularCarteira(cliente.id))!;
 
       if (input.valor > carteira.disponivel)

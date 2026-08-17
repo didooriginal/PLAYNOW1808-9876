@@ -1,11 +1,12 @@
 import { z } from "zod";
 import { desc, eq } from "drizzle-orm";
 import { base } from "../__core/app";
-import { adminOnly } from "../middleware/auth";
+import { adminOnly, authed } from "../middleware/auth";
 import { auth } from "../auth";
 import { db } from "../database";
 import { resetsSenha, usuarios } from "../database/schema";
 import { emailConfigurado, remetente } from "../services/email";
+import { garantirFichaDaSessao } from "../lib/sessao";
 
 /**
  * RECUPERAÇÃO DE SENHA
@@ -30,6 +31,21 @@ function mascarar(email: string) {
 }
 
 export const senha = {
+  /**
+   * Cliente que entrou com senha provisoria (conta criada pelo ADM) confirma
+   * que trocou a senha: derruba a flag e libera o painel.
+   * Nao mexe na senha em si — quem troca e o Better Auth, pelo front.
+   */
+  confirmarTroca: authed.handler(async ({ context }) => {
+    const ficha = await garantirFichaDaSessao(context.user);
+    if (!ficha) return { ok: false };
+    await db
+      .update(usuarios)
+      .set({ precisaTrocarSenha: false })
+      .where(eq(usuarios.id, ficha.id));
+    return { ok: true };
+  }),
+
   /** Público: o front usa para explicar ao cliente o que vai acontecer. */
   canal: base.handler(async () => ({
     emailAtivo: emailConfigurado(),

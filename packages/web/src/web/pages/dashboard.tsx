@@ -20,6 +20,7 @@ import {
   MessageCircle,
   Receipt,
   Settings,
+  UserRound,
   Sparkles,
   TrendingUp,
   TriangleAlert,
@@ -61,7 +62,10 @@ import { TelaBloqueio } from "../components/cliente/bloqueio";
 import { AvisosCliente } from "../components/cliente/avisos";
 import { SalaJogos } from "../components/cliente/sala-jogos";
 import { CarteiraAfiliado } from "../components/cliente/carteira";
+import { podeSerAfiliado } from "../lib/niveis";
 import { AlterarSenhaView } from "../components/cliente/alterar-senha";
+import { MeusDados } from "../components/cliente/meus-dados";
+import { useConfirmarTrocaSenha } from "../queries/usuarios";
 import { ContadorEconomia } from "../components/cliente/economia";
 import { PagarPix } from "../components/cliente/pagar-pix";
 import { AreaPagamento } from "../components/cliente/pagamento";
@@ -663,13 +667,14 @@ export default function DashboardPage() {
       { id: "jogos", label: "Futebol Ao Vivo", icon: Goal },
       {
         id: "carteira",
-        label: (data?.cliente.nivel ?? 1) >= 3 ? "Afiliados / Saque" : "Indique e Ganhe",
+        label: podeSerAfiliado(data?.cliente.nivel ?? 1) ? "Afiliados / Saque" : "Indique e Ganhe",
         icon: Wallet,
       },
       { id: "novidades", label: "Novidades/Upgrades", icon: Sparkles, badge: String(upgrades.length) },
       { id: "pagamento", label: "Pagar / Renovar", icon: BadgePercent },
       { id: "faturas", label: "Faturas", icon: Receipt },
       { id: "senha", label: "Segurança", icon: Settings },
+      { id: "meusdados", label: "Meus Dados", icon: UserRound },
       {
         id: "suporte",
         label: "Suporte",
@@ -745,6 +750,14 @@ export default function DashboardPage() {
     );
   }
 
+  /**
+   * SENHA PROVISORIA: conta criada pelo ADM. O painel inteiro fica travado
+   * ate o cliente definir a propria senha — nada de acessos antes disso.
+   */
+  if (cliente.precisaTrocarSenha) {
+    return <TrocaObrigatoria nome={cliente.nome} />;
+  }
+
   return (
     <div className="relative min-h-screen">
       {precisaAceitarTermos && <ChecklistBoasVindas nome={cliente.nome} />}
@@ -771,6 +784,7 @@ export default function DashboardPage() {
               {active === "pagamento" && "Pagar e Renovar"}
               {active === "faturas" && "Minhas Faturas"}
               {active === "senha" && "Segurança da Conta"}
+              {active === "meusdados" && "Meus Dados"}
               {active === "suporte" && "Suporte"}
             </h1>
             <p className="mt-1.5 font-sans text-sm text-white/40">
@@ -789,6 +803,8 @@ export default function DashboardPage() {
                 "Escolha a periodicidade que mais te economiza ou antecipe o pagamento com desconto no Pix."}
               {active === "faturas" && "Acompanhe pagamentos, vencimentos e recibos."}
               {active === "senha" && "Altere sua senha de acesso ao painel."}
+              {active === "meusdados" &&
+                "Mantenha seu contato, endereço e foto atualizados. Nome, e-mail e plano são alterados pelo suporte."}
               {active === "suporte" && "Relate um problema e acompanhe o andamento do chamado."}
             </p>
             </div>
@@ -853,10 +869,42 @@ export default function DashboardPage() {
             </>
           )}
           {active === "senha" && <AlterarSenhaView />}
+          {active === "meusdados" && <MeusDados cliente={cliente} />}
           {active === "suporte" && <SuporteClienteView />}
         </div>
       </PanelShell>
       <AssistenteIA cliente={{ nome: cliente.nome, apps: acessos.length }} />
+    </div>
+  );
+}
+
+/**
+ * TROCA OBRIGATORIA — conta criada pelo ADM com senha provisoria.
+ * Tela unica, sem abas e sem acessos: o cliente so entra no painel depois de
+ * definir a propria senha. Ao concluir, `senha.confirmarTroca` derruba a flag
+ * e o painel recarrega sozinho pela invalidacao da query.
+ */
+function TrocaObrigatoria({ nome }: { nome: string }) {
+  const confirmar = useConfirmarTrocaSenha();
+
+  return (
+    <div className="relative min-h-screen px-4 py-10 sm:px-6">
+      <NeonBackdrop />
+      <div className="mx-auto max-w-xl space-y-5">
+        <div className="text-center">
+          <div className="font-display text-lg font-extrabold tracking-tight text-white">
+            PLAYPLUSNOW
+          </div>
+          <h1 className="mt-4 font-display text-2xl font-extrabold tracking-tight text-white">
+            Crie a sua senha, {nome.split(" ")[0]}
+          </h1>
+          <p className="mt-2 font-sans text-sm text-white/45">
+            Sua conta foi criada com uma senha provisória. Defina uma senha só sua para liberar o
+            painel — use a provisória no campo &ldquo;senha atual&rdquo;.
+          </p>
+        </div>
+        <AlterarSenhaView obrigatorio onTrocada={() => confirmar.mutate({})} />
+      </div>
     </div>
   );
 }

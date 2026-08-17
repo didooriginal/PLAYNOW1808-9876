@@ -393,7 +393,26 @@ export async function recalcularProgresso(clienteId: number) {
       .returning();
   }
 
-  return { cliente, codigo, progresso: progresso!, indicados, assinantes };
+  /**
+   * FONTE UNICA DO NIVEL. `usuarios.nivel` era um campo manual que nunca
+   * acompanhava o XP — resultado: cliente Prata na trilha e `tornarAfiliado`
+   * negando por "nivel 1". Aqui o nivel calculado sobe o campo do cliente,
+   * NUNCA rebaixa: nivel dado a mao pelo ADM continua valendo como piso.
+   */
+  const nivelEfetivo = Math.max(cliente.nivel, nivel);
+  if (nivelEfetivo > cliente.nivel) {
+    await db.update(usuarios).set({ nivel: nivelEfetivo }).where(eq(usuarios.id, clienteId));
+    cliente.nivel = nivelEfetivo;
+  }
+
+  return { cliente, codigo, progresso: progresso!, indicados, assinantes, nivelEfetivo };
+}
+
+/** XP que falta para o proximo nivel (0 quando ja esta no topo). */
+export function xpParaProximoNivel(xp: number) {
+  const nivel = Math.floor(xp / XP_POR_NIVEL) + 1;
+  if (nivel >= NIVEIS.length) return 0;
+  return nivel * XP_POR_NIVEL - xp;
 }
 
 /** resolve o registro de `usuarios` a partir da sessao */

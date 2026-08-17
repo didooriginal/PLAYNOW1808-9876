@@ -29,6 +29,7 @@ import { validarAssinaturaWebhook } from "./lib/mercadopago";
 import { checkout } from "./routes/checkout";
 import { ciclos } from "./routes/ciclos";
 import { senha } from "./routes/senha";
+import { upload } from "./routes/upload";
 import { marketing } from "./routes/marketing";
 import { gerarBackupExcel } from "./lib/backup";
 import { processarLembretesVencimento } from "./lib/emails/cron";
@@ -71,6 +72,7 @@ export const router = {
   checkout,
   ciclos,
   senha,
+  upload,
   renovacao,
   marketing,
   seed,
