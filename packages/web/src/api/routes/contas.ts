@@ -28,6 +28,13 @@ const contaInput = z.object({
   rotulo: z.string().min(1),
   email: z.string().min(1),
   senha: z.string().min(1),
+  /**
+   * Endereço do NOSSO domínio que recebe os códigos desta matriz
+   * (ex.: netflix01@mail.playplusnow.com.br). O Cloudflare Email Routing
+   * entrega nele e o Worker chama /api/webhooks/email. Vazio = captura
+   * automática desligada para esta conta.
+   */
+  emailCaptura: z.string().default(""),
   totalVagas: z.number().int().positive().default(1),
   vagasOcupadas: z.number().int().nonnegative().default(0),
   status: z.enum(["ativo", "manutencao"]).default("ativo"),

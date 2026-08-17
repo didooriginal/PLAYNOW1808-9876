@@ -122,6 +122,8 @@ export const AJUDA: Record<string, string> = {
   "contas.servico": "Qual app essa conta matriz serve. Define o ícone, o gift card aceito e em quais pacotes a vaga pode ser usada.",
   "contas.rotulo": "Apelido interno da conta, só você vê. Use um padrão como 'Netflix — Matriz 09' para achar rápido na busca.",
   "contas.email": "E-mail de login da assinatura real no site do streaming. É por ele que o sistema identifica os códigos de verificação que chegam.",
+  "contas.emailCaptura":
+    "Endereço do nosso domínio que recebe os códigos desta matriz (ex.: netflix01@mail.playplusnow.com.br). Configure o encaminhamento na conta do streaming para este endereço: quando o código chegar, ele entra sozinho na Central de Códigos e vai para o cliente que pediu. Vazio = captura automática desligada nesta conta.",
   "contas.senha": "Senha da conta no streaming. Fica guardada para você copiar quando precisar entrar — o cliente nunca vê.",
   "contas.totalVagas": "Quantos perfis/telas essa conta suporta vender. Passar desse número é overbooking: o sistema bloqueia a alocação.",
   "contas.vencimento": "Data em que a assinatura renova e o valor é debitado. Alimenta o alerta de vencimento e a conta de saldo necessário.",

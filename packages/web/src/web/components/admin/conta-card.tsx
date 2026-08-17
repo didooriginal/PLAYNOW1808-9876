@@ -18,6 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { sugerirCaptura } from "@/lib/captura-email";
 import { CampoSenha } from "../ui/campo-senha";
 import { AppIcon } from "../app-icon";
 import { GlassCard, NeonButton, ProgressBar } from "../ui/kit";
@@ -378,6 +379,7 @@ function EditorConta({
     rotulo: conta.rotulo,
     servico: conta.servico,
     email: conta.email,
+    emailCaptura: conta.emailCaptura ?? "",
     senha: conta.senha,
     custo: conta.custo,
     dataVencimento: conta.dataVencimento ?? "",
@@ -442,6 +444,28 @@ function EditorConta({
             value={form.email}
             onChange={(e) => set("email", e.target.value)}
           />
+        </Campo>
+        <Campo
+          label="E-mail de captura de códigos"
+          ajuda="contas.emailCaptura"
+          htmlFor={`ec-captura-${conta.id}`}
+        >
+          <div className="flex gap-2">
+            <input
+              id={`ec-captura-${conta.id}`}
+              className={input}
+              placeholder="netflix01@mail.playplusnow.com.br"
+              value={form.emailCaptura}
+              onChange={(e) => set("emailCaptura", e.target.value)}
+            />
+            <button
+              type="button"
+              onClick={() => set("emailCaptura", sugerirCaptura(form.servico, conta.id))}
+              className="shrink-0 rounded-xl border border-neon-cyan/35 px-2.5 font-sans text-[11px] text-neon-cyan transition-colors hover:bg-neon-cyan/10"
+            >
+              sugerir
+            </button>
+          </div>
         </Campo>
         <Campo
           label="Senha"
@@ -550,6 +574,7 @@ function EditorConta({
               ...form,
               rotulo: form.rotulo.trim(),
               email: form.email.trim(),
+              emailCaptura: form.emailCaptura.trim().toLowerCase(),
               senha: form.senha.trim(),
               observacao: form.observacao.trim() || null,
             },

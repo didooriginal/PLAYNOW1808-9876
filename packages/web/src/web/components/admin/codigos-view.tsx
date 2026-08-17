@@ -15,6 +15,7 @@ import { GlassCard, NeonButton, Pill, accentHex } from "../ui/kit";
 import { Ajuda, Campo, TituloSecao, Tooltip } from "../ui/tooltip";
 import {
   useCodigos,
+  usePedidosAbertos,
   useRegistrarEmailManual,
   useRemoverCodigo,
   useVincularCodigo,
@@ -166,8 +167,13 @@ export function CodigosView() {
   const remover = useRemoverCodigo();
   const [copiado, setCopiado] = useState<number | null>(null);
 
-  const codigos = data ?? [];
-  const semDono = codigos.filter((c) => !c.clienteId).length;
+  const pedidos = usePedidosAbertos();
+  const [soSemDono, setSoSemDono] = useState(false);
+
+  const todos = data ?? [];
+  const semDono = todos.filter((c) => c.semDono).length;
+  const codigos = soSemDono ? todos.filter((c) => c.semDono) : todos;
+  const abertos = pedidos.data ?? [];
 
   return (
     <div className="space-y-5">
@@ -176,21 +182,21 @@ export function CodigosView() {
           {
             label: "Códigos na última hora",
             ajuda: "codigos.expira",
-            value: String(codigos.length),
+            value: String(todos.length),
             sub: "apagados automaticamente após 60 min",
             accent: "cyan" as const,
           },
           {
-            label: "Sem cliente vinculado",
-            ajuda: "Códigos que chegaram numa conta compartilhada e o sistema não conseguiu atribuir. Escolha o cliente na lista ao lado do código.",
+            label: "Sem dono (ninguém pediu)",
+            ajuda: "Código que chegou sem nenhum cliente ter clicado em \"Pedi o código agora\". Ele NÃO aparece em painel nenhum — se alguém reclamar, vincule na mão aqui.",
             value: String(semDono),
-            sub: "conta compartilhada — vincule na mão",
+            sub: "não aparece para nenhum cliente",
             accent: "red" as const,
           },
           {
-            label: "Vinculados",
-            ajuda: "Códigos já entregues no painel do cliente certo, sem você fazer nada.",
-            value: String(codigos.length - semDono),
+            label: "Entregues ao cliente certo",
+            ajuda: "Códigos casados automaticamente com o pedido de um cliente. Ele já vê o código no painel, sem você fazer nada.",
+            value: String(todos.length - semDono),
             sub: "visíveis no painel do cliente",
             accent: "purple" as const,
           },
@@ -212,6 +218,52 @@ export function CodigosView() {
         <ColarEmail />
         <WebhookCard />
       </div>
+
+      {/* FILA VIVA: quem está esperando código neste minuto */}
+      <GlassCard accent="purple" className="p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-1.5 font-display text-sm font-bold text-white">
+            Pedidos abertos agora
+            <Ajuda ajuda="Clientes que clicaram em &quot;Pedi o código agora&quot; e ainda estão esperando o e-mail chegar. O próximo código daquela conta vai automaticamente para o pedido mais antigo." />
+          </div>
+          <span className="font-sans text-[11px] text-white/35">{abertos.length} na fila</span>
+        </div>
+        {abertos.length === 0 ? (
+          <p className="mt-3 font-sans text-xs text-white/40">
+            Ninguém esperando código neste momento.
+          </p>
+        ) : (
+          <div className="mt-3 space-y-2">
+            {abertos.map((p) => (
+              <div
+                key={p.id}
+                className="flex flex-wrap items-center gap-3 rounded-xl border border-white/[0.07] bg-black/25 px-3 py-2"
+              >
+                <AppIcon id={p.servicoSlug} size="sm" active />
+                <span className="min-w-[120px] flex-1 font-sans text-xs text-white/80">
+                  {p.clienteNome ?? `cliente #${p.clienteId}`}
+                </span>
+                <span className="font-sans text-[11px] text-white/40">
+                  {p.contaRotulo ?? "matriz não identificada"}
+                </span>
+                <Pill accent="purple" icon={<Timer className="size-3" />}>
+                  pediu {haQuantoTempo(p.criadoEm)}
+                </Pill>
+              </div>
+            ))}
+          </div>
+        )}
+      </GlassCard>
+
+      <label className="flex items-center gap-2 font-sans text-[11px] text-white/50">
+        <input
+          type="checkbox"
+          checked={soSemDono}
+          onChange={(e) => setSoSemDono(e.target.checked)}
+          className="size-3.5 accent-[#ff1f3d]"
+        />
+        mostrar só os códigos sem dono
+      </label>
 
       {isError && (
         <GlassCard accent="red" className="p-8 text-center">
@@ -273,6 +325,21 @@ export function CodigosView() {
                   )}
                 </button>
                 </Tooltip>
+
+                <div className="min-w-[150px]">
+                  {c.semDono ? (
+                    <Pill accent="red">sem dono — ninguém pediu</Pill>
+                  ) : (
+                    <Pill accent="purple">
+                      entregue a {c.entregueNome ?? `cliente #${c.entregueClienteId}`}
+                    </Pill>
+                  )}
+                  {c.usadoEm ? (
+                    <div className="mt-1 font-sans text-[11px] text-emerald-300/80">
+                      já usado pelo cliente
+                    </div>
+                  ) : null}
+                </div>
 
                 <div className="min-w-[150px]">
                   <div className="font-sans text-xs text-white/70">{horaBr(c.recebidoEm)}</div>

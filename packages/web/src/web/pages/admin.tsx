@@ -43,6 +43,7 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { sugerirCaptura } from "@/lib/captura-email";
 import { AppIcon } from "../components/app-icon";
 import {
   ContaMatrizCard,
@@ -324,6 +325,7 @@ function NovaContaForm({ onClose }: { onClose: () => void }) {
     servico: "netflix",
     rotulo: "",
     email: "",
+    emailCaptura: "",
     senha: "",
     totalVagas: 5,
     renovacao: "",
@@ -388,6 +390,28 @@ function NovaContaForm({ onClose }: { onClose: () => void }) {
             value={form.email}
             onChange={(e) => set("email", e.target.value)}
           />
+        </Campo>
+        <Campo
+          label="E-mail de captura de códigos"
+          ajuda="contas.emailCaptura"
+          htmlFor="nc-captura"
+        >
+          <div className="flex gap-2">
+            <input
+              id="nc-captura"
+              className={input}
+              placeholder="netflix01@mail.playplusnow.com.br"
+              value={form.emailCaptura}
+              onChange={(e) => set("emailCaptura", e.target.value)}
+            />
+            <button
+              type="button"
+              onClick={() => set("emailCaptura", sugerirCaptura(form.servico, null))}
+              className="shrink-0 rounded-xl border border-neon-cyan/35 px-2.5 font-sans text-[11px] text-neon-cyan transition-colors hover:bg-neon-cyan/10"
+            >
+              sugerir
+            </button>
+          </div>
         </Campo>
         <Campo
           label="Senha"

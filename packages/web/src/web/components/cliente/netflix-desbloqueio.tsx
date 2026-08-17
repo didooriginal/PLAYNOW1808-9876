@@ -4,8 +4,8 @@ import {
   Check,
   CheckCircle2,
   ChevronRight,
-  Copy,
   Clock,
+  ExternalLink,
   Loader2,
   Mail,
   MonitorSmartphone,
@@ -23,9 +23,8 @@ import {
   useMinhaTelaNetflix,
   useSolicitarTv,
   haQuantoTempoTv,
-  horaCurta,
 } from "../../queries/netflix";
-import { minutosRestantes } from "../../queries/codigos";
+import { CodigoAcesso } from "./codigo-acesso";
 
 /**
  * DESBLOQUEAR TELA NETFLIX — central de auto-atendimento do cliente.
@@ -80,85 +79,56 @@ function OpcaoEmail({
   atualizando: boolean;
   onAtualizar: () => void;
 }) {
-  const [copiado, setCopiado] = useState<number | null>(null);
-  const principal = codigos[0];
-
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-white/[0.07] bg-black/25 p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Mail className="size-4" style={{ color: "#ff6b74" }} />
-            <span className="font-display text-sm font-bold text-white">
-              Código enviado para o e-mail da conta
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={onAtualizar}
-            data-testid="netflix-atualizar-codigo"
-            className="flex items-center gap-1.5 font-sans text-[11px] text-white/40 transition-colors hover:text-white"
-          >
-            <RefreshCw className={atualizando ? "size-3 animate-spin" : "size-3"} />
-            buscar de novo
-          </button>
+      {/*
+        O pedido do código vive no componente compartilhado: ele abre a janela
+        de entrega para ESTE cliente, faz o polling e mostra a contagem de 15
+        minutos. Aqui sobra só o contexto Netflix.
+      */}
+      <CodigoAcesso slug="netflix" nome="Netflix" compacto />
+
+      <div className="flex flex-wrap items-center gap-3">
+        <a
+          href="https://www.netflix.com/tv2"
+          target="_blank"
+          rel="noopener noreferrer"
+          data-testid="netflix-conectar-tv"
+        >
+          <NeonButton size="sm" accent="red">
+            Conectar minha TV
+            <ExternalLink className="size-3.5" />
+          </NeonButton>
+        </a>
+        <button
+          type="button"
+          onClick={onAtualizar}
+          data-testid="netflix-atualizar-codigo"
+          className="flex items-center gap-1.5 font-sans text-[11px] text-white/40 transition-colors hover:text-white"
+        >
+          <RefreshCw className={atualizando ? "size-3 animate-spin" : "size-3"} />
+          buscar de novo
+        </button>
+        {codigos.length > 0 && (
+          <Pill accent="cyan" icon={<Timer className="size-3" />}>
+            código disponível agora
+          </Pill>
+        )}
+      </div>
+
+      {/* AVISO CRITICO: "Atualizar residencia" derruba todo mundo da matriz */}
+      <div className="rounded-2xl border border-amber-400/35 bg-amber-400/[0.08] p-4">
+        <div className="flex items-center gap-1.5 font-display text-xs font-bold text-amber-300">
+          <ShieldAlert className="size-3.5" />
+          Nunca clique em "Atualizar residência"
         </div>
-
-        {principal ? (
-          <div className="mt-4 flex flex-wrap items-center gap-4">
-            <button
-              type="button"
-              data-testid="netflix-copiar-codigo"
-              onClick={() => {
-                void navigator.clipboard?.writeText(principal.codigo);
-                setCopiado(principal.id);
-                setTimeout(() => setCopiado(null), 1800);
-              }}
-              className="flex items-center gap-3 rounded-2xl border px-5 py-3 transition-colors"
-              style={{ borderColor: `${NETFLIX}66`, background: `${NETFLIX}14` }}
-            >
-              <span
-                className="font-display text-3xl font-extrabold tracking-[0.22em]"
-                style={{ color: "#ff6b74" }}
-              >
-                {principal.codigo}
-              </span>
-              {copiado === principal.id ? (
-                <Check className="size-4 text-emerald-400" />
-              ) : (
-                <Copy className="size-4 text-white/45" />
-              )}
-            </button>
-            <div className="space-y-1.5">
-              <Pill accent="cyan" icon={<Timer className="size-3" />}>
-                expira em {minutosRestantes(principal.recebidoEm)} min
-              </Pill>
-              <div className="font-sans text-[11px] text-white/35">
-                recebido {haQuantoTempoTv(principal.recebidoEm)} · toque no código para copiar
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="mt-4 rounded-xl border border-amber-400/30 bg-amber-400/[0.07] p-4">
-            <p className="font-sans text-xs leading-relaxed text-amber-200/90">
-              Nenhum código da Netflix chegou na última hora. Peça o envio na TV (botão{" "}
-              <strong className="font-semibold">Enviar e-mail</strong>) e toque em{" "}
-              <strong className="font-semibold">buscar de novo</strong> — ele aparece aqui em
-              segundos, sem precisar acessar o e-mail da conta.
-            </p>
-          </div>
-        )}
-
-        {codigos.length > 1 && (
-          <div className="mt-4 flex flex-wrap gap-2 border-t border-white/8 pt-3">
-            <span className="font-sans text-[11px] text-white/30">códigos anteriores:</span>
-            {codigos.slice(1).map((c) => (
-              <span key={c.id} className="font-mono text-[11px] text-white/40">
-                {c.codigo} ({horaCurta(c.recebidoEm)})
-              </span>
-            ))}
-          </div>
-        )}
+        <p className="mt-2 font-sans text-[12.5px] leading-relaxed text-white/70">
+          Na tela de bloqueio a Netflix costuma oferecer{" "}
+          <strong className="font-semibold">"Atualizar Netflix residência"</strong> junto com o
+          envio do código. Essa opção troca o endereço principal da conta e derruba todo mundo.
+          Escolha sempre <strong className="font-semibold">"Enviar e-mail"</strong> /{" "}
+          <strong className="font-semibold">"Estou viajando"</strong>.
+        </p>
       </div>
 
       <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5">
@@ -167,11 +137,11 @@ function OpcaoEmail({
         </div>
         <Passos
           itens={[
-            'Na tela de bloqueio da TV, escolha "Enviar e-mail" (ou "Obter código por e-mail").',
+            'Na tela de bloqueio da TV, escolha "Enviar e-mail" (ou "Estou viajando") — nunca "Atualizar residência".',
             'A Netflix responde "E-mail enviado" e mostra o campo para digitar o código.',
-            "Volte aqui e toque no código acima para copiar — ele chega em poucos segundos.",
-            "Digite os 4 dígitos na TV e confirme. A tela libera na hora.",
-            "Se o código não aparecer em 1 minuto, toque em buscar de novo antes de pedir suporte.",
+            'Volte aqui e clique em "Pedi o código agora" — é isso que reserva o código para você.',
+            "Toque no código para copiar, digite na TV e confirme. A tela libera na hora.",
+            "O código vale 15 minutos. Depois de usar, toque em \"já usei este código\".",
           ]}
         />
       </div>

@@ -64,6 +64,13 @@ export const contasMatrizes = sqliteTable("contas_matrizes", {
   rotulo: text("rotulo").notNull(),
   /** e-mail de login do streaming */
   email: text("email").notNull(),
+  /**
+   * Endereco do NOSSO dominio que recebe os e-mails de codigo desta matriz
+   * (ex.: "netflix01@mail.playplusnow.com.br"). O Cloudflare Email Routing faz
+   * catch-all -> Worker -> POST /api/webhooks/email, e este campo e o que
+   * amarra o e-mail recebido a conta matriz certa. Vazio = captura desligada.
+   */
+  emailCaptura: text("email_captura").notNull().default(""),
   /** senha do streaming */
   senha: text("senha").notNull(),
   totalVagas: integer("total_vagas").notNull().default(1),
@@ -586,10 +593,61 @@ export const codigosOtp = sqliteTable("codigos_otp", {
   recebidoEm: integer("recebido_em", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),
+
+  /* ---- ENTREGA DIRIGIDA (um codigo para UM cliente) ---- */
+  /**
+   * Pedido que este codigo atendeu. Numa matriz com varios clientes, o codigo
+   * so vai para quem clicou em "Pedi o codigo agora": sem pedido casado, ele
+   * fica sem dono e aparece apenas no admin.
+   */
+  pedidoId: integer("pedido_id"),
+  /** cliente que REALMENTE recebeu o codigo no painel (preenchido na entrega) */
+  entregueClienteId: integer("entregue_cliente_id").references(() => usuarios.id, {
+    onDelete: "set null",
+  }),
+  /** o cliente clicou em "ja usei este codigo" — some do painel na hora */
+  usadoEm: integer("usado_em", { mode: "timestamp" }),
+  /** limite de exibicao no painel do cliente (entrega + 15 min) */
+  expiraEm: integer("expira_em", { mode: "timestamp" }),
 });
 
 export type CodigoOtp = typeof codigosOtp.$inferSelect;
 export type NovoCodigoOtp = typeof codigosOtp.$inferInsert;
+
+/* ------------------------------------------------------------------ */
+/* PEDIDOS DE CODIGO — o que garante o isolamento entre clientes       */
+/* ------------------------------------------------------------------ */
+
+/**
+ * O cliente clica em "Pedi o codigo agora" ANTES de acionar o streaming.
+ * Quando o e-mail chega, `entregarCodigo()` casa o codigo com o pedido
+ * `aguardando` mais antigo da mesma matriz + mesmo servico (FIFO, janela de
+ * 10 minutos). Dois clientes da mesma conta pedindo ao mesmo tempo recebem
+ * cada um o SEU codigo; quem nao pediu nao ve nada.
+ *
+ * Fluxo: aguardando -> entregue | expirado | cancelado.
+ */
+export const pedidosCodigo = sqliteTable("pedidos_codigo", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  clienteId: integer("cliente_id")
+    .notNull()
+    .references(() => usuarios.id, { onDelete: "cascade" }),
+  /** matriz em que o cliente tem vaga ativa naquele app */
+  contaId: integer("conta_id").references(() => contasMatrizes.id, { onDelete: "set null" }),
+  /** slug do app pedido (netflix, disney, prime, ...) */
+  servicoSlug: text("servico_slug").notNull(),
+  /** aguardando | entregue | expirado | cancelado */
+  status: text("status").notNull().default("aguardando"),
+  /** codigo que atendeu este pedido */
+  codigoId: integer("codigo_id"),
+  criadoEm: integer("criado_em", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  atendidoEm: integer("atendido_em", { mode: "timestamp" }),
+});
+
+export type PedidoCodigo = typeof pedidosCodigo.$inferSelect;
+export type NovoPedidoCodigo = typeof pedidosCodigo.$inferInsert;
 
 /* ------------------------------------------------------------------ */
 /* SOLICITACOES DE TV (desbloqueio netflix.com/tv2)                    */

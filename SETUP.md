@@ -178,3 +178,53 @@ apenas para suporte.
 - Tabela nova: `resets_senha`.
 - Env: `RESEND_API_KEY` (configurada) e `EMAIL_REMETENTE` (opcional).
 - **Limitação atual:** sem domínio verificado no Resend, o envio só entrega em `playnowplus01@gmail.com` (e-mail dono da conta). Para os demais clientes, o admin copia o link da fila. Ao verificar um domínio, preencher `EMAIL_REMETENTE` — nenhuma mudança de código é necessária.
+
+## Central de Códigos 2.0 — entrega automática (17/08/2026)
+
+Antes o painel do cliente mostrava "o último código recebido" da conta matriz — o que
+significava que dois clientes da mesma conta podiam ver o código um do outro. Agora o
+código tem **dono**.
+
+### Como o código chega no sistema
+
+1. Cada conta matriz ganha um endereço de captura no nosso domínio, cadastrado no admin
+   em **Estoque → editar conta → "E-mail de captura de códigos"** (botão *sugerir* gera
+   `netflix07@mail.playplusnow.com.br`).
+2. **Cloudflare Email Routing** com regra **catch-all** em `mail.playplusnow.com.br`
+   entrega tudo para um **Email Worker**.
+3. O Worker (código pronto em `docs/email-worker.js`) faz `POST` em
+   `/api/webhooks/email` com `remetente`, `destinatario`, `assunto` e `corpo`, usando
+   `Authorization: Bearer <EMAIL_WEBHOOK_TOKEN>`.
+4. O backend extrai o código, identifica o serviço pelo remetente e casa a conta pelo
+   **e-mail de login OU pelo e-mail de captura**.
+
+Nada de IMAP e nenhuma senha de e-mail guardada no banco.
+
+### Como o código encontra o dono
+
+- O cliente clica em **"Pedi o código agora"** no painel (bloco que aparece na Netflix e
+  no modal "Como acessar" de todos os apps). Isso abre um **pedido** válido por 10 min.
+- Quando o e-mail chega, o código é casado com o pedido `aguardando` mais antigo da
+  **mesma matriz + mesmo serviço** (FIFO) — tabela `pedidos_codigo`.
+- O código entregue vale **15 minutos** e some na hora se o cliente clicar em
+  **"já usei este código"**.
+- Sem pedido casado, o código fica **sem dono**: não aparece em painel nenhum, só na
+  Central de Códigos do admin (com selo *"sem dono — ninguém pediu"* e a lista
+  **"Pedidos abertos agora"**).
+
+### Netflix
+
+O painel agora traz o botão **"Conectar minha TV"** (abre `netflix.com/tv2` em nova aba)
+e um aviso destacado para **nunca clicar em "Atualizar residência"** — essa opção troca o
+endereço principal da conta e derruba todos os clientes da matriz.
+
+> Atenção: "Estou viajando" / código por e-mail é um recurso de acesso temporário da
+> Netflix. Uso recorrente pode levar a Netflix a mudar o fluxo ou bloquear a conta — vale
+> manter o caminho do `tv2` como alternativa e não depender só do código por e-mail.
+
+### O que falta configurar (fora do código)
+
+- Habilitar o Email Routing e publicar o Worker (`docs/email-worker.js`).
+- Trocar o e-mail de login das matrizes para o endereço de captura **ou** ligar o
+  encaminhamento no Gmail de cada matriz.
+- Preencher "E-mail de captura de códigos" em cada conta matriz no admin.

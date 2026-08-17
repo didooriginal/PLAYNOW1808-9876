@@ -11,6 +11,7 @@ import {
 import { AppIcon } from "../app-icon";
 import { NeonButton } from "../ui/kit";
 import { REGRAS_OURO, servicoInfo } from "@/lib/servicos-info";
+import { CodigoAcesso } from "./codigo-acesso";
 
 export function ComoAcessarModal({
   slug,
@@ -104,6 +105,9 @@ export function ComoAcessarModal({
               ))}
             </ol>
           </div>
+
+          {/* pedido de código: vale para qualquer app que verifica por e-mail */}
+          <CodigoAcesso slug={slug} nome={nome} compacto />
 
           {info.dicas.length > 0 && (
             <div className="rounded-2xl border border-neon-cyan/25 bg-neon-cyan/[0.06] p-4">

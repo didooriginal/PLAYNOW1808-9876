@@ -12,6 +12,7 @@ import {
   solicitacoesTv,
   usuarios,
 } from "../database/schema";
+import { meusCodigosVisiveis } from "../lib/codigos-entrega";
 
 /**
  * CENTRAL DE DESBLOQUEIO NETFLIX.
@@ -66,7 +67,15 @@ async function clienteDaSessao(authUserId: string) {
 const SEM_TELA = {
   temNetflix: false as const,
   conta: null,
-  codigos: [],
+  codigos: [] as Array<{
+    id: number;
+    codigo: string;
+    servico: string;
+    servicoSlug: string;
+    assunto: string;
+    recebidoEm: Date;
+    expiraEm: Date | null;
+  }>,
   solicitacoes: [],
   pendente: null,
 };
@@ -126,33 +135,13 @@ export const netflix = {
     const contas = await minhasContasNetflix(cliente.id);
     const conta = contas[0] ?? null;
 
-    const limite = new Date(Date.now() - UMA_HORA_MS);
-    const emails = [
-      ...new Set([cliente.email.toLowerCase(), ...contas.map((c) => c.email.toLowerCase())]),
-    ];
-
-    const codigos = await db
-      .select({
-        id: codigosOtp.id,
-        codigo: codigosOtp.codigo,
-        servico: codigosOtp.servico,
-        servicoSlug: codigosOtp.servicoSlug,
-        assunto: codigosOtp.assunto,
-        recebidoEm: codigosOtp.recebidoEm,
-      })
-      .from(codigosOtp)
-      .where(
-        and(
-          inArray(codigosOtp.servicoSlug, SLUGS_NETFLIX),
-          gt(codigosOtp.recebidoEm, limite),
-          or(
-            eq(codigosOtp.clienteId, cliente.id),
-            emails.length ? inArray(codigosOtp.destinatario, emails) : undefined,
-          ),
-        ),
-      )
-      .orderBy(desc(codigosOtp.recebidoEm))
-      .limit(3);
+    /*
+     * Só entra aqui o código ENTREGUE a este cliente (ele clicou em "Pedi o
+     * código agora"). Numa matriz compartilhada isso é o que impede um cliente
+     * de ver o código do outro.
+     */
+    const visiveis = await meusCodigosVisiveis(cliente.id);
+    const codigos = visiveis.filter((c) => SLUGS_NETFLIX.includes(c.servicoSlug)).slice(0, 3);
 
     const solicitacoes = await db
       .select()
@@ -177,6 +166,7 @@ export const netflix = {
           }
         : null,
       codigos,
+      contaIds: contas.map((c) => c.contaId),
       solicitacoes,
       pendente: solicitacoes.find((s) => s.status === "pendente") ?? null,
     };

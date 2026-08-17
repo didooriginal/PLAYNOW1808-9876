@@ -10,8 +10,17 @@ import {
   aplicativos,
   codigosOtp,
   contasMatrizes,
+  pedidosCodigo,
   usuarios,
 } from "../database/schema";
+import {
+  JANELA_PEDIDO_MS,
+  entregarCodigo,
+  expirarPedidosVencidos,
+  meusCodigosVisiveis,
+  minhasContasDoServico,
+  slugsDaFamilia,
+} from "../lib/codigos-entrega";
 
 /**
  * CENTRAL DE CÓDIGOS (OTP).
@@ -186,33 +195,43 @@ async function identificarServico(remetente: string, assunto: string, corpo: str
  */
 async function identificarCliente(destinatario: string, servicoSlug: string) {
   const email = destinatario.trim().toLowerCase();
-  if (!email) return null;
+  if (!email) return { clienteId: null as number | null, contaIds: [] as number[] };
 
   const [cliente] = await db.select().from(usuarios).where(eq(usuarios.email, email));
-  if (cliente) return cliente.id;
+  if (cliente) return { clienteId: cliente.id, contaIds: [] as number[] };
 
+  /*
+   * O destinatario pode ser o e-mail de LOGIN da matriz ou o endereco de
+   * CAPTURA do nosso dominio (netflix01@mail.playplusnow.com.br), que e o
+   * caminho novo via Cloudflare Email Routing.
+   */
   const contas = await db
     .select({ id: contasMatrizes.id })
     .from(contasMatrizes)
-    .where(eq(contasMatrizes.email, email));
-  if (!contas.length) return null;
+    .where(or(eq(contasMatrizes.email, email), eq(contasMatrizes.emailCaptura, email)));
+  if (!contas.length) return { clienteId: null as number | null, contaIds: [] as number[] };
+
+  const contaIds = contas.map((c) => c.id);
 
   const vagas = await db
     .select({ clienteId: alocacoes.clienteId })
     .from(alocacoes)
     .where(
       and(
-        inArray(
-          alocacoes.contaId,
-          contas.map((c) => c.id),
-        ),
+        inArray(alocacoes.contaId, contaIds),
         eq(alocacoes.status, "ativo"),
-        ...(servicoSlug !== "desconhecido" ? [eq(alocacoes.servico, servicoSlug)] : []),
+        ...(servicoSlug !== "desconhecido"
+          ? [inArray(alocacoes.servico, slugsDaFamilia(servicoSlug))]
+          : []),
       ),
     );
 
+  /*
+   * Vaga unica: da para atribuir com seguranca. Conta compartilhada: fica sem
+   * dono aqui e quem decide e o `entregarCodigo()`, pelo pedido em aberto.
+   */
   const unicos = [...new Set(vagas.map((v) => v.clienteId))];
-  return unicos.length === 1 ? unicos[0] : null;
+  return { clienteId: unicos.length === 1 ? unicos[0] : null, contaIds };
 }
 
 /* ------------------------------------------------------------------ */
@@ -266,7 +285,7 @@ export async function registrarEmail(entrada: EmailBruto) {
   if (!achado) return { ok: false as const, motivo: "Nenhum código de 4 a 6 dígitos encontrado" };
 
   const { servicoSlug, servico } = await identificarServico(remetente, assunto, entrada.corpo);
-  const clienteId = await identificarCliente(destinatario, servicoSlug);
+  const { clienteId, contaIds } = await identificarCliente(destinatario, servicoSlug);
 
   await purgar();
 
@@ -286,24 +305,55 @@ export async function registrarEmail(entrada: EmailBruto) {
     })
     .returning();
 
+  /*
+   * ENTREGA DIRIGIDA: o codigo so vai para o painel de quem clicou em
+   * "Pedi o codigo agora". Sem pedido casado ele fica sem dono (so admin).
+   */
+  const pedido = row
+    ? await entregarCodigo({
+        codigoId: row.id,
+        servicoSlug,
+        contaIds,
+        clienteDireto: clienteId,
+      })
+    : null;
+
+  let dono: { id: number; nome: string } | null = null;
+  if (pedido) {
+    const [u] = await db
+      .select({ id: usuarios.id, nome: usuarios.nome })
+      .from(usuarios)
+      .where(eq(usuarios.id, pedido.clienteId));
+    dono = u ?? null;
+  }
+
   // GATILHO: todo OTP capturado vira alerta na central do admin.
   await notificar({
     escopo: "admin",
-    clienteId,
+    clienteId: pedido?.clienteId ?? clienteId,
     tipo: "otp",
     severidade: servicoSlug.startsWith("netflix") ? "alerta" : "info",
     titulo: `Código ${servico} recebido: ${achado.codigo}`,
-    mensagem: `${destinatario || "conta matriz"}${assunto ? ` · ${assunto}` : ""}`,
+    mensagem: dono
+      ? `Entregue a ${dono.nome}${assunto ? ` · ${assunto}` : ""}`
+      : `Sem dono — ninguém pediu${destinatario ? ` · ${destinatario}` : ""}${assunto ? ` · ${assunto}` : ""}`,
     destino: "codigos",
     chave: `otp:${row?.id ?? `${achado.codigo}-${Date.now()}`}`,
   });
 
-  return { ok: true as const, registro: row };
+  return { ok: true as const, registro: row, entregue: dono };
 }
 
 /* ------------------------------------------------------------------ */
 /* ROTAS                                                               */
 /* ------------------------------------------------------------------ */
+
+/** ficha do cliente logado — todas as rotas de pedido dependem dela */
+async function fichaDaSessao(authUserId: string) {
+  const [cliente] = await db.select().from(usuarios).where(eq(usuarios.authUserId, authUserId));
+  if (!cliente) throw new ORPCError("NOT_FOUND", { message: "Ficha de cliente não encontrada" });
+  return cliente;
+}
 
 export const codigos = {
   /** central do admin — purga os antigos e devolve os códigos da última hora */
@@ -324,10 +374,52 @@ export const codigos = {
         trecho: codigosOtp.trecho,
         origem: codigosOtp.origem,
         recebidoEm: codigosOtp.recebidoEm,
+        pedidoId: codigosOtp.pedidoId,
+        entregueClienteId: codigosOtp.entregueClienteId,
+        usadoEm: codigosOtp.usadoEm,
+        expiraEm: codigosOtp.expiraEm,
       })
       .from(codigosOtp)
       .leftJoin(usuarios, eq(usuarios.id, codigosOtp.clienteId))
       .orderBy(desc(codigosOtp.recebidoEm));
+
+    // nome de quem REALMENTE recebeu (pode diferir do palpite de vinculo)
+    const ids = [...new Set(rows.map((r) => r.entregueClienteId).filter((v): v is number => !!v))];
+    const donos = ids.length
+      ? await db
+          .select({ id: usuarios.id, nome: usuarios.nome })
+          .from(usuarios)
+          .where(inArray(usuarios.id, ids))
+      : [];
+    const mapa = new Map(donos.map((d) => [d.id, d.nome]));
+
+    return rows.map((r) => ({
+      ...r,
+      entregueNome: r.entregueClienteId ? (mapa.get(r.entregueClienteId) ?? null) : null,
+      semDono: !r.entregueClienteId,
+    }));
+  }),
+
+  /** pedidos em aberto agora — mostra a fila viva no admin */
+  pedidosAbertos: adminOnly.handler(async () => {
+    await expirarPedidosVencidos();
+    const rows = await db
+      .select({
+        id: pedidosCodigo.id,
+        clienteId: pedidosCodigo.clienteId,
+        clienteNome: usuarios.nome,
+        contaId: pedidosCodigo.contaId,
+        contaRotulo: contasMatrizes.rotulo,
+        servicoSlug: pedidosCodigo.servicoSlug,
+        status: pedidosCodigo.status,
+        criadoEm: pedidosCodigo.criadoEm,
+      })
+      .from(pedidosCodigo)
+      .leftJoin(usuarios, eq(usuarios.id, pedidosCodigo.clienteId))
+      .leftJoin(contasMatrizes, eq(contasMatrizes.id, pedidosCodigo.contaId))
+      .where(eq(pedidosCodigo.status, "aguardando"))
+      .orderBy(desc(pedidosCodigo.criadoEm))
+      .limit(50);
     return rows;
   }),
 
@@ -365,50 +457,125 @@ export const codigos = {
     return { ok: true };
   }),
 
+  /* ---------------------------------------------------------------- */
+  /* PEDIDO DE CÓDIGO (cliente)                                        */
+  /* ---------------------------------------------------------------- */
+
   /**
-   * "Seu código de acesso recente" no painel do cliente.
-   * Devolve os códigos vinculados a ele OU endereçados a uma conta matriz em
-   * que ele tem vaga ativa — sem nunca expor a conta/e-mail da matriz.
+   * "Pedi o código agora": abre a janela em que ESTE cliente pode receber o
+   * próximo código da matriz. É o que impede um cliente de ver o código do
+   * outro na mesma conta compartilhada.
+   */
+  pedirCodigo: authed
+    .input(z.object({ servicoSlug: z.string().min(2) }))
+    .handler(async ({ context, input }) => {
+      const cliente = await fichaDaSessao(context.user.id);
+      if (estaBloqueado(cliente.statusPagamento, cliente.confiancaAte))
+        throw new ORPCError("FORBIDDEN", {
+          message: "Assinatura em atraso — regularize para pedir um código.",
+        });
+
+      await expirarPedidosVencidos();
+
+      // já existe um pedido em aberto? devolve o mesmo, sem duplicar a fila
+      const [aberto] = await db
+        .select()
+        .from(pedidosCodigo)
+        .where(
+          and(eq(pedidosCodigo.clienteId, cliente.id), eq(pedidosCodigo.status, "aguardando")),
+        )
+        .orderBy(desc(pedidosCodigo.criadoEm))
+        .limit(1);
+      if (aberto) return aberto;
+
+      const contas = await minhasContasDoServico(cliente.id, input.servicoSlug);
+      if (!contas.length)
+        throw new ORPCError("FORBIDDEN", {
+          message: "Você não tem uma vaga ativa nesse aplicativo.",
+        });
+
+      const [pedido] = await db
+        .insert(pedidosCodigo)
+        .values({
+          clienteId: cliente.id,
+          contaId: contas[0].contaId,
+          servicoSlug: input.servicoSlug,
+          status: "aguardando",
+          criadoEm: new Date(),
+        })
+        .returning();
+      return pedido;
+    }),
+
+  /** o cliente desistiu — libera a vez para outro da mesma matriz */
+  cancelarPedido: authed
+    .input(z.object({ id: z.number().int() }))
+    .handler(async ({ context, input }) => {
+      const cliente = await fichaDaSessao(context.user.id);
+      await db
+        .update(pedidosCodigo)
+        .set({ status: "cancelado" })
+        .where(
+          and(
+            eq(pedidosCodigo.id, input.id),
+            eq(pedidosCodigo.clienteId, cliente.id),
+            eq(pedidosCodigo.status, "aguardando"),
+          ),
+        );
+      return { ok: true };
+    }),
+
+  /** "já usei este código" — some do painel na hora */
+  marcarUsado: authed
+    .input(z.object({ id: z.number().int() }))
+    .handler(async ({ context, input }) => {
+      const cliente = await fichaDaSessao(context.user.id);
+      await db
+        .update(codigosOtp)
+        .set({ usadoEm: new Date() })
+        .where(
+          and(eq(codigosOtp.id, input.id), eq(codigosOtp.entregueClienteId, cliente.id)),
+        );
+      return { ok: true };
+    }),
+
+  /**
+   * Painel do cliente: código entregue a ELE, ainda não usado e dentro dos
+   * 15 minutos. Mais o pedido em aberto, para a tela mostrar "aguardando".
    */
   meuCodigo: authed.handler(async ({ context }) => {
     await purgar();
+    await expirarPedidosVencidos();
 
     const [cliente] = await db
       .select()
       .from(usuarios)
       .where(eq(usuarios.authUserId, context.user.id));
-    if (!cliente) return [];
+    if (!cliente) return { codigos: [], pedido: null };
     // inadimplente nao ve codigos de acesso
-    if (estaBloqueado(cliente.statusPagamento, cliente.confiancaAte)) return [];
+    if (estaBloqueado(cliente.statusPagamento, cliente.confiancaAte))
+      return { codigos: [], pedido: null };
 
-    const minhasContas = await db
-      .select({ email: contasMatrizes.email })
-      .from(alocacoes)
-      .innerJoin(contasMatrizes, eq(contasMatrizes.id, alocacoes.contaId))
-      .where(and(eq(alocacoes.clienteId, cliente.id), eq(alocacoes.status, "ativo")));
-
-    const emails = [
-      ...new Set([cliente.email, ...minhasContas.map((c) => c.email.toLowerCase())]),
-    ];
-
-    const rows = await db
-      .select({
-        id: codigosOtp.id,
-        codigo: codigosOtp.codigo,
-        servicoSlug: codigosOtp.servicoSlug,
-        servico: codigosOtp.servico,
-        recebidoEm: codigosOtp.recebidoEm,
-      })
-      .from(codigosOtp)
+    const codigos = await meusCodigosVisiveis(cliente.id);
+    const [pedido] = await db
+      .select()
+      .from(pedidosCodigo)
       .where(
-        or(
-          eq(codigosOtp.clienteId, cliente.id),
-          emails.length ? inArray(codigosOtp.destinatario, emails) : undefined,
-        ),
+        and(eq(pedidosCodigo.clienteId, cliente.id), eq(pedidosCodigo.status, "aguardando")),
       )
-      .orderBy(desc(codigosOtp.recebidoEm))
-      .limit(5);
+      .orderBy(desc(pedidosCodigo.criadoEm))
+      .limit(1);
 
-    return rows;
+    return {
+      codigos,
+      pedido: pedido
+        ? {
+            id: pedido.id,
+            servicoSlug: pedido.servicoSlug,
+            criadoEm: pedido.criadoEm,
+            expiraEm: new Date(pedido.criadoEm.getTime() + JANELA_PEDIDO_MS),
+          }
+        : null,
+    };
   }),
 };

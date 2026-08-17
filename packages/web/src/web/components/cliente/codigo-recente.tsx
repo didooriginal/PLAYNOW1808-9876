@@ -1,19 +1,30 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, Copy, KeyRound, Loader2, RefreshCw, Timer } from "lucide-react";
 import { AppIcon } from "../app-icon";
 import { GlassCard, Pill } from "../ui/kit";
-import { useMeuCodigo, haQuantoTempo, minutosRestantes } from "../../queries/codigos";
+import { contagem, useMarcarUsado, useMeuCodigo } from "../../queries/codigos";
 
 /**
- * "Seu código de acesso recente".
- * Quando o streaming pede a verificação por e-mail, o código cai aqui em
- * segundos — sem o cliente precisar abrir chamado. Some sozinho depois de 1h.
+ * "Seu código de acesso recente" no painel.
+ *
+ * Mostra apenas o que foi ENTREGUE a este cliente — ou seja, o código que
+ * chegou depois de ele clicar em "Pedi o código agora" na tela do aplicativo.
+ * Código de conta compartilhada sem pedido casado nunca aparece aqui.
  */
 export function CodigoRecente() {
   const { data, isPending, isFetching, refetch } = useMeuCodigo();
+  const usar = useMarcarUsado();
   const [copiado, setCopiado] = useState<number | null>(null);
+  const [, forcar] = useState(0);
 
-  const codigos = data ?? [];
+  // relógio de 1s para a contagem regressiva andar entre os refetches
+  useEffect(() => {
+    const t = setInterval(() => forcar((n) => n + 1), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  const codigos = data?.codigos ?? [];
+  const pedido = data?.pedido ?? null;
   const principal = codigos[0];
 
   return (
@@ -41,10 +52,19 @@ export function CodigoRecente() {
           <span className="font-sans text-xs text-white/40">Procurando códigos...</span>
         </div>
       ) : !principal ? (
-        <p className="mt-3 font-sans text-xs leading-relaxed text-white/45">
-          Nenhum código no momento. Quando o app pedir um código de verificação enviado por e-mail,
-          ele aparece aqui automaticamente — atualize esta tela após solicitar.
-        </p>
+        <div className="mt-3 space-y-2">
+          {pedido ? (
+            <p className="flex items-center gap-2 font-sans text-xs leading-relaxed text-white/60">
+              <Loader2 className="size-3.5 animate-spin text-neon-cyan" />
+              Pedido aberto — esperando o código chegar ({contagem(pedido.expiraEm)}).
+            </p>
+          ) : (
+            <p className="font-sans text-xs leading-relaxed text-white/45">
+              Nenhum código no momento. Abra o app na sua lista, toque em "Como acessar" e clique em
+              "Pedi o código agora" — o código cai aqui em segundos.
+            </p>
+          )}
+        </div>
       ) : (
         <div className="mt-4 space-y-3">
           {codigos.map((c) => (
@@ -55,9 +75,13 @@ export function CodigoRecente() {
               <AppIcon id={c.servicoSlug} size="sm" active />
               <div className="min-w-[110px] flex-1">
                 <div className="font-display text-sm font-bold text-white">{c.servico}</div>
-                <div className="font-sans text-[11px] text-white/35">
-                  {haQuantoTempo(c.recebidoEm)}
-                </div>
+                <button
+                  type="button"
+                  onClick={() => usar.mutate({ id: c.id })}
+                  className="font-sans text-[11px] text-white/35 underline underline-offset-4 transition-colors hover:text-white"
+                >
+                  já usei este código
+                </button>
               </div>
 
               <button
@@ -67,7 +91,7 @@ export function CodigoRecente() {
                   setCopiado(c.id);
                   setTimeout(() => setCopiado(null), 1800);
                 }}
-                title="Copiar código"
+                aria-label="Copiar código"
                 className="flex items-center gap-2 rounded-xl border border-neon-cyan/30 bg-neon-cyan/[0.07] px-4 py-2 transition-colors hover:border-neon-cyan/60"
               >
                 <span className="font-display text-xl font-extrabold tracking-[0.22em] text-neon-cyan">
@@ -80,11 +104,8 @@ export function CodigoRecente() {
                 )}
               </button>
 
-              <Pill
-                accent={minutosRestantes(c.recebidoEm) < 10 ? "red" : "cyan"}
-                icon={<Timer className="size-3" />}
-              >
-                expira em {minutosRestantes(c.recebidoEm)} min
+              <Pill accent="cyan" icon={<Timer className="size-3" />}>
+                expira em {contagem(c.expiraEm)}
               </Pill>
             </div>
           ))}

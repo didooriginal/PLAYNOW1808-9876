@@ -15,7 +15,15 @@ export function useCodigos() {
 
 export function useMeuCodigo() {
   return useQuery(
-    orpc.codigos.meuCodigo.queryOptions({ staleTime: 5_000, refetchInterval: 20_000 }),
+    // polling curto: depois de pedir, o codigo chega em segundos
+    orpc.codigos.meuCodigo.queryOptions({ staleTime: 2_000, refetchInterval: 5_000 }),
+  );
+}
+
+/** fila de pedidos em aberto (admin) */
+export function usePedidosAbertos() {
+  return useQuery(
+    orpc.codigos.pedidosAbertos.queryOptions({ staleTime: 5_000, refetchInterval: 15_000 }),
   );
 }
 
@@ -32,6 +40,23 @@ export function useRegistrarEmailManual() {
 export function useVincularCodigo() {
   const invalidar = useInvalidarCodigos();
   return useMutation(orpc.codigos.vincular.mutationOptions({ onSuccess: invalidar }));
+}
+
+/** "Pedi o código agora" — abre a janela de entrega para ESTE cliente */
+export function usePedirCodigo() {
+  const invalidar = useInvalidarCodigos();
+  return useMutation(orpc.codigos.pedirCodigo.mutationOptions({ onSuccess: invalidar }));
+}
+
+export function useCancelarPedido() {
+  const invalidar = useInvalidarCodigos();
+  return useMutation(orpc.codigos.cancelarPedido.mutationOptions({ onSuccess: invalidar }));
+}
+
+/** "já usei este código" — tira o código da tela na hora */
+export function useMarcarUsado() {
+  const invalidar = useInvalidarCodigos();
+  return useMutation(orpc.codigos.marcarUsado.mutationOptions({ onSuccess: invalidar }));
 }
 
 export function useRemoverCodigo() {
@@ -52,6 +77,17 @@ export function haQuantoTempo(data: Date | string) {
 export function minutosRestantes(data: Date | string) {
   const passados = Math.floor((Date.now() - new Date(data).getTime()) / 60_000);
   return Math.max(0, 60 - passados);
+}
+
+/** "04:37" — contagem regressiva até a data informada */
+export function contagem(ate: Date | string | null | undefined) {
+  if (!ate) return "00:00";
+  const ms = new Date(ate).getTime() - Date.now();
+  if (ms <= 0) return "00:00";
+  const total = Math.floor(ms / 1000);
+  const min = String(Math.floor(total / 60)).padStart(2, "0");
+  const seg = String(total % 60).padStart(2, "0");
+  return `${min}:${seg}`;
 }
 
 export function horaBr(data: Date | string) {
