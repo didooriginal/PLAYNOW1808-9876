@@ -10,3 +10,12 @@ export function parseDataBrClient(valor: string | null | undefined): Date | null
   if (iso) return new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
   return null;
 }
+
+/**
+ * Exibe uma data em `dd/mm/aaaa` para o usuário, aceitando ISO ou BR na entrada.
+ * O banco guarda `clienteDesde` em ISO (ordenação/comparação em SQL); a tela mostra BR.
+ */
+export function exibirData(valor: string | null | undefined, vazio = "—") {
+  const d = parseDataBrClient(valor);
+  return d ? d.toLocaleDateString("pt-BR") : valor?.trim() || vazio;
+}

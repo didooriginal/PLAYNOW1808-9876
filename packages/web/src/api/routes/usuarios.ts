@@ -13,6 +13,7 @@ import {
   usuarios as tabelaUsuarios,
 } from "../database/schema";
 import { resolverServicos, type ServicoResolvido } from "../lib/planos";
+import { paraIso } from "../lib/ciclos";
 import { garantirAlocacao } from "./alocacoes";
 import { extrasEmAberto, recalcularValorCliente } from "../lib/cobranca-apps";
 import {
@@ -112,7 +113,11 @@ export const usuarios = {
   }),
 
   criar: adminOnly.input(usuarioInput).handler(async ({ input }) => {
-    const [row] = await db.insert(tabelaUsuarios).values(input).returning();
+    const [row] = await db
+      .insert(tabelaUsuarios)
+      // `clienteDesde` alimenta ordenação e comparação em SQL: sempre ISO.
+      .values({ ...input, clienteDesde: paraIso(input.clienteDesde) || input.clienteDesde })
+      .returning();
     return row;
   }),
 
@@ -124,6 +129,9 @@ export const usuarios = {
       const patch = Object.fromEntries(
         Object.entries(bruto).filter(([, v]) => v !== undefined),
       ) as Partial<typeof bruto>;
+
+      // `clienteDesde` é comparado/ordenado em SQL: normaliza dd/mm/aaaa para ISO.
+      if (patch.clienteDesde) patch.clienteDesde = paraIso(patch.clienteDesde) || patch.clienteDesde;
 
       // TRAVA DE VENCIMENTO: a data de cobranca nunca muda por edicao livre.
       // Use `tabelaUsuarios.alterarVencimento`, que exige motivo e grava historico.

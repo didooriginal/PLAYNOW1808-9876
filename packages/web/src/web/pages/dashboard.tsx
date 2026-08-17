@@ -66,6 +66,7 @@ import { ContadorEconomia } from "../components/cliente/economia";
 import { PagarPix } from "../components/cliente/pagar-pix";
 import { AreaPagamento } from "../components/cliente/pagamento";
 import { AcessoConvite } from "../components/cliente/acesso-convite";
+import { exibirData } from "../lib/datas";
 
 /** dados vindos do banco (usuarios.painel) */
 type PainelCliente = NonNullable<ReturnType<typeof usePainelCliente>["data"]>;
@@ -344,7 +345,7 @@ function ActivePlanCard({
           </div>
           <div className="mt-5 grid grid-cols-2 gap-x-8 gap-y-3 sm:grid-cols-3">
             {[
-              { label: "Cliente desde", value: cliente.clienteDesde || "—", icon: CalendarClock },
+              { label: "Cliente desde", value: exibirData(cliente.clienteDesde), icon: CalendarClock },
               { label: "Próxima cobrança", value: cliente.proximaCobranca || "—", icon: Wallet },
               { label: "Economia mensal", value: brl(economia), icon: TrendingUp },
             ].map((m) => (
@@ -498,7 +499,7 @@ function InvoicesView({
         <div className="flex items-center justify-between gap-3 border-b border-white/8 px-5 py-4">
           <div className="font-display text-sm font-bold text-white">Histórico de faturas</div>
           <span className="font-sans text-[11px] text-white/30">
-            cliente desde {cliente.clienteDesde || "—"}
+            cliente desde {exibirData(cliente.clienteDesde)}
           </span>
         </div>
         <div className="divide-y divide-white/6">

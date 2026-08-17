@@ -2325,7 +2325,8 @@ function NovoClienteForm() {
               proximaCobranca: form.proximaCobranca,
               statusPagamento: "ativo",
               ciclo: "mensal",
-              clienteDesde: new Date().toLocaleDateString("pt-BR"),
+              // ISO: `clienteDesde` é ordenado e comparado em SQL (dd/mm/aaaa quebra a ordem)
+              clienteDesde: new Date().toISOString().slice(0, 10),
               admin: false,
             },
             {

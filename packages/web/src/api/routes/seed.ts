@@ -2,7 +2,8 @@ import { z } from "zod";
 import { eq, sql } from "drizzle-orm";
 import { adminOnly } from "../middleware/auth";
 import { db } from "../database";
-import { aplicativos, bannersAfiliados, combos, contasMatrizes, pacotes, usuarios } from "../database/schema";
+import { aplicativos, bannersAfiliados, cobrancasPix, combos, contasMatrizes, faturas, pacotes, usuarios } from "../database/schema";
+import { ORPCError } from "@orpc/server";
 
 /**
  * Popula o banco com o catálogo inicial da operação.
@@ -208,14 +209,14 @@ export async function semearPoolJogos() {
 
 /** Clientes de demonstração (também usados para restaurar a base depois de migrações). */
 export const CLIENTES = [
-  { nome: "Diego Dias Silva", email: "diego.silva@email.com", pacote: "Turbo", statusPagamento: "ativo", ciclo: "mensal", valor: 49, proximaCobranca: "12/09/2026", clienteDesde: "12/03/2025", nivel: 1 },
-  { nome: "Camila Ribeiro", email: "camila.rib@email.com", pacote: "15 em 1", statusPagamento: "ativo", ciclo: "mensal", valor: 99.9, proximaCobranca: "20/09/2026", clienteDesde: "07/08/2025", nivel: 2 },
-  { nome: "Lucas Ferraz", email: "lucas.ferraz@email.com", pacote: "Pacote 03", statusPagamento: "pendente", ciclo: "mensal", valor: 34.9, proximaCobranca: "09/08/2026", clienteDesde: "09/12/2025", nivel: 3 },
-  { nome: "Juliana Prado", email: "ju.prado@email.com", pacote: "Pacote 03", statusPagamento: "ativo", ciclo: "mensal", valor: 41.5, proximaCobranca: "28/08/2026", clienteDesde: "28/02/2026", nivel: 3 },
-  { nome: "Rafael Monteiro", email: "rafa.monteiro@email.com", pacote: "Turbo", statusPagamento: "ativo", ciclo: "anual", valor: 470.4, proximaCobranca: "02/02/2027", clienteDesde: "02/02/2024", nivel: 3 },
-  { nome: "Beatriz Aguiar", email: "bia.aguiar@email.com", pacote: "15 em 1", statusPagamento: "ativo", ciclo: "anual", valor: 958.8, proximaCobranca: "17/11/2026", clienteDesde: "17/11/2025", nivel: 1 },
-  { nome: "Marcos Tavares", email: "marcos.tv@email.com", pacote: "Pacote 03", statusPagamento: "atrasado", ciclo: "mensal", valor: 34.9, proximaCobranca: "26/07/2026", clienteDesde: "26/01/2026", nivel: 2 },
-  { nome: "Fernanda Lopes", email: "fer.lopes@email.com", pacote: "Turbo", statusPagamento: "pendente", ciclo: "mensal", valor: 49, proximaCobranca: "10/08/2026", clienteDesde: "10/04/2026", nivel: 3 },
+  { nome: "Diego Dias Silva", email: "diego.silva@email.com", pacote: "Turbo", statusPagamento: "ativo", ciclo: "mensal", valor: 49, proximaCobranca: "12/09/2026", clienteDesde: "2025-03-12", nivel: 1 },
+  { nome: "Camila Ribeiro", email: "camila.rib@email.com", pacote: "15 em 1", statusPagamento: "ativo", ciclo: "mensal", valor: 99.9, proximaCobranca: "20/09/2026", clienteDesde: "2025-08-07", nivel: 2 },
+  { nome: "Lucas Ferraz", email: "lucas.ferraz@email.com", pacote: "Pacote 03", statusPagamento: "pendente", ciclo: "mensal", valor: 34.9, proximaCobranca: "09/08/2026", clienteDesde: "2025-12-09", nivel: 3 },
+  { nome: "Juliana Prado", email: "ju.prado@email.com", pacote: "Pacote 03", statusPagamento: "ativo", ciclo: "mensal", valor: 41.5, proximaCobranca: "28/08/2026", clienteDesde: "2026-02-28", nivel: 3 },
+  { nome: "Rafael Monteiro", email: "rafa.monteiro@email.com", pacote: "Turbo", statusPagamento: "ativo", ciclo: "anual", valor: 470.4, proximaCobranca: "02/02/2027", clienteDesde: "2024-02-02", nivel: 3 },
+  { nome: "Beatriz Aguiar", email: "bia.aguiar@email.com", pacote: "15 em 1", statusPagamento: "ativo", ciclo: "anual", valor: 958.8, proximaCobranca: "17/11/2026", clienteDesde: "2025-11-17", nivel: 1 },
+  { nome: "Marcos Tavares", email: "marcos.tv@email.com", pacote: "Pacote 03", statusPagamento: "atrasado", ciclo: "mensal", valor: 34.9, proximaCobranca: "26/07/2026", clienteDesde: "2026-01-26", nivel: 2 },
+  { nome: "Fernanda Lopes", email: "fer.lopes@email.com", pacote: "Turbo", statusPagamento: "pendente", ciclo: "mensal", valor: 49, proximaCobranca: "10/08/2026", clienteDesde: "2026-04-10", nivel: 3 },
 ];
 
 const BANNERS_AFILIADOS = [
@@ -249,10 +250,60 @@ async function contar() {
 }
 
 /**
+ * Conta indícios de operação real no banco: cliente com pagamento em dia,
+ * fatura paga ou Pix confirmado. Usado como trava do seed destrutivo.
+ */
+export async function contarDadosReais() {
+  const [a] = await db
+    .select({ n: sql<number>`count(*)` })
+    .from(usuarios)
+    .where(eq(usuarios.statusPagamento, "ativo"));
+  const [f] = await db
+    .select({ n: sql<number>`count(*)` })
+    .from(faturas)
+    .where(eq(faturas.status, "pago"));
+  const [p] = await db
+    .select({ n: sql<number>`count(*)` })
+    .from(cobrancasPix)
+    .where(eq(cobrancasPix.status, "pago"));
+  const clientesAtivos = Number(a?.n ?? 0);
+  const faturasPagas = Number(f?.n ?? 0);
+  const pixPagos = Number(p?.n ?? 0);
+  return {
+    clientesAtivos,
+    faturasPagas,
+    pixPagos,
+    total: clientesAtivos + faturasPagas + pixPagos,
+  };
+}
+
+/** Mensagem única da trava, usada pela procedure e pelo script de linha de comando. */
+function mensagemTrava(reais: Awaited<ReturnType<typeof contarDadosReais>>) {
+  return [
+    "Seed destrutivo bloqueado: o banco tem dados reais de operação.",
+    `Encontrados ${reais.clientesAtivos} cliente(s) com pagamento ativo, ${reais.faturasPagas} fatura(s) paga(s) e ${reais.pixPagos} Pix confirmado(s).`,
+    "O modo force apaga TODOS os usuários, contas matrizes e pacotes — foi assim que a base de clientes se perdeu antes.",
+    "Se você realmente quer recriar a base de demonstração: rode `bun run db:backup` e depois `bun run seed -- force --confirmo-apagar-tudo`.",
+  ].join(" ");
+}
+
+/**
  * Executa o seed. Compartilhado entre a procedure `seed.run` (admin) e o
  * script `bun scripts/seed.ts`, usado no bootstrap de um banco novo.
+ *
+ * `force` apaga os dados existentes. Quando o banco tem sinal de operação real,
+ * a execução só passa com `confirmarApagarTudo: true` (não exposto na UI de admin).
  */
-export async function executarSeed({ force = false }: { force?: boolean } = {}) {
+export async function executarSeed({
+  force = false,
+  confirmarApagarTudo = false,
+}: { force?: boolean; confirmarApagarTudo?: boolean } = {}) {
+  if (force && !confirmarApagarTudo) {
+    const reais = await contarDadosReais();
+    if (reais.total > 0) {
+      throw new ORPCError("CONFLICT", { message: mensagemTrava(reais), data: reais });
+    }
+  }
   const antes = await contar();
   // catálogo de apps é sincronizado sempre — preço de tabela muda com o tempo
   await semearAplicativos();
@@ -301,8 +352,9 @@ export async function executarSeed({ force = false }: { force?: boolean } = {}) 
 }
 
 export const seed = {
-  status: adminOnly.handler(() => contar()),
+  status: adminOnly.handler(async () => ({ ...(await contar()), dadosReais: await contarDadosReais() })),
 
+  // a UI nunca envia `confirmarApagarTudo`: force com dados reais sempre falha aqui.
   run: adminOnly
     .input(z.object({ force: z.boolean().default(false) }).optional())
     .handler(({ input }) => executarSeed({ force: input?.force ?? false })),

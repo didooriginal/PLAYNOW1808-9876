@@ -11,7 +11,7 @@
  * como voltar atrás. Rode antes de qualquer seed, migração ou deploy.
  */
 import { createClient } from "@libsql/client";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const url = process.env.DATABASE_URL;
@@ -50,5 +50,15 @@ writeFileSync(
   JSON.stringify({ criadoEm: new Date().toISOString(), tabelas: dump }, null, 2),
 );
 
+/* RETENÇÃO: mantém os 14 dumps mais recentes (~2 semanas de backup diário). */
+const MANTER = 14;
+const antigos = readdirSync(pasta)
+  .filter((f) => f.startsWith("backup-") && f.endsWith(".json"))
+  .sort()
+  .reverse()
+  .slice(MANTER);
+for (const f of antigos) rmSync(join(pasta, f));
+
 console.log(`\nBackup salvo: ${arquivo}`);
+if (antigos.length) console.log(`${antigos.length} backup(s) antigo(s) removido(s) (retenção: ${MANTER})`);
 console.log(`${tabelas.length} tabelas · ${total} linhas`);
