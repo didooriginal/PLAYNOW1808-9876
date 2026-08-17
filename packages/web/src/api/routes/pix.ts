@@ -2,7 +2,7 @@ import { z } from "zod";
 import { and, desc, eq } from "drizzle-orm";
 import { ORPCError } from "@orpc/server";
 import { adminOnly, authed } from "../middleware/auth";
-import { notificar } from "./notificacoes";
+import { notificar, resolverAlertasDeCobranca } from "./notificacoes";
 import { lerParametros } from "../lib/config";
 import { db } from "../database";
 import { cobrancasPix, faturas, usuarios } from "../database/schema";
@@ -260,6 +260,9 @@ export async function confirmarPagamento(
     .update(usuarios)
     .set({ statusPagamento: "ativo" })
     .where(eq(usuarios.id, cobranca.clienteId));
+
+  // a causa acabou: alertas de atraso/vencimento deste cliente saem da central
+  await resolverAlertasDeCobranca(cobranca.clienteId);
 
   // pagamento de fatura simples: empurra o vencimento para o próximo ciclo,
   // senão o cliente pago continuaria aparecendo como atrasado

@@ -17,7 +17,7 @@ import {
   pacotes,
   usuarios,
 } from "../database/schema";
-import { notificar } from "../routes/notificacoes";
+import { notificar, resolverAlertasSemVaga } from "../routes/notificacoes";
 import { linkWhats, numeroAdmin } from "./whats";
 import { resolverServico } from "./planos";
 
@@ -106,6 +106,61 @@ export async function garantirAlocacao(
     .returning();
   await sincronizarVagas(livre.id);
   return { alocacao: row ?? null, motivo: row ? "alocado" : "sem_vaga" };
+}
+
+export type ContaAnterior = { id: number; rotulo: string; servico: string };
+
+/**
+ * Libera as alocações ATIVAS do cliente para o mesmo serviço que estejam em
+ * OUTRA conta matriz.
+ *
+ * Por que existe: o admin podia alocar o mesmo cliente em duas contas do
+ * mesmo app (duas contas Disney, por exemplo). A alocação antiga continuava
+ * ativa, então a vaga da conta velha ficava presa (vaga fantasma) e a
+ * ocupação exibida no estoque ficava errada. Um cliente tem no máximo UMA
+ * vaga ativa por serviço.
+ *
+ * Devolve as contas de onde ele saiu, para a UI conseguir avisar "movido de X".
+ */
+export async function liberarAlocacoesDoServico(
+  clienteId: number,
+  servico: string,
+  manterContaId: number,
+): Promise<ContaAnterior[]> {
+  const ativas = await db
+    .select({
+      id: alocacoes.id,
+      contaId: alocacoes.contaId,
+      rotulo: contasMatrizes.rotulo,
+    })
+    .from(alocacoes)
+    .innerJoin(contasMatrizes, eq(alocacoes.contaId, contasMatrizes.id))
+    .where(
+      and(
+        eq(alocacoes.clienteId, clienteId),
+        eq(alocacoes.servico, servico),
+        eq(alocacoes.status, "ativo"),
+      ),
+    );
+
+  const antigas = ativas.filter((a) => a.contaId !== manterContaId);
+  if (!antigas.length) return [];
+
+  await db
+    .update(alocacoes)
+    .set({ status: "liberado", motivo: "troca_de_conta", liberadoEm: new Date() })
+    .where(
+      inArray(
+        alocacoes.id,
+        antigas.map((a) => a.id),
+      ),
+    );
+
+  for (const conta of new Set(antigas.map((a) => a.contaId))) {
+    await sincronizarVagas(conta);
+  }
+
+  return antigas.map((a) => ({ id: a.contaId, rotulo: a.rotulo, servico }));
 }
 
 export type OrigemAssinatura = "pacote" | "combo" | "avulso" | "premio";
@@ -241,7 +296,11 @@ export async function entrarNaFila(clienteId: number, servico: string, motivo: s
   return row ?? null;
 }
 
-/** Tira o cliente da fila quando a vaga finalmente saiu. */
+/**
+ * Tira o cliente da fila quando a vaga finalmente saiu.
+ * Como a causa acabou, o alerta crítico de "sem vaga" também é encerrado —
+ * senão o admin continuaria vendo na central um problema já resolvido.
+ */
 export async function sairDaFila(clienteId: number, servico: string) {
   await db
     .update(filaVagas)
@@ -253,6 +312,7 @@ export async function sairDaFila(clienteId: number, servico: string) {
         eq(filaVagas.status, "aguardando"),
       ),
     );
+  await resolverAlertasSemVaga(clienteId, servico);
 }
 
 /** Alerta crítico no painel + link de WhatsApp pronto para o admin. */

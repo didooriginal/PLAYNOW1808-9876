@@ -231,6 +231,10 @@ export const AJUDA: Record<string, string> = {
   "comissoes.antifraude": "Indicações vindas do mesmo IP ou dispositivo do afiliado ficam retidas aqui até você liberar.",
   "saude.fila":
     "Clientes que pagaram mas ficaram sem vaga — normalmente depois de repor ou desligar uma matriz. Assim que uma vaga abre no serviço, o sistema aloca sozinho; o WhatsApp serve para avisar antes disso.",
+  "saude.resolverFila":
+    "Tenta alocar o cliente agora e tira ele da fila. Se não houver vaga livre, o item continua aqui e o motivo aparece embaixo.",
+  "saude.cancelarFila":
+    "Fecha o pedido sem alocar — use quando o cliente desistiu, pediu errado ou o item está duplicado.",
   "saude.estoquePorServico": "Ocupação das vagas por serviço. Serviço perto de 100% precisa de conta matriz nova antes da próxima venda.",
   "saude.contasFalhas": "Contas que acumularam falhas de login. Passando do limite dos parâmetros, elas param de receber cliente novo.",
   "saude.ultimasFalhas": "Últimas falhas relatadas por clientes ou pela varredura automática, com data e conta envolvida.",
@@ -262,7 +266,12 @@ export const AJUDA: Record<string, string> = {
     "Roda a checagem de vencimentos, saldos e ocupação agora, sem esperar a rotina automática.",
   "alertas.marcarTodas":
     "Marca toda a fila como lida. O histórico continua guardado, só sai do contador.",
-  "alertas.marcarLida": "Marca este alerta como resolvido e tira do contador de pendências.",
+  "alertas.marcarLida": "Marca este alerta como lido e tira do contador de pendências.",
+  "alertas.resolver":
+    "Encerra o alerta: o problema acabou. Ele sai da fila na hora. Alertas de cobrança e de fila de vaga também se encerram sozinhos quando o cliente paga ou consegue a vaga.",
+  "alertas.verResolvidos":
+    "Mostra também os alertas já encerrados, para conferir o histórico ou reabrir algum fechado por engano.",
+  "alertas.reabrir": "Devolve o alerta encerrado para a fila de pendências.",
 
   /* ---------------- recuperação (winback) ---------------- */
   "winback.pendentes": "Clientes inativos com oferta pronta que ainda não foi enviada.",

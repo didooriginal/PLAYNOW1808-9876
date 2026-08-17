@@ -3,10 +3,10 @@ import { orpc } from "../lib/api";
 
 /** CENTRAL DE ALERTAS — fila do admin e avisos do cliente */
 
-export function useAlertasAdmin(apenasNaoLidas = false) {
+export function useAlertasAdmin(apenasNaoLidas = false, incluirResolvidos = false) {
   return useQuery(
     orpc.notificacoes.listar.queryOptions({
-      input: { apenasNaoLidas },
+      input: { apenasNaoLidas, incluirResolvidos },
       staleTime: 15_000,
       refetchInterval: 30_000,
     }),
@@ -32,6 +32,12 @@ export function useMarcarLida() {
 export function useMarcarTodasLidas() {
   const invalidar = useInvalidarAlertas();
   return useMutation(orpc.notificacoes.marcarTodas.mutationOptions({ onSuccess: invalidar }));
+}
+
+/** Botao "resolvido": encerra (ou reabre) um alerta da fila do admin. */
+export function useResolverAlerta() {
+  const invalidar = useInvalidarAlertas();
+  return useMutation(orpc.notificacoes.resolver.mutationOptions({ onSuccess: invalidar }));
 }
 
 export function useVarrerVencimentos() {

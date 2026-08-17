@@ -634,6 +634,14 @@ export const notificacoes = sqliteTable(
     /** chave de deduplicacao do gatilho */
     chave: text("chave").notNull(),
     lida: integer("lida", { mode: "boolean" }).notNull().default(false),
+    /**
+     * Quando o alerta deixou de ser um problema. "Lida" só diz que o admin
+     * viu; "resolvido" tira o item da fila. Preenchido automaticamente quando
+     * a causa some (cliente pagou, vaga apareceu) ou pelo botão do painel.
+     */
+    resolvidoEm: integer("resolvido_em", { mode: "timestamp" }),
+    /** auto | manual — quem encerrou o alerta */
+    resolvidoPor: text("resolvido_por"),
     criadoEm: integer("criado_em", { mode: "timestamp" })
       .notNull()
       .$defaultFn(() => new Date()),

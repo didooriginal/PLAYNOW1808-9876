@@ -4,7 +4,13 @@ import { ORPCError } from "@orpc/server";
 import { adminOnly } from "../middleware/auth";
 import { db } from "../database";
 import { alocacoes, contasMatrizes, filaVagas, usuarios } from "../database/schema";
-import { atenderFila, realocarClientes, sincronizarVagas } from "../lib/acessos";
+import {
+  atenderFila,
+  garantirAlocacao,
+  realocarClientes,
+  sincronizarVagas,
+} from "../lib/acessos";
+import { resolverAlertasSemVaga } from "./notificacoes";
 import { linkWhats } from "../lib/whats";
 
 /** contagem de vagas realmente ocupadas (alocações ativas) */
@@ -196,6 +202,46 @@ export const contas = {
       ),
     }));
   }),
+
+  /**
+   * Botao "Resolvido" da fila de vagas (aba Saude & Estoque).
+   *
+   * `atendido` tenta alocar o cliente na hora: se conseguiu, tira da fila e
+   * encerra o alerta critico de "sem vaga". Se nao houver vaga, o item CONTINUA
+   * na fila e devolvemos o motivo, para o admin nao achar que resolveu.
+   * `cancelado` fecha o item na marra (desistencia, duplicidade, engano).
+   */
+  resolverFila: adminOnly
+    .input(
+      z.object({
+        id: z.number().int(),
+        acao: z.enum(["atendido", "cancelado"]).default("atendido"),
+      }),
+    )
+    .handler(async ({ input }) => {
+      const [item] = await db
+        .select()
+        .from(filaVagas)
+        .where(eq(filaVagas.id, input.id));
+      if (!item) throw new ORPCError("NOT_FOUND", { message: "Item da fila não encontrado." });
+      if (item.status !== "aguardando")
+        return { ok: true, acao: item.status, motivo: "ja_resolvido" as const };
+
+      if (input.acao === "atendido") {
+        const r = await garantirAlocacao(item.clienteId, item.servico);
+        if (!r.alocacao) {
+          return { ok: false, acao: "aguardando" as const, motivo: r.motivo };
+        }
+      }
+
+      await db
+        .update(filaVagas)
+        .set({ status: input.acao, atendidoEm: new Date() })
+        .where(eq(filaVagas.id, item.id));
+      await resolverAlertasSemVaga(item.clienteId, item.servico);
+
+      return { ok: true, acao: input.acao, motivo: input.acao };
+    }),
 
   /** recalcula `vagasOcupadas` de todas as contas a partir das alocações ativas */
   sincronizar: adminOnly.handler(async () => {

@@ -15,6 +15,7 @@ import {
   direitosDoCliente,
   encerrarAssinaturaApp,
   garantirAlocacao,
+  liberarAlocacoesDoServico,
   registrarAssinaturaApp,
   sincronizarAcessosDoCliente,
   sincronizarVagas,
@@ -122,12 +123,24 @@ export const alocacoes = {
           message: "Conta lotada — libere uma vaga ou aumente o total",
         });
 
+      /**
+       * Um cliente só pode ter UMA vaga ativa por serviço. Antes desta trava,
+       * alocar em outra conta do mesmo app deixava a alocação antiga ativa e a
+       * vaga da conta velha ficava presa. Aqui a antiga é liberada como
+       * `troca_de_conta` e as duas contas são resincronizadas.
+       */
+      const anteriores = await liberarAlocacoesDoServico(
+        input.clienteId,
+        conta.servico,
+        conta.id,
+      );
+
       const [row] = await db
         .insert(tabelaAlocacoes)
         .values({ clienteId: input.clienteId, contaId: conta.id, servico: conta.servico })
         .returning();
       await sincronizarVagas(conta.id);
-      return row;
+      return { ...row!, trocou: anteriores.length > 0, contasAnteriores: anteriores };
     }),
 
   /**

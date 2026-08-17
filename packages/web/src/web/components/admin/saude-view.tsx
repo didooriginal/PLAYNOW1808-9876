@@ -1,7 +1,8 @@
-import { Activity, ArrowRightLeft, Clock3, HeartPulse, Loader2, MessageCircle, PackageSearch, RefreshCw, ShieldAlert } from "lucide-react";
+import { useState } from "react";
+import { Activity, ArrowRightLeft, Check, Clock3, HeartPulse, Loader2, MessageCircle, PackageSearch, RefreshCw, ShieldAlert, X } from "lucide-react";
 import { AppIcon } from "../app-icon";
 import { GlassCard, NeonButton, Pill, ProgressBar } from "../ui/kit";
-import { Ajuda } from "../ui/tooltip";
+import { Ajuda, Tooltip } from "../ui/tooltip";
 import {
   useAlternarReserva,
   useFalhasRecentes,
@@ -10,7 +11,7 @@ import {
   useRemanejarConta,
   useVarrerSaude,
 } from "../../queries/saude";
-import { useFilaVagas } from "../../queries/contas";
+import { useFilaVagas, useResolverFila } from "../../queries/contas";
 
 /**
  * SAÚDE DAS CONTAS + ESTOQUE INTELIGENTE.
@@ -35,6 +36,33 @@ export function SaudeView() {
   const liberar = useLiberarEntrada();
   const remanejar = useRemanejarConta();
   const fila = useFilaVagas();
+  const resolverFila = useResolverFila();
+  // itens que sumiram da tela no clique + recado de quando nao deu pra alocar
+  const [encerrando, setEncerrando] = useState<number[]>([]);
+  const [recado, setRecado] = useState<Record<number, string>>({});
+
+  const MOTIVO_FALHA: Record<string, string> = {
+    sem_vaga: "Ainda não há vaga livre nesse app — abra uma vaga ou cadastre outra conta matriz.",
+    sem_conta: "Nenhuma conta matriz cadastrada para esse app.",
+  };
+
+  function resolverItem(id: number, acao: "atendido" | "cancelado") {
+    setEncerrando((v) => [...v, id]);
+    setRecado((r) => ({ ...r, [id]: "" }));
+    resolverFila.mutate(
+      { id, acao },
+      {
+        onSuccess: (res) => {
+          if (!res.ok)
+            setRecado((r) => ({
+              ...r,
+              [id]: MOTIVO_FALHA[res.motivo] ?? "Não foi possível alocar agora.",
+            }));
+        },
+        onSettled: () => setEncerrando((v) => v.filter((x) => x !== id)),
+      },
+    );
+  }
 
   if (isLoading) return <p className="font-sans text-sm text-white/40">Analisando as contas…</p>;
 
@@ -81,7 +109,7 @@ export function SaudeView() {
         <span className="font-display text-sm font-bold text-white">Fila de espera por vaga</span>
         <Ajuda ajuda="saude.fila" lado="bottom" />
         <div className="mt-4 space-y-2">
-          {(fila.data ?? []).map((f) => (
+          {(fila.data ?? []).filter((f) => !encerrando.includes(f.id)).map((f) => (
             <div
               key={f.id}
               data-testid={`fila-vaga-${f.id}`}
@@ -116,7 +144,33 @@ export function SaudeView() {
                     WhatsApp
                   </a>
                 )}
+                <Tooltip texto="saude.resolverFila" titulo="Marcar como resolvido">
+                  <button
+                    type="button"
+                    data-testid={`resolver-fila-${f.id}`}
+                    onClick={() => resolverItem(f.id, "atendido")}
+                    aria-label={`Marcar vaga de ${f.nome} como resolvida`}
+                    className="flex items-center gap-1.5 rounded-lg border border-emerald-400/25 bg-emerald-400/10 px-3 py-1.5 font-sans text-[11px] text-emerald-300 transition-colors hover:border-emerald-400/60"
+                  >
+                    <Check className="size-3.5" />
+                    Resolvido
+                  </button>
+                </Tooltip>
+                <Tooltip texto="saude.cancelarFila" titulo="Cancelar pedido">
+                  <button
+                    type="button"
+                    data-testid={`cancelar-fila-${f.id}`}
+                    onClick={() => resolverItem(f.id, "cancelado")}
+                    aria-label={`Cancelar pedido de vaga de ${f.nome}`}
+                    className="flex size-8 items-center justify-center rounded-lg border border-white/12 text-white/45 transition-colors hover:border-neon-red/50 hover:text-neon-red"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </Tooltip>
               </div>
+              {recado[f.id] && (
+                <p className="w-full font-sans text-[11px] text-amber-300/90">{recado[f.id]}</p>
+              )}
             </div>
           ))}
           {!fila.data?.length && (

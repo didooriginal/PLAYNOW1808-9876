@@ -9,6 +9,7 @@ import {
   Loader2,
   RefreshCw,
   TriangleAlert,
+  Undo2,
 } from "lucide-react";
 import { GlassCard, NeonButton, Pill } from "../ui/kit";
 import { Ajuda, Tooltip } from "../ui/tooltip";
@@ -17,6 +18,7 @@ import {
   useAlertasAdmin,
   useMarcarLida,
   useMarcarTodasLidas,
+  useResolverAlerta,
   useVarrerVencimentos,
 } from "../../queries/notificacoes";
 
@@ -35,12 +37,24 @@ const ROTULO_TIPO: Record<string, string> = {
 
 export function AlertasView({ onIr }: { onIr?: (destino: string) => void }) {
   const [apenasNaoLidas, setApenasNaoLidas] = useState(false);
-  const { data, isLoading } = useAlertasAdmin(apenasNaoLidas);
+  const [verResolvidos, setVerResolvidos] = useState(false);
+  const [encerrando, setEncerrando] = useState<number[]>([]);
+  const { data, isLoading } = useAlertasAdmin(apenasNaoLidas, verResolvidos);
   const marcarLida = useMarcarLida();
   const marcarTodas = useMarcarTodasLidas();
+  const resolver = useResolverAlerta();
   const varrer = useVarrerVencimentos();
 
-  const itens = data?.itens ?? [];
+  // some da tela na hora do clique, sem esperar o refetch
+  function encerrar(id: number, reabrir = false) {
+    setEncerrando((v) => [...v, id]);
+    resolver.mutate(
+      { ids: [id], reabrir },
+      { onSettled: () => setEncerrando((v) => v.filter((x) => x !== id)) },
+    );
+  }
+
+  const itens = (data?.itens ?? []).filter((n) => !encerrando.includes(n.id));
   const naoLidas = data?.naoLidas ?? 0;
   const criticos = data?.criticos ?? 0;
 
@@ -80,6 +94,20 @@ export function AlertasView({ onIr }: { onIr?: (destino: string) => void }) {
           }`}
         >
           Somente não lidos
+        </button>
+        </Tooltip>
+        <Tooltip texto="alertas.verResolvidos" titulo="Ver encerrados">
+        <button
+          type="button"
+          data-testid="filtro-resolvidos"
+          onClick={() => setVerResolvidos((v) => !v)}
+          className={`rounded-xl border px-3.5 py-2 font-sans text-[12px] transition-colors ${
+            verResolvidos
+              ? "border-neon-cyan/55 bg-neon-cyan/12 text-white"
+              : "border-white/10 bg-white/[0.03] text-white/50 hover:border-white/25"
+          }`}
+        >
+          Ver encerrados
         </button>
         </Tooltip>
         <Tooltip texto="alertas.reavaliar" titulo="Reavaliar vencimentos">
@@ -135,7 +163,9 @@ export function AlertasView({ onIr }: { onIr?: (destino: string) => void }) {
             return (
               <li key={n.id}>
                 <GlassCard
-                  className={`flex items-start gap-3 p-4 ${n.lida ? "opacity-60" : ""}`}
+                  className={`flex items-start gap-3 p-4 ${
+                    n.resolvidoEm ? "opacity-45" : n.lida ? "opacity-60" : ""
+                  }`}
                 >
                   <span
                     className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl border"
@@ -152,8 +182,14 @@ export function AlertasView({ onIr }: { onIr?: (destino: string) => void }) {
                       <Pill accent={sev === "critico" ? "red" : sev === "alerta" ? "purple" : "cyan"}>
                         {ROTULO_TIPO[n.tipo] ?? n.tipo}
                       </Pill>
-                      {!n.lida && (
-                        <span className="size-1.5 rounded-full bg-neon-purple" aria-hidden />
+                      {n.resolvidoEm ? (
+                        <Pill accent="cyan">
+                          Encerrado{n.resolvidoPor === "auto" ? " automaticamente" : ""}
+                        </Pill>
+                      ) : (
+                        !n.lida && (
+                          <span className="size-1.5 rounded-full bg-neon-purple" aria-hidden />
+                        )
                       )}
                     </div>
                     {n.mensagem && (
@@ -178,18 +214,48 @@ export function AlertasView({ onIr }: { onIr?: (destino: string) => void }) {
                     </div>
                   </div>
 
-                  {!n.lida && (
-                    <Tooltip texto="alertas.marcarLida" titulo="Marcar como lido">
-                    <button
-                      type="button"
-                      onClick={() => marcarLida.mutate({ ids: [n.id] })}
-                      aria-label="Marcar como lido"
-                      className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-white/10 text-white/40 transition-colors hover:border-neon-purple/50 hover:text-neon-purple"
-                    >
-                      <Check className="size-3.5" />
-                    </button>
-                    </Tooltip>
-                  )}
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    {n.resolvidoEm ? (
+                      <Tooltip texto="alertas.reabrir" titulo="Reabrir alerta">
+                        <button
+                          type="button"
+                          data-testid={`reabrir-alerta-${n.id}`}
+                          onClick={() => encerrar(n.id, true)}
+                          aria-label="Reabrir alerta"
+                          className="flex size-8 items-center justify-center rounded-lg border border-white/10 text-white/40 transition-colors hover:border-neon-cyan/50 hover:text-neon-cyan"
+                        >
+                          <Undo2 className="size-3.5" />
+                        </button>
+                      </Tooltip>
+                    ) : (
+                      <>
+                        {!n.lida && (
+                          <Tooltip texto="alertas.marcarLida" titulo="Marcar como lido">
+                            <button
+                              type="button"
+                              onClick={() => marcarLida.mutate({ ids: [n.id] })}
+                              aria-label="Marcar como lido"
+                              className="flex size-8 items-center justify-center rounded-lg border border-white/10 text-white/40 transition-colors hover:border-neon-purple/50 hover:text-neon-purple"
+                            >
+                              <Check className="size-3.5" />
+                            </button>
+                          </Tooltip>
+                        )}
+                        <Tooltip texto="alertas.resolver" titulo="Marcar como resolvido">
+                          <button
+                            type="button"
+                            data-testid={`resolver-alerta-${n.id}`}
+                            onClick={() => encerrar(n.id)}
+                            aria-label="Marcar alerta como resolvido"
+                            className="flex h-8 items-center gap-1.5 rounded-lg border border-emerald-400/25 bg-emerald-400/10 px-2.5 font-sans text-[11px] text-emerald-300 transition-colors hover:border-emerald-400/60"
+                          >
+                            <CheckCheck className="size-3.5" />
+                            Resolvido
+                          </button>
+                        </Tooltip>
+                      </>
+                    )}
+                  </div>
                 </GlassCard>
               </li>
             );

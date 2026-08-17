@@ -93,6 +93,8 @@ function ClientesVinculados({
 }) {
   const [alocando, setAlocando] = useState(false);
   const [escolhido, setEscolhido] = useState<number | "">("");
+  /** aviso de troca: o cliente saiu de outra conta do mesmo app */
+  const [movidoDe, setMovidoDe] = useState<string[]>([]);
   const disponiveis = useClientesDisponiveis(conta.id, alocando);
   const alocar = useAlocarCliente();
   const liberar = useLiberarVaga();
@@ -180,15 +182,21 @@ function ClientesVinculados({
               accent="cyan"
               size="sm"
               className="flex-1"
+              data-testid={`confirmar-vinculo-${conta.id}`}
               disabled={!escolhido || alocar.isPending}
               onClick={() =>
                 escolhido &&
                 alocar.mutate(
                   { clienteId: Number(escolhido), contaId: conta.id },
                   {
-                    onSuccess: () => {
+                    onSuccess: (res) => {
                       setEscolhido("");
                       setAlocando(false);
+                      setMovidoDe(
+                        res?.trocou
+                          ? res.contasAnteriores.map((c) => c.rotulo)
+                          : [],
+                      );
                     },
                   },
                 )
@@ -217,12 +225,33 @@ function ClientesVinculados({
           variant="outline"
           size="sm"
           className="mt-3 w-full"
+          data-testid={`vincular-cliente-${conta.id}`}
           disabled={livres <= 0}
           onClick={() => setAlocando(true)}
         >
           <UserPlus className="size-3.5" />
           {livres > 0 ? "Vincular cliente" : "Sem vagas livres"}
         </NeonButton>
+      )}
+
+      {movidoDe.length > 0 && (
+        <div
+          data-testid={`aviso-movido-${conta.id}`}
+          className="mt-3 flex items-start justify-between gap-2 rounded-xl border border-amber-400/30 bg-amber-400/5 px-3 py-2"
+        >
+          <p className="font-sans text-[11px] leading-relaxed text-amber-200/80">
+            Movido de <span className="font-semibold">{movidoDe.join(", ")}</span> — a vaga
+            antiga do mesmo app foi liberada automaticamente.
+          </p>
+          <button
+            type="button"
+            aria-label="Fechar aviso de troca de conta"
+            onClick={() => setMovidoDe([])}
+            className="text-amber-200/50 hover:text-amber-200"
+          >
+            <X className="size-3" />
+          </button>
+        </div>
       )}
     </div>
   );
@@ -494,6 +523,7 @@ export function ContaMatrizCard({
 
       <button
         type="button"
+        data-testid={`abrir-clientes-${acc.id}`}
         onClick={() => setAberto((v) => !v)}
         className="relative mt-4 flex items-center justify-between rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2 font-sans text-[11px] text-white/50 transition-colors hover:text-white"
       >

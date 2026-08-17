@@ -63,3 +63,17 @@ export function useAlternarContaAtiva() {
 export function useFilaVagas() {
   return useQuery(orpc.contas.fila.queryOptions({ staleTime: 15_000 }));
 }
+
+/** botao "Resolvido"/"Cancelar" da fila de vagas */
+export function useResolverFila() {
+  const invalidar = useInvalidarContas();
+  const qc = useQueryClient();
+  return useMutation(
+    orpc.contas.resolverFila.mutationOptions({
+      onSuccess: () => {
+        invalidar();
+        qc.invalidateQueries({ queryKey: orpc.notificacoes.key() });
+      },
+    }),
+  );
+}

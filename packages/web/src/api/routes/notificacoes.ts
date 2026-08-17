@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, like, or, sql } from "drizzle-orm";
 import { adminOnly, authed } from "../middleware/auth";
 import { db } from "../database";
 import { notificacoes as tabelaNotificacoes, usuarios } from "../database/schema";
@@ -64,6 +64,53 @@ export async function notificar(alerta: NovoAlerta) {
 }
 
 /**
+ * RESOLUCAO DE ALERTAS
+ * ------------------------------------------------------------------
+ * "Lida" e "resolvido" sao coisas diferentes: lida = o admin viu; resolvido =
+ * o problema acabou. So o resolvido tira o item da fila. A resolucao
+ * automatica usa o mesmo prefixo de `chave` que o gatilho gravou, entao nao
+ * precisa de cron: quem emite tambem sabe encerrar.
+ */
+export async function resolverPorPrefixo(prefixos: string[], origem: "auto" | "manual" = "auto") {
+  const alvos = prefixos.filter(Boolean);
+  if (!alvos.length) return 0;
+  try {
+    const resultado = await db
+      .update(tabelaNotificacoes)
+      .set({ resolvidoEm: new Date(), resolvidoPor: origem, lida: true })
+      .where(
+        and(
+          sql`${tabelaNotificacoes.resolvidoEm} is null`,
+          or(...alvos.map((p) => like(tabelaNotificacoes.chave, `${p}%`))),
+        ),
+      )
+      .returning({ id: tabelaNotificacoes.id });
+    return resultado.length;
+  } catch {
+    // encerrar alerta nunca pode derrubar o fluxo que chamou (webhook, pagamento...)
+    return 0;
+  }
+}
+
+/** encerra os alertas de cobranca de um cliente — usado quando o pagamento entra */
+export function resolverAlertasDeCobranca(clienteId: number) {
+  return resolverPorPrefixo([
+    `admin-atraso:${clienteId}:`,
+    `admin-venc:${clienteId}:`,
+    `atraso:${clienteId}:`,
+    `venc0:${clienteId}:`,
+    `venc3:${clienteId}:`,
+  ]);
+}
+
+/** encerra os alertas "sem vaga" de um cliente (todos os apps ou um so) */
+export function resolverAlertasSemVaga(clienteId: number, servico?: string) {
+  return resolverPorPrefixo([
+    servico ? `sem-vaga:${clienteId}:${servico}:` : `sem-vaga:${clienteId}:`,
+  ]);
+}
+
+/**
  * Webhook de saida opcional (Slack, n8n, WhatsApp API, Zapier...).
  * Configure `ALERTAS_WEBHOOK_URL` no .env para receber os alertas do admin
  * fora do painel. Falha de rede nunca quebra a operacao.
@@ -114,6 +161,15 @@ export async function varrerVencimentos(forcar = false) {
   for (const cliente of clientes) {
     const dias = diasAteVencimento(cliente.proximaCobranca);
     if (dias === null) continue;
+
+    /**
+     * AUTO-RESOLUCAO: o cliente pagou e o vencimento foi empurrado para longe,
+     * entao os alertas de atraso/vencimento daquele ciclo nao sao mais um
+     * problema — somem da fila sem o admin precisar clicar em nada.
+     */
+    if (cliente.statusPagamento === "ativo" && dias > DIAS_AVISO_PREVIO) {
+      await resolverAlertasDeCobranca(cliente.id);
+    }
 
     const alvo = statusEsperado(cliente.proximaCobranca, cliente.statusPagamento);
     if (alvo !== cliente.statusPagamento) {
@@ -198,15 +254,21 @@ export const notificacoes = {
   listar: adminOnly
     .input(
       z
-        .object({ apenasNaoLidas: z.boolean().default(false) })
-        .default({ apenasNaoLidas: false }),
+        .object({
+          apenasNaoLidas: z.boolean().default(false),
+          /** por padrao a fila mostra so o que ainda e problema */
+          incluirResolvidos: z.boolean().default(false),
+        })
+        .default({ apenasNaoLidas: false, incluirResolvidos: false }),
     )
     .handler(async ({ input }) => {
       await varrerVencimentos();
 
-      const filtro = input.apenasNaoLidas
-        ? and(eq(tabelaNotificacoes.escopo, "admin"), eq(tabelaNotificacoes.lida, false))
-        : eq(tabelaNotificacoes.escopo, "admin");
+      const condicoes = [eq(tabelaNotificacoes.escopo, "admin")];
+      if (input.apenasNaoLidas) condicoes.push(eq(tabelaNotificacoes.lida, false));
+      if (!input.incluirResolvidos)
+        condicoes.push(sql`${tabelaNotificacoes.resolvidoEm} is null`);
+      const filtro = and(...condicoes);
 
       const itens = await db
         .select({
@@ -217,6 +279,8 @@ export const notificacoes = {
           mensagem: tabelaNotificacoes.mensagem,
           destino: tabelaNotificacoes.destino,
           lida: tabelaNotificacoes.lida,
+          resolvidoEm: tabelaNotificacoes.resolvidoEm,
+          resolvidoPor: tabelaNotificacoes.resolvidoPor,
           criadoEm: tabelaNotificacoes.criadoEm,
           clienteId: tabelaNotificacoes.clienteId,
           clienteNome: usuarios.nome,
@@ -233,9 +297,37 @@ export const notificacoes = {
           criticos: sql<number>`coalesce(sum(case when ${tabelaNotificacoes.lida} = 0 and ${tabelaNotificacoes.severidade} = 'critico' then 1 else 0 end), 0)`,
         })
         .from(tabelaNotificacoes)
-        .where(eq(tabelaNotificacoes.escopo, "admin"));
+        .where(
+          and(
+            eq(tabelaNotificacoes.escopo, "admin"),
+            sql`${tabelaNotificacoes.resolvidoEm} is null`,
+          ),
+        );
 
       return { itens, naoLidas: contagem?.naoLidas ?? 0, criticos: contagem?.criticos ?? 0 };
+    }),
+
+  /**
+   * Botao "resolvido" do painel: tira o alerta da fila na hora.
+   * `reabrir` desfaz, caso o admin encerre por engano.
+   */
+  resolver: adminOnly
+    .input(
+      z.object({
+        ids: z.array(z.number().int()).min(1),
+        reabrir: z.boolean().default(false),
+      }),
+    )
+    .handler(async ({ input }) => {
+      await db
+        .update(tabelaNotificacoes)
+        .set(
+          input.reabrir
+            ? { resolvidoEm: null, resolvidoPor: null }
+            : { resolvidoEm: new Date(), resolvidoPor: "manual", lida: true },
+        )
+        .where(inArray(tabelaNotificacoes.id, input.ids));
+      return { ok: true, total: input.ids.length };
     }),
 
   /** avisos do cliente logado */
