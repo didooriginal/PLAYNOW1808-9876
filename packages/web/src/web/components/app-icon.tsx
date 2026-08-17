@@ -35,6 +35,10 @@ const OFFICIAL_LOGOS = new Set<string>([
   "canva",
   "looke",
   "recordplus",
+  "telecine",
+  "premiere",
+  "brasilparalelo",
+  "unitv",
   // logos próprias da PLAYPLUSNOW — serviços da casa, sem marca de terceiro
   "iptv",
   "jogos",
