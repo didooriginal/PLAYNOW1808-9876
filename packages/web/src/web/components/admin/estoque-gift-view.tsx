@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   Trash2,
   Ticket,
+  X,
 } from "lucide-react";
 import { AppIcon } from "../app-icon";
 import { GlassCard, NeonButton, Pill } from "../ui/kit";
@@ -24,6 +25,7 @@ import {
   useRemoverGift,
   useResumoEstoqueGift,
   useRevelarGift,
+  useAlternarAppGift,
 } from "../../queries/estoque-gift";
 
 /**
@@ -367,6 +369,9 @@ export function EstoqueGiftView() {
   const provedores = resumo.data?.provedores ?? [];
   const totais = resumo.data?.totais;
   const catalogo = useMemo(() => resumo.data?.catalogo ?? [], [resumo.data]);
+  const disponiveis = resumo.data?.disponiveis ?? [];
+  const alternarApp = useAlternarAppGift();
+  const [adicionando, setAdicionando] = useState("");
 
   return (
     <div className="grid gap-5">
@@ -421,6 +426,50 @@ export function EstoqueGiftView() {
       <div className="grid gap-5 lg:grid-cols-[1fr_380px]">
         {/* saldo por provedor */}
         <div className="grid gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1 font-sans text-[11px] uppercase tracking-wider text-white/35">
+              Apps na tela
+              <Ajuda ajuda="gift.apps" />
+            </div>
+            <div className="ml-auto flex items-center gap-2">
+              <select
+                aria-label="Escolher aplicativo para adicionar ao estoque de gift card"
+                value={adicionando}
+                onChange={(e) => setAdicionando(e.target.value)}
+                className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 font-sans text-xs text-white focus:border-neon-cyan/50 focus:outline-none"
+              >
+                <option value="" className="bg-[#09090b]">
+                  Escolher aplicativo…
+                </option>
+                {disponiveis.map((a) => (
+                  <option key={a.slug} value={a.slug} className="bg-[#09090b]">
+                    {a.nome}
+                  </option>
+                ))}
+              </select>
+              <NeonButton
+                accent="cyan"
+                size="sm"
+                disabled={!adicionando || alternarApp.isPending}
+                onClick={() =>
+                  alternarApp.mutate(
+                    { slug: adicionando, ativo: true },
+                    { onSuccess: () => setAdicionando("") },
+                  )
+                }
+              >
+                {alternarApp.isPending ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <Plus className="size-3.5" />
+                )}
+                Adicionar app
+              </NeonButton>
+            </div>
+          </div>
+          {alternarApp.isError && (
+            <p className="font-sans text-xs text-neon-red">{alternarApp.error?.message}</p>
+          )}
           {resumo.isPending && (
             <GlassCard className="p-8 text-center">
               <Loader2 className="mx-auto size-5 animate-spin text-white/40" />
@@ -447,7 +496,6 @@ export function EstoqueGiftView() {
                 </div>
                 <div className="ml-auto text-right">
                   <div className="flex items-center justify-end gap-1.5 font-display text-xl font-extrabold text-neon-cyan">
-                    <Ajuda ajuda="gift.mesesFolga" />
                     {brl(p.disponivelValor)}
                   </div>
                   <div className="font-sans text-[11px] text-white/35">
@@ -459,6 +507,27 @@ export function EstoqueGiftView() {
                   </div>
                 </div>
               </button>
+              <div className="mt-2 flex items-center justify-end gap-2">
+                <Ajuda ajuda="gift.mesesFolga" />
+                <button
+                  type="button"
+                  aria-label={`Remover ${p.nome} do estoque de gift cards`}
+                  disabled={alternarApp.isPending}
+                  onClick={() => {
+                    if (
+                      confirm(
+                        `Remover ${p.nome} da tela de gift cards? Os códigos já usados continuam no histórico.`,
+                      )
+                    ) {
+                      alternarApp.mutate({ slug: p.provider, ativo: false });
+                    }
+                  }}
+                  className="rounded-lg border border-white/10 px-2.5 py-1 font-sans text-[11px] text-white/40 transition-colors hover:border-neon-red/40 hover:text-neon-red"
+                >
+                  <X className="mr-1 inline size-3" />
+                  Remover
+                </button>
+              </div>
             </GlassCard>
           ))}
         </div>

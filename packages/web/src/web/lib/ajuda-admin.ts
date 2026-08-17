@@ -105,6 +105,12 @@ export const AJUDA: Record<string, string> = {
   "secao.manual": "Guia operacional do painel: o que cada módulo faz e o que fazer em cada situação.",
 
   /* ---------------- contas matrizes ---------------- */
+  "estoque.filtroApp":
+    "Mostra só as matrizes de um aplicativo. Pega todas as variações dele (ex.: Globoplay comum, Premium e Premium + Telecine).",
+  "app.temGiftCard":
+    "Marque quando esse app aceita gift card. Ele passa a aparecer na tela de Estoque de gift cards mesmo sem nenhum código cadastrado.",
+  "gift.apps":
+    "Quais apps aparecem aqui. Use 'Adicionar app' para trazer um app novo e 'Remover' para tirar da tela — só é possível remover quem não tem código disponível.",
   "contas.servico": "Qual app essa conta matriz serve. Define o ícone, o gift card aceito e em quais pacotes a vaga pode ser usada.",
   "contas.rotulo": "Apelido interno da conta, só você vê. Use um padrão como 'Netflix — Matriz 09' para achar rápido na busca.",
   "contas.email": "E-mail de login da assinatura real no site do streaming. É por ele que o sistema identifica os códigos de verificação que chegam.",
@@ -113,6 +119,8 @@ export const AJUDA: Record<string, string> = {
   "contas.vencimento": "Data em que a assinatura renova e o valor é debitado. Alimenta o alerta de vencimento e a conta de saldo necessário.",
   "contas.custoMensal": "Quanto essa conta custa por mês para você. Base do lucro por vaga e do cálculo automático de saldo crítico.",
   "contas.regiao": "País/região da conta, quando o preço ou o catálogo mudam por região. Deixe em branco se não se aplica.",
+  "contas.observacao":
+    "Anotação interna sobre a matriz (ex.: perfil reservado, conta em teste). Só o ADM vê.",
   "contas.cartao": "Qual cartão ou gift card paga essa conta. Ajuda a saber onde recarregar quando o saldo cai.",
   "contas.saldo": "Saldo de gift card disponível nessa conta hoje. Você nunca digita esse número: ele é o resultado dos lançamentos do extrato.",
   "contas.folga": "Quantos meses o saldo atual cobre, dividindo o saldo pelo custo mensal. Abaixo de 1 mês, recarregue.",
@@ -207,6 +215,8 @@ export const AJUDA: Record<string, string> = {
 
   /* ---------------- futebol ao vivo (pool) ---------------- */
   "jogos.rotulo": "Apelido interno da conta no pool, para você diferenciar as contas na fila de liberação.",
+  "jogos.appPool":
+    "Qual app essa conta do pool usa (só para você se organizar). A conta continua sendo vendida como 'jogos' e não entra no estoque normal.",
   "jogos.servico": "Slug do serviço no catálogo. Mantenha 'jogos' para o adicional de futebol.",
   "jogos.email": "Login da conta usada nas liberações do adicional.",
   "jogos.senha": "Senha entregue ao cliente durante a janela de liberação. Troque quando desconfiar de vazamento.",

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, ne } from "drizzle-orm";
 import { ORPCError } from "@orpc/server";
 import { adminOnly } from "../middleware/auth";
 import { db } from "../database";
@@ -93,10 +93,18 @@ export const estoqueGift = {
     const nomes = new Map(apps.map((a) => [a.slug, a.nome]));
     const cores = new Map(apps.map((a) => [a.slug, a.cor]));
 
-    /** provedores que realmente importam: os que têm conta matriz ou estoque */
+    /**
+     * Quais provedores aparecem na tela:
+     *  - os marcados com `temGiftCard` (escolha explícita do admin);
+     *  - + os que ainda têm código vivo (`disponivel` ou `em_uso`), para
+     *    dinheiro parado nunca sumir de vista por causa de uma flag desligada.
+     * Histórico só de códigos já utilizados não segura o app na tela — senão o
+     * botão "Remover" não teria efeito nenhum. O catálogo inteiro também não
+     * entra: a maioria dos apps não vende gift card.
+     */
     const slugs = new Set<string>([
-      ...contas.map((c) => c.servico),
-      ...cards.map((c) => c.provider),
+      ...apps.filter((a) => a.temGiftCard).map((a) => a.slug),
+      ...cards.filter((c) => c.status !== "utilizado").map((c) => c.provider),
     ]);
 
     const provedores = [...slugs]
@@ -132,7 +140,13 @@ export const estoqueGift = {
     return {
       provedores,
       /** catálogo para o formulário de cadastro */
-      catalogo: apps.filter((a) => a.ativo).map((a) => ({ slug: a.slug, nome: a.nome })),
+      catalogo: apps
+        .filter((a) => a.ativo && (a.temGiftCard || slugs.has(a.slug)))
+        .map((a) => ({ slug: a.slug, nome: a.nome })),
+      /** apps que ainda não estão na tela — alimentam o botão "Adicionar app" */
+      disponiveis: apps
+        .filter((a) => a.ativo && !slugs.has(a.slug))
+        .map((a) => ({ slug: a.slug, nome: a.nome })),
       totais: {
         disponivelValor: centavos(
           cards.filter((c) => c.status === "disponivel").reduce((s, c) => s + c.value, 0),
@@ -146,6 +160,38 @@ export const estoqueGift = {
       },
     };
   }),
+
+  /**
+   * Liga/desliga um app na aba de gift cards.
+   * Desligar é só visual (a flag), mas quem ainda tem código `disponivel` não
+   * pode sumir da tela — o dinheiro ficaria invisível. Nesse caso recusamos.
+   */
+  alternarApp: adminOnly
+    .input(z.object({ slug: z.string().min(1), ativo: z.boolean() }))
+    .handler(async ({ input }) => {
+      const [app] = await db
+        .select()
+        .from(aplicativos)
+        .where(eq(aplicativos.slug, input.slug));
+      if (!app) throw new ORPCError("NOT_FOUND", { message: "Aplicativo não encontrado." });
+
+      if (!input.ativo) {
+        const restantes = await db
+          .select({ id: giftCards.id })
+          .from(giftCards)
+          .where(and(eq(giftCards.provider, input.slug), ne(giftCards.status, "utilizado")));
+        if (restantes.length)
+          throw new ORPCError("BAD_REQUEST", {
+            message: `${app.nome} ainda tem ${restantes.length} código(s) em estoque (livre ou em uso). Use ou remova esses códigos antes de tirar o app da tela.`,
+          });
+      }
+
+      await db
+        .update(aplicativos)
+        .set({ temGiftCard: input.ativo })
+        .where(eq(aplicativos.id, app.id));
+      return { ok: true, slug: input.slug, ativo: input.ativo };
+    }),
 
   /** lista de códigos com filtro — SEMPRE mascarado */
   listar: adminOnly

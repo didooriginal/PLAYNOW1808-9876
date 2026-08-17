@@ -9,6 +9,8 @@ import {
   usePainelJogos,
   useRevogarJogos,
 } from "../../queries/jogos";
+import { useAplicativos } from "../../queries/aplicativos";
+import { AppIcon } from "../app-icon";
 
 /**
  * FUTEBOL AO VIVO (admin) — o admin só abastece o pool.
@@ -29,9 +31,10 @@ function tempoRestante(min: number) {
 
 function NovaConta() {
   const criar = useCadastrarContaJogos();
+  const apps = (useAplicativos().data ?? []).filter((a) => a.ativo);
   const [form, setForm] = useState({
     rotulo: "",
-    servico: "jogos",
+    appPool: "",
     email: "",
     senha: "",
     totalVagas: "4",
@@ -60,14 +63,22 @@ function NovaConta() {
             onChange={set("rotulo")}
           />
         </Campo>
-        <Campo label="Serviço" ajuda="jogos.servico" htmlFor="jogos-servico">
-          <input
-            id="jogos-servico"
+        <Campo label="Aplicativo do pool" ajuda="jogos.appPool" htmlFor="jogos-app">
+          <select
+            id="jogos-app"
             className={inputCls}
-            placeholder="jogos"
-            value={form.servico}
-            onChange={set("servico")}
-          />
+            value={form.appPool}
+            onChange={set("appPool")}
+          >
+            <option value="" className="bg-[#09090b]">
+              Sem app específico
+            </option>
+            {apps.map((a) => (
+              <option key={a.slug} value={a.slug} className="bg-[#09090b]">
+                {a.nome}
+              </option>
+            ))}
+          </select>
         </Campo>
         <Campo label="E-mail de login" ajuda="jogos.email" htmlFor="jogos-email" obrigatorio>
           <input
@@ -119,13 +130,14 @@ function NovaConta() {
           criar.mutate(
             {
               rotulo: form.rotulo,
-              servico: form.servico || "jogos",
+              servico: "jogos",
+              appPool: form.appPool || null,
               email: form.email,
               senha: form.senha,
               totalVagas: Number(form.totalVagas) || 4,
               custoMensal: Number(form.custoMensal.replace(",", ".")) || 0,
             },
-            { onSuccess: () => setForm({ rotulo: "", servico: "jogos", email: "", senha: "", totalVagas: "4", custoMensal: "" }) },
+            { onSuccess: () => setForm({ rotulo: "", appPool: "", email: "", senha: "", totalVagas: "4", custoMensal: "" }) },
           )
         }
       >
@@ -138,6 +150,10 @@ function NovaConta() {
 
 export function JogosView() {
   const { data, isLoading } = usePainelJogos();
+  const appsCatalogo = useAplicativos().data ?? [];
+  /** nome legível do app do pool; cai no slug quando o app foi removido */
+  const nomeApp = (slug: string) =>
+    appsCatalogo.find((a) => a.slug === slug)?.nome ?? slug;
   const alternarPool = useAlternarPoolJogos();
   const revogar = useRevogarJogos();
   const alternarCliente = useAlternarClienteJogos();
@@ -199,10 +215,14 @@ export function JogosView() {
         <div className="mt-4 space-y-2">
           {(p?.pool ?? []).map((c) => (
             <div key={c.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white/[0.03] px-4 py-3">
-              <div className="min-w-0">
-                <div className="truncate font-display text-sm font-semibold text-white">{c.rotulo}</div>
-                <div className="truncate font-sans text-[11px] text-white/35">
-                  {c.email} · {c.vagasOcupadas}/{c.totalVagas} vagas
+              <div className="flex min-w-0 items-center gap-3">
+                {c.appPool ? <AppIcon id={c.appPool} size="sm" /> : null}
+                <div className="min-w-0">
+                  <div className="truncate font-display text-sm font-semibold text-white">{c.rotulo}</div>
+                  <div className="truncate font-sans text-[11px] text-white/35">
+                    {c.appPool ? `${nomeApp(c.appPool)} · ` : ""}
+                    {c.email} · {c.vagasOcupadas}/{c.totalVagas} vagas
+                  </div>
                 </div>
               </div>
               <div className="flex items-center gap-2">

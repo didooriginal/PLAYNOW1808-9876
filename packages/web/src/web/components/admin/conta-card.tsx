@@ -6,6 +6,7 @@ import {
   ChevronDown,
   Copy,
   CreditCard,
+  Pencil,
   Loader2,
   RefreshCw,
   SlidersHorizontal,
@@ -20,11 +21,13 @@ import { cn } from "@/lib/utils";
 import { AppIcon } from "../app-icon";
 import { GlassCard, NeonButton, ProgressBar } from "../ui/kit";
 import { SeloSalvo, useSeloTransitorio } from "./salvamento";
-import { Rotulo, Tooltip } from "../ui/tooltip";
+import { Campo, Rotulo, Tooltip } from "../ui/tooltip";
+import { SelectServico } from "./select-servico";
 import { brl, serviceById } from "@/lib/mock-data";
 import {
   useAlternarContaAtiva,
   useContas,
+  useAtualizarConta,
   useEditarVagas,
   useRemoverConta,
   useReporConta,
@@ -353,6 +356,221 @@ function EditorVagas({
   );
 }
 
+/**
+ * EDITOR COMPLETO DA MATRIZ
+ * ------------------------------------------------------------------
+ * Antes só dava para mexer nas vagas: e-mail ou senha errados obrigavam a
+ * apagar a conta e cadastrar de novo (perdendo os vínculos). Aqui todos os
+ * campos do cadastro voltam preenchidos e salvam via `contas.atualizar`.
+ */
+function EditorConta({
+  conta,
+  onClose,
+  onSalvo,
+}: {
+  conta: Conta;
+  onClose: () => void;
+  onSalvo: () => void;
+}) {
+  const atualizar = useAtualizarConta();
+  const [form, setForm] = useState({
+    rotulo: conta.rotulo,
+    servico: conta.servico,
+    email: conta.email,
+    senha: conta.senha,
+    custo: conta.custo,
+    dataVencimento: conta.dataVencimento ?? "",
+    cartaoUtilizado: conta.cartaoUtilizado ?? "",
+    regiao: conta.regiao ?? "BR",
+    observacao: conta.observacao ?? "",
+  });
+  const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) =>
+    setForm((f) => ({ ...f, [k]: v }));
+
+  const input =
+    "w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 font-sans text-xs text-white placeholder:text-white/25 focus:border-neon-purple/60 focus:outline-none";
+
+  return (
+    <div className="relative mt-4 rounded-2xl border border-neon-purple/35 bg-neon-purple/8 p-3">
+      <div className="flex items-center justify-between">
+        <span className="font-display text-[11px] font-bold uppercase tracking-wide text-neon-purple">
+          Editar conta
+        </span>
+        <button
+          type="button"
+          onClick={onClose}
+          className="font-sans text-[11px] text-white/40 hover:text-white"
+        >
+          cancelar
+        </button>
+      </div>
+
+      <div className="mt-2.5 grid gap-2.5 sm:grid-cols-2">
+        <Campo
+          label="Rótulo"
+          ajuda="contas.rotulo"
+          htmlFor={`ec-rotulo-${conta.id}`}
+        >
+          <input
+            id={`ec-rotulo-${conta.id}`}
+            className={input}
+            value={form.rotulo}
+            onChange={(e) => set("rotulo", e.target.value)}
+          />
+        </Campo>
+        <Campo
+          label="Serviço"
+          ajuda="contas.servico"
+          htmlFor={`ec-servico-${conta.id}`}
+        >
+          <SelectServico
+            id={`ec-servico-${conta.id}`}
+            value={form.servico}
+            onChange={(v) => set("servico", v)}
+            className={input}
+          />
+        </Campo>
+        <Campo
+          label="E-mail do streaming"
+          ajuda="contas.email"
+          htmlFor={`ec-email-${conta.id}`}
+        >
+          <input
+            id={`ec-email-${conta.id}`}
+            className={input}
+            value={form.email}
+            onChange={(e) => set("email", e.target.value)}
+          />
+        </Campo>
+        <Campo
+          label="Senha"
+          ajuda="contas.senha"
+          htmlFor={`ec-senha-${conta.id}`}
+        >
+          <input
+            id={`ec-senha-${conta.id}`}
+            className={input}
+            value={form.senha}
+            onChange={(e) => set("senha", e.target.value)}
+          />
+        </Campo>
+        <Campo
+          label="Custo mensal"
+          ajuda="contas.custoMensal"
+          htmlFor={`ec-custo-${conta.id}`}
+        >
+          <input
+            id={`ec-custo-${conta.id}`}
+            className={input}
+            type="number"
+            step="0.01"
+            min={0}
+            value={form.custo}
+            onChange={(e) => set("custo", Number(e.target.value))}
+          />
+        </Campo>
+        <Campo
+          label="Data de vencimento"
+          ajuda="contas.vencimento"
+          htmlFor={`ec-venc-${conta.id}`}
+        >
+          <input
+            id={`ec-venc-${conta.id}`}
+            className={input}
+            type="date"
+            value={form.dataVencimento}
+            onChange={(e) => set("dataVencimento", e.target.value)}
+          />
+        </Campo>
+        <Campo
+          label="Cartão utilizado"
+          ajuda="contas.cartao"
+          htmlFor={`ec-cartao-${conta.id}`}
+        >
+          <input
+            id={`ec-cartao-${conta.id}`}
+            className={input}
+            placeholder="Ex.: Nubank final 4412"
+            value={form.cartaoUtilizado}
+            onChange={(e) => set("cartaoUtilizado", e.target.value)}
+          />
+        </Campo>
+        <Campo
+          label="Região"
+          ajuda="contas.regiao"
+          htmlFor={`ec-regiao-${conta.id}`}
+        >
+          <input
+            id={`ec-regiao-${conta.id}`}
+            className={input}
+            value={form.regiao}
+            onChange={(e) => set("regiao", e.target.value)}
+          />
+        </Campo>
+        <div className="sm:col-span-2">
+          <Campo
+            label="Observação"
+            ajuda="contas.observacao"
+            htmlFor={`ec-obs-${conta.id}`}
+          >
+            <textarea
+              id={`ec-obs-${conta.id}`}
+              rows={2}
+              className={input}
+              placeholder="Anotações internas sobre esta matriz"
+              value={form.observacao}
+              onChange={(e) => set("observacao", e.target.value)}
+            />
+          </Campo>
+        </div>
+      </div>
+
+      {atualizar.isError && (
+        <p className="mt-2 font-sans text-[11px] text-neon-red">
+          {atualizar.error?.message}
+        </p>
+      )}
+
+      <NeonButton
+        accent="purple"
+        size="sm"
+        className="mt-2.5 w-full"
+        disabled={
+          atualizar.isPending ||
+          !form.rotulo.trim() ||
+          !form.email.trim() ||
+          !form.senha.trim()
+        }
+        onClick={() =>
+          atualizar.mutate(
+            {
+              id: conta.id,
+              ...form,
+              rotulo: form.rotulo.trim(),
+              email: form.email.trim(),
+              senha: form.senha.trim(),
+              observacao: form.observacao.trim() || null,
+            },
+            {
+              onSuccess: () => {
+                onSalvo();
+                onClose();
+              },
+            },
+          )
+        }
+      >
+        {atualizar.isPending ? (
+          <Loader2 className="size-3.5 animate-spin" />
+        ) : (
+          <Check className="size-3.5" />
+        )}
+        Salvar conta
+      </NeonButton>
+    </div>
+  );
+}
+
 export function ContaMatrizCard({
   acc,
   vinculos,
@@ -367,6 +585,7 @@ export function ContaMatrizCard({
   const nearly = !full && pct >= 75;
 
   const [editando, setEditando] = useState(false);
+  const [editandoConta, setEditandoConta] = useState(false);
   const [aberto, setAberto] = useState(false);
 
   const repor = useReporConta();
@@ -513,6 +732,14 @@ export function ContaMatrizCard({
         ))}
       </div>
 
+      {editandoConta && (
+        <EditorConta
+          conta={acc}
+          onClose={() => setEditandoConta(false)}
+          onSalvo={marcarSalvo}
+        />
+      )}
+
       {editando && (
         <EditorVagas
           conta={acc}
@@ -548,10 +775,28 @@ export function ContaMatrizCard({
           size="sm"
           className="flex-1 whitespace-nowrap px-2"
           disabled={busy}
-          onClick={() => setEditando((v) => !v)}
+          onClick={() => {
+            setEditandoConta(false);
+            setEditando((v) => !v);
+          }}
         >
           <SlidersHorizontal className="size-3.5 shrink-0" />
           Vagas
+        </NeonButton>
+        <NeonButton
+          accent="cyan"
+          variant="outline"
+          size="sm"
+          className="flex-1 whitespace-nowrap px-2"
+          data-testid={`editar-conta-${acc.id}`}
+          disabled={busy}
+          onClick={() => {
+            setEditando(false);
+            setEditandoConta((v) => !v);
+          }}
+        >
+          <Pencil className="size-3.5 shrink-0" />
+          Editar conta
         </NeonButton>
         <Tooltip
           texto="conta.liberarTodas"

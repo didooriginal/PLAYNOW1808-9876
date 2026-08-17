@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -94,6 +94,10 @@ import {
 import { useContas, useCriarConta, useResumoEstoque } from "../queries/contas";
 import { useMapaAlocacoes } from "../queries/alocacoes";
 import { useAplicativos } from "../queries/aplicativos";
+import {
+  SelectServico,
+  useOpcoesServico,
+} from "../components/admin/select-servico";
 import { useResumoSuporte } from "../queries/suporte";
 import { useResumoRecompensas } from "../queries/recompensas";
 import { useFilaConvites } from "../queries/planos-apps";
@@ -311,8 +315,6 @@ function StatCards() {
 
 function NovaContaForm({ onClose }: { onClose: () => void }) {
   const criar = useCriarConta();
-  const catalogo = useAplicativos();
-  const apps = (catalogo.data ?? []).filter((a) => a.ativo);
   const [form, setForm] = useState({
     servico: "netflix",
     rotulo: "",
@@ -347,21 +349,12 @@ function NovaContaForm({ onClose }: { onClose: () => void }) {
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Campo label="Serviço" ajuda="contas.servico" htmlFor="nc-servico">
-          <select
+          <SelectServico
             id="nc-servico"
             value={form.servico}
-            onChange={(e) => set("servico", e.target.value)}
+            onChange={(v) => set("servico", v)}
             className={input}
-          >
-            {(apps.length
-              ? apps
-              : services.map((s) => ({ slug: s.id, nome: s.name }))
-            ).map((a) => (
-              <option key={a.slug} value={a.slug} className="bg-[#09090b]">
-                {a.nome}
-              </option>
-            ))}
-          </select>
+          />
         </Campo>
         <Campo
           label="Rótulo"
@@ -521,21 +514,73 @@ function NovaContaForm({ onClose }: { onClose: () => void }) {
 
 /* ------------------------------------------------------------------ */
 
+const CHAVE_FILTROS_ESTOQUE = "playplusnow.estoque.filtros";
+
+type FiltrosEstoque = {
+  query: string;
+  filter: "todas" | "esgotadas" | "livres" | "vencendo";
+  app: string;
+};
+
+/** lê os filtros salvos do estoque; qualquer erro cai no padrão */
+function lerFiltrosEstoque(): FiltrosEstoque {
+  const padrao: FiltrosEstoque = { query: "", filter: "todas", app: "" };
+  try {
+    const cru = localStorage.getItem(CHAVE_FILTROS_ESTOQUE);
+    if (!cru) return padrao;
+    const dados = JSON.parse(cru) as Partial<FiltrosEstoque>;
+    return {
+      query: typeof dados.query === "string" ? dados.query : "",
+      filter:
+        dados.filter === "esgotadas" ||
+        dados.filter === "livres" ||
+        dados.filter === "vencendo"
+          ? dados.filter
+          : "todas",
+      app: typeof dados.app === "string" ? dados.app : "",
+    };
+  } catch {
+    return padrao;
+  }
+}
+
 function StockView() {
   const { data: contas, isPending, isError, error } = useContas();
   const resumo = useResumoEstoque();
   const mapa = useMapaAlocacoes();
-  const [query, setQuery] = useState("");
+  const { porSlug, nomeDe, apps } = useOpcoesServico();
+  const salvos = useMemo(() => lerFiltrosEstoque(), []);
+  const [query, setQuery] = useState(salvos.query);
   const [filter, setFilter] = useState<
     "todas" | "esgotadas" | "livres" | "vencendo"
-  >("todas");
+  >(salvos.filter);
+  const [app, setApp] = useState(salvos.app);
   const [criando, setCriando] = useState(false);
+
+  /** os filtros ficam no localStorage para sobreviver ao F5 */
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        CHAVE_FILTROS_ESTOQUE,
+        JSON.stringify({ query, filter, app }),
+      );
+    } catch {
+      /* modo privado / storage cheio: filtro segue só em memória */
+    }
+  }, [query, filter, app]);
 
   const filtered = useMemo(() => {
     return (contas ?? []).filter((a) => {
-      const q = query.toLowerCase();
+      const q = query.trim().toLowerCase();
+      const nomeServico = (porSlug.get(a.servico)?.nome ?? a.servico).toLowerCase();
       const matchesQuery =
-        a.rotulo.toLowerCase().includes(q) || a.email.toLowerCase().includes(q);
+        !q ||
+        a.rotulo.toLowerCase().includes(q) ||
+        a.email.toLowerCase().includes(q) ||
+        a.servico.toLowerCase().includes(q) ||
+        nomeServico.includes(q);
+      const matchesApp =
+        !app || (porSlug.get(a.servico)?.appSlug ?? a.servico) === app;
       const full = a.vagasOcupadas >= a.totalVagas;
       const dias = diasParaVencer(a.dataVencimento);
       const matchesFilter =
@@ -546,9 +591,9 @@ function StockView() {
             : filter === "vencendo"
               ? dias !== null && dias <= 5
               : !full;
-      return matchesQuery && matchesFilter;
+      return matchesQuery && matchesApp && matchesFilter;
     });
-  }, [contas, query, filter]);
+  }, [contas, query, filter, app, porSlug]);
 
   if (isError) return <ErrorBox message={error?.message} />;
 
@@ -611,11 +656,30 @@ function StockView() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            aria-label="Buscar conta matriz ou login"
-            placeholder="Buscar conta matriz ou login..."
+            aria-label="Buscar conta matriz, login ou serviço"
+            placeholder="Buscar por rótulo, login ou serviço..."
             className="w-full bg-transparent font-sans text-sm text-white placeholder:text-white/25 focus:outline-none"
           />
           <Ajuda ajuda="busca.contas" />
+        </div>
+        <div className="glass flex h-11 items-center gap-2 rounded-full px-4">
+          <select
+            id="estoque-app"
+            aria-label="Filtrar por aplicativo"
+            value={app}
+            onChange={(e) => setApp(e.target.value)}
+            className="max-w-44 bg-transparent font-sans text-sm text-white focus:outline-none"
+          >
+            <option value="" className="bg-[#09090b]">
+              Todos os aplicativos
+            </option>
+            {apps.map((a) => (
+              <option key={a.slug} value={a.slug} className="bg-[#09090b]">
+                {a.nome}
+              </option>
+            ))}
+          </select>
+          <Ajuda ajuda="estoque.filtroApp" />
         </div>
         <div className="flex gap-1.5">
           {(["todas", "esgotadas", "livres", "vencendo"] as const).map((f) => (
@@ -650,6 +714,31 @@ function StockView() {
         <Loading label="Carregando estoque..." />
       ) : (
         <>
+          <div className="flex flex-wrap items-center gap-2 font-sans text-xs text-white/40">
+            <span>
+              Exibindo <strong className="text-white/70">{filtered.length}</strong> de{" "}
+              {(contas ?? []).length} contas
+            </span>
+            {(query || app || filter !== "todas") && (
+              <button
+                type="button"
+                onClick={() => {
+                  setQuery("");
+                  setApp("");
+                  setFilter("todas");
+                }}
+                className="rounded-full border border-white/10 px-3 py-1 text-white/50 transition-colors hover:text-white"
+              >
+                limpar filtros
+              </button>
+            )}
+            {app && (
+              <span className="text-white/30">
+                aplicativo: {nomeDe(app)}
+              </span>
+            )}
+          </div>
+
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {filtered.map((acc) => (
               <ContaMatrizCard

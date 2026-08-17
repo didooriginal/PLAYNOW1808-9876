@@ -116,6 +116,13 @@ export const contasMatrizes = sqliteTable("contas_matrizes", {
   /* ---- FUTEBOL AO VIVO ---- */
   /** conta do pool exclusivo de dias de jogo (descartável//alta rotatividade) */
   poolJogos: integer("pool_jogos", { mode: "boolean" }).notNull().default(false),
+  /**
+   * App realmente contratado nesta conta do pool (`aplicativos.slug`).
+   * Só vale para contas com `poolJogos = true`: o `servico` delas continua
+   * "jogos" para elas NÃO entrarem no estoque normal, mas o admin precisa
+   * saber que aquela conta é, por exemplo, um Premiere temporário.
+   */
+  appPool: text("app_pool"),
   criadoEm: integer("criado_em", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),
@@ -233,6 +240,11 @@ export const aplicativos = sqliteTable("aplicativos", {
    */
   ordem: integer("ordem").notNull().default(0),
   ativo: integer("ativo", { mode: "boolean" }).notNull().default(true),
+  /**
+   * Nem todo app tem gift card à venda. Quando false, o provedor não aparece
+   * na aba Estoque de Gift Cards (a menos que já tenha código cadastrado).
+   */
+  temGiftCard: integer("tem_gift_card", { mode: "boolean" }).notNull().default(false),
   criadoEm: integer("criado_em", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),

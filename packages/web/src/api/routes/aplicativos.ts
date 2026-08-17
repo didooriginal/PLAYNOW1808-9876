@@ -37,6 +37,8 @@ const aplicativoInput = z.object({
   preco: z.number().nonnegative().default(0),
   ordem: z.number().int().nonnegative().optional(),
   ativo: z.boolean().default(true),
+  /** aparece na aba Estoque de Gift Cards */
+  temGiftCard: z.boolean().default(false),
 });
 
 export const aplicativos = {

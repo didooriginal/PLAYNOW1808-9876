@@ -6,7 +6,7 @@ import { notificar } from "./notificacoes";
 import { estaBloqueado, MSG_BLOQUEIO } from "../lib/cobranca";
 import { lerParametros } from "../lib/config";
 import { db } from "../database";
-import { contasMatrizes, liberacoesJogos, usuarios } from "../database/schema";
+import { aplicativos, contasMatrizes, liberacoesJogos, usuarios } from "../database/schema";
 
 /**
  * FUTEBOL AO VIVO — adicional com liberação automática
@@ -362,6 +362,7 @@ export const jogos = {
         id: c.id,
         rotulo: c.rotulo,
         servico: c.servico,
+        appPool: c.appPool,
         email: c.email,
         senha: c.senha,
         status: c.status,
@@ -388,6 +389,8 @@ export const jogos = {
       z.object({
         rotulo: z.string().min(2),
         servico: z.string().min(2).default("jogos"),
+        /** app realmente contratado nesta conta do pool (`aplicativos.slug`) */
+        appPool: z.string().min(1).nullable().default(null),
         email: z.string().email(),
         senha: z.string().min(1),
         totalVagas: z.number().int().min(1).max(20).default(4),
@@ -395,10 +398,24 @@ export const jogos = {
       }),
     )
     .handler(async ({ input }) => {
+      // o app do pool precisa existir no catálogo — senão o ícone e o nome
+      // exibidos na aba Jogos viram um slug solto que ninguém reconhece
+      if (input.appPool) {
+        const [app] = await db
+          .select({ id: aplicativos.id })
+          .from(aplicativos)
+          .where(eq(aplicativos.slug, input.appPool));
+        if (!app)
+          throw new ORPCError("BAD_REQUEST", {
+            message: `O aplicativo "${input.appPool}" não existe no catálogo.`,
+          });
+      }
+
       const [conta] = await db
         .insert(contasMatrizes)
         .values({
           servico: input.servico,
+          appPool: input.appPool,
           rotulo: input.rotulo,
           nomeConta: input.rotulo,
           email: input.email,

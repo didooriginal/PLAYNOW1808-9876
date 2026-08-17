@@ -11,6 +11,7 @@ import {
   sincronizarVagas,
 } from "../lib/acessos";
 import { resolverAlertasSemVaga } from "./notificacoes";
+import { resolverServico } from "../lib/planos";
 import { linkWhats } from "../lib/whats";
 
 /** contagem de vagas realmente ocupadas (alocações ativas) */
@@ -40,10 +41,33 @@ const contaInput = z.object({
   cartaoUtilizado: z.string().default(""),
 });
 
+/**
+ * O `servico` de uma matriz é o slug VENDIDO: pode ser o slug do app
+ * ("netflix") ou o de uma opção ("globoplay-premium-telecine"). Cadastrar uma
+ * matriz com slug fora do catálogo cria estoque fantasma — nenhum cliente é
+ * alocado nela porque o alocador procura pelo slug da assinatura.
+ */
+async function validarServico(slug: string) {
+  const resolvido = await resolverServico(slug);
+  if (!resolvido)
+    throw new ORPCError("BAD_REQUEST", {
+      message: `O serviço "${slug}" não existe no catálogo. Cadastre o app (ou a opção dele) antes de criar a matriz.`,
+    });
+  return resolvido;
+}
+
 export const contas = {
-  /** estoque completo de contas matrizes */
+  /**
+   * estoque completo de contas matrizes.
+   * Contas do pool de Futebol Ao Vivo ficam de fora: elas são temporárias,
+   * vivem na aba Jogos e poluiriam a contagem de vagas do estoque normal.
+   */
   listar: adminOnly.handler(() =>
-    db.select().from(contasMatrizes).orderBy(asc(contasMatrizes.servico), asc(contasMatrizes.rotulo)),
+    db
+      .select()
+      .from(contasMatrizes)
+      .where(eq(contasMatrizes.poolJogos, false))
+      .orderBy(asc(contasMatrizes.servico), asc(contasMatrizes.rotulo)),
   ),
 
   obter: adminOnly.input(z.object({ id: z.number().int() })).handler(async ({ input }) => {
@@ -53,6 +77,7 @@ export const contas = {
   }),
 
   criar: adminOnly.input(contaInput).handler(async ({ input }) => {
+    await validarServico(input.servico);
     const [row] = await db.insert(contasMatrizes).values(input).returning();
     return row;
   }),
@@ -61,6 +86,7 @@ export const contas = {
     .input(contaInput.partial().extend({ id: z.number().int() }))
     .handler(async ({ input }) => {
       const { id, ...patch } = input;
+      if (patch.servico) await validarServico(patch.servico);
       const [row] = await db
         .update(contasMatrizes)
         .set(patch)
@@ -270,7 +296,9 @@ export const contas = {
         vencendo: sql<number>`coalesce(sum(case when ${contasMatrizes.dataVencimento} <> '' and julianday(${contasMatrizes.dataVencimento}) - julianday('now') between 0 and 5 then 1 else 0 end), 0)`,
         vencidas: sql<number>`coalesce(sum(case when ${contasMatrizes.dataVencimento} <> '' and julianday(${contasMatrizes.dataVencimento}) < julianday('now') then 1 else 0 end), 0)`,
       })
-      .from(contasMatrizes);
+      .from(contasMatrizes)
+      // mesmo recorte de `listar`: o pool de jogos tem painel próprio
+      .where(eq(contasMatrizes.poolJogos, false));
     return row;
   }),
 };

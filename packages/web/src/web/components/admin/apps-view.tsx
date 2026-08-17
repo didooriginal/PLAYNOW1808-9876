@@ -6,6 +6,7 @@ import {
   Check,
   ChevronsDown,
   ChevronsUp,
+  Gift,
   Loader2,
   ListOrdered,
   Layers,
@@ -69,6 +70,7 @@ function NovoAppForm({ onClose }: { onClose: () => void }) {
     categoria: "streaming" as CategoriaId,
     preco: 0,
     precoAvulso: 0,
+    temGiftCard: false,
   });
   const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
@@ -182,6 +184,20 @@ function NovoAppForm({ onClose }: { onClose: () => void }) {
             }}
           />
         </Campo>
+        <label
+          htmlFor="app-gift"
+          className="flex cursor-pointer items-center gap-2 self-end rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5"
+        >
+          <input
+            id="app-gift"
+            type="checkbox"
+            checked={form.temGiftCard}
+            onChange={(e) => set("temGiftCard", e.target.checked)}
+            className="size-4 accent-[#22d3ee]"
+          />
+          <span className="font-sans text-xs text-white/70">Tem gift card</span>
+          <Ajuda ajuda="app.temGiftCard" />
+        </label>
       </div>
 
       {criar.isError && (
@@ -651,6 +667,28 @@ export function AppsView() {
                       <PrecoInline app={app} />
                     </div>
                   </div>
+                  <button
+                    type="button"
+                    aria-label={
+                      app.temGiftCard
+                        ? `Tirar ${app.nome} do estoque de gift cards`
+                        : `Marcar que ${app.nome} tem gift card`
+                    }
+                    disabled={atualizar.isPending}
+                    onClick={() =>
+                      atualizar.mutate({
+                        id: app.id,
+                        temGiftCard: !app.temGiftCard,
+                      })
+                    }
+                    className={
+                      app.temGiftCard
+                        ? "flex size-8 shrink-0 items-center justify-center rounded-lg border border-neon-cyan/50 bg-neon-cyan/10 text-neon-cyan"
+                        : "flex size-8 shrink-0 items-center justify-center rounded-lg border border-white/10 text-white/30 transition-colors hover:border-neon-cyan/40 hover:text-neon-cyan"
+                    }
+                  >
+                    <Gift className="size-3.5" />
+                  </button>
                   <button
                     type="button"
                     aria-label={`Opções de ${app.nome}`}

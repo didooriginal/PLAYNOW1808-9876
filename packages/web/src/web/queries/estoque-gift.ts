@@ -31,6 +31,20 @@ function useInvalidarEstoque() {
   };
 }
 
+/** liga/desliga um app na aba de gift cards */
+export function useAlternarAppGift() {
+  const invalidar = useInvalidarEstoque();
+  const qc = useQueryClient();
+  return useMutation(
+    orpc.estoqueGift.alternarApp.mutationOptions({
+      onSuccess: () => {
+        invalidar();
+        void qc.invalidateQueries({ queryKey: orpc.aplicativos.key() });
+      },
+    }),
+  );
+}
+
 export function useCadastrarLoteGift() {
   const invalidar = useInvalidarEstoque();
   return useMutation(orpc.estoqueGift.cadastrarLote.mutationOptions({ onSuccess: invalidar }));
