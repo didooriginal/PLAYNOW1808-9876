@@ -2,6 +2,7 @@ import { z } from "zod";
 import { and, desc, eq, inArray, like, or, sql } from "drizzle-orm";
 import { adminOnly, authed } from "../middleware/auth";
 import { db } from "../database";
+import { enviarWhatsappSeguro } from "../services/whatsapp";
 import { notificacoes as tabelaNotificacoes, usuarios } from "../database/schema";
 import {
   DIAS_AVISO_PREVIO,
@@ -116,6 +117,28 @@ export function resolverAlertasSemVaga(clienteId: number, servico?: string) {
  * fora do painel. Falha de rede nunca quebra a operacao.
  */
 async function dispararWebhook(alerta: typeof tabelaNotificacoes.$inferSelect) {
+  /**
+   * WHATSAPP DO ADMIN: todo alerta de admin tambem vira mensagem no WhatsApp
+   * dos numeros configurados em `WHATSAPP_DESTINOS`. Independe do webhook
+   * generico abaixo e nunca derruba nada (ver services/whatsapp.ts).
+   */
+  const marca =
+    alerta.severidade === "critico"
+      ? "[URGENTE]"
+      : alerta.severidade === "alerta"
+        ? "[ATENCAO]"
+        : "[AVISO]";
+  enviarWhatsappSeguro(
+    [
+      `${marca} PLAYPLUSNOW`,
+      alerta.titulo,
+      alerta.mensagem || "",
+      alerta.destino ? `Painel: aba ${alerta.destino}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+  );
+
   const url = process.env.ALERTAS_WEBHOOK_URL;
   if (!url) return;
   try {

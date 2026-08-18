@@ -88,6 +88,16 @@ export const AJUDA: Record<string, string> = {
   "secao.faturas": "Cobranças a vencer, recebidas e atrasadas, com o histórico de cada cliente.",
   "secao.codigos":
     "Códigos de verificação dos streamings extraídos do e-mail. Ficam válidos por 1 hora e são entregues ao cliente que pediu.",
+  "secao.iptv":
+    "Clientes que compraram o plano de canais ao vivo (IPTV) e enviaram o endereço MAC do aparelho pelo painel. Cadastre o MAC no servidor de IPTV e marque como ativado — o cliente é avisado na hora.",
+  "iptv.fila":
+    "Cada linha é um aparelho. Copie o MAC, cadastre no painel do servidor de IPTV e clique em “Marcar como ativado”. Recusar devolve ao cliente o pedido de conferir o número no app.",
+  "iptv.pendentes":
+    "Aparelhos que já receberam o MAC do cliente e ainda não foram cadastrados no servidor. Enquanto está aqui, o cliente não tem canal nenhum abrindo.",
+  "iptv.ativados":
+    "Total de aparelhos que você já liberou. Um mesmo cliente pode ter vários (TV Box, celular, Fire Stick).",
+  "iptv.total":
+    "Histórico completo de pedidos de ativação, incluindo recusados e cancelados pelo próprio cliente.",
   "secao.netflixtv":
     "Fila de pedidos de liberação de TV da Netflix. Você aprova e a TV do cliente destrava na hora.",
   "secao.alertas":

@@ -15,6 +15,7 @@ import { faturas } from "./routes/faturas";
 import { combos } from "./routes/combos";
 import { codigos, registrarEmail } from "./routes/codigos";
 import { netflix } from "./routes/netflix";
+import { iptv } from "./routes/iptv";
 import { notificacoes } from "./routes/notificacoes";
 import { afiliados } from "./routes/afiliados";
 import { giftcards } from "./routes/giftcards";
@@ -60,6 +61,7 @@ export const router = {
   combos,
   codigos,
   netflix,
+  iptv,
   notificacoes,
   afiliados,
   giftcards,

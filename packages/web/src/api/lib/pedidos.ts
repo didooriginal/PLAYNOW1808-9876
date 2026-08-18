@@ -8,6 +8,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { enviarEmail } from "../services/email";
 import { templates } from "./emails/templates";
+import { LINK_APP_IPTV, SLUGS_IPTV } from "./iptv";
 import { db } from "../database";
 import { resolverServicos, slugsDePacote } from "./planos";
 import {
@@ -376,6 +377,30 @@ export async function aplicarPedido(clienteId: number, pedido: Pedido) {
     });
   } catch (e) {
     console.error("[Email] falha ao enviar a entrega de acesso:", e);
+  }
+
+  /**
+   * IPTV: o app Funplay nao usa login/senha, e liberado pelo ENDERECO MAC do
+   * aparelho. Quando o pedido inclui IPTV, sai um segundo e-mail pedindo o MAC
+   * (o cliente devolve pelo painel, aba "Ativar IPTV"). Nunca derruba a
+   * ativacao se o envio falhar.
+   */
+  if (pedido.apps.some((slug) => SLUGS_IPTV.includes(slug))) {
+    try {
+      const email = templates.boasVindasIptv({
+        nome: cliente.nome,
+        linkApp: LINK_APP_IPTV,
+        linkPainel: `${process.env.WEBSITE_URL || "https://playplusnow.com.br"}/dashboard`,
+      });
+      await enviarEmail({
+        para: cliente.email,
+        assunto: email.assunto,
+        texto: email.texto,
+        html: email.html,
+      });
+    } catch (e) {
+      console.error("[Email] falha ao enviar as boas-vindas do IPTV:", e);
+    }
   }
 }
 

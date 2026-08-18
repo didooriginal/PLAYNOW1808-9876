@@ -41,6 +41,7 @@ import {
   BellRing,
   CalendarClock,
   X,
+  Radio,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { sugerirCaptura } from "@/lib/captura-email";
@@ -56,6 +57,7 @@ import { CodigosView } from "../components/admin/codigos-view";
 import { SuporteView } from "../components/admin/suporte-view";
 import { ManualView } from "../components/admin/manual-view";
 import { NetflixTvView } from "../components/admin/netflix-tv-view";
+import { AtivacoesIptvView } from "../components/admin/ativacoes-iptv-view";
 import { CopilotoAdmin } from "../components/admin/copiloto";
 import { MarketingView } from "../components/admin/marketing-view";
 import { AlertasView } from "../components/admin/alertas-view";
@@ -108,6 +110,7 @@ import { useFilaConvites } from "../queries/planos-apps";
 import { useCodigos } from "../queries/codigos";
 import { useResumoEstoqueGift } from "../queries/estoque-gift";
 import { useFilaTvNetflix } from "../queries/netflix";
+import { useFilaIptv } from "../queries/iptv";
 import {
   useFaturas,
   useResumoFaturas,
@@ -3042,6 +3045,7 @@ export default function AdminPage() {
   const gamificacao = useResumoRecompensas();
   const codigos = useCodigos();
   const filaTv = useFilaTvNetflix();
+  const filaIptv = useFilaIptv();
   const convites = useFilaConvites();
   const convitesPendentes = (convites.data ?? []).filter((c) => c.status === "pendente").length;
   const alertas = useAlertasAdmin();
@@ -3122,6 +3126,12 @@ export default function AdminPage() {
       badge: filaTv.data?.pendentes ? String(filaTv.data.pendentes) : undefined,
     },
     {
+      id: "iptv",
+      label: "Ativações IPTV (MAC)",
+      icon: Radio,
+      badge: filaIptv.data?.pendentes ? String(filaIptv.data.pendentes) : undefined,
+    },
+    {
       id: "alertas",
       label: "Central de Alertas",
       icon: BellRing,
@@ -3198,6 +3208,10 @@ export default function AdminPage() {
     codigos: {
       title: "Central de Códigos",
       sub: "Códigos de verificação dos streamings, extraídos do e-mail e entregues ao cliente. Expiram em 1 hora.",
+    },
+    iptv: {
+      title: "Ativações de IPTV",
+      sub: "Endereços MAC enviados pelos clientes do plano de canais ao vivo. Copie o MAC, cadastre no servidor e marque como ativado.",
     },
     netflixtv: {
       title: "Solicitações de TV Netflix",
@@ -3306,6 +3320,7 @@ export default function AdminPage() {
           )}
           {active === "codigos" && <CodigosView />}
           {active === "netflixtv" && <NetflixTvView />}
+          {active === "iptv" && <AtivacoesIptvView />}
           {active === "alertas" && <AlertasView onIr={setActive} />}
           {active === "convites" && <ConvitesView />}
           {active === "senhas" && <SenhasView />}

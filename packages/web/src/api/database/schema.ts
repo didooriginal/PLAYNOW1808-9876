@@ -1365,3 +1365,52 @@ export const convitesApps = sqliteTable("convites_apps", {
 
 export type ConviteApp = typeof convitesApps.$inferSelect;
 export type NovoConviteApp = typeof convitesApps.$inferInsert;
+
+/* ------------------------------------------------------------------ */
+/* ATIVACOES IPTV — MAC do app Funplay enviado pelo cliente            */
+/* ------------------------------------------------------------------ */
+
+/**
+ * O IPTV (slug "iptv" — PLAYPLUSNOW + Canais ao vivo) nao e liberado por
+ * login/senha: o app Funplay e travado por ENDERECO MAC do aparelho. Fluxo:
+ *
+ *  1. compra confirmada -> e-mail de boas-vindas do IPTV com o link do app e a
+ *     instrucao "pegue o MAC no canto inferior direito da tela";
+ *  2. o cliente digita esse MAC no painel dele (uma linha aqui, status
+ *     "pendente");
+ *  3. o admin recebe alerta no painel + WhatsApp e cadastra o MAC no servidor;
+ *  4. o admin marca "ativado" e o cliente ve a confirmacao no painel.
+ *
+ * Um cliente pode ter varios aparelhos, entao a tabela e um historico: o
+ * mesmo MAC nao entra duas vezes para o mesmo cliente (indice unico).
+ */
+export const ativacoesIptv = sqliteTable(
+  "ativacoes_iptv",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    clienteId: integer("cliente_id")
+      .notNull()
+      .references(() => usuarios.id, { onDelete: "cascade" }),
+    /** slug do app que originou o pedido (hoje sempre "iptv") */
+    servicoSlug: text("servico_slug").notNull().default("iptv"),
+    /** MAC normalizado em MAIUSCULAS no formato AA:BB:CC:DD:EE:FF */
+    mac: text("mac").notNull(),
+    /** onde o app esta instalado: "TV Box sala", "Fire Stick", ... */
+    dispositivo: text("dispositivo").notNull().default(""),
+    /** pendente | ativado | recusado | cancelado */
+    status: text("status").notNull().default("pendente"),
+    /** recado do admin devolvido ao cliente */
+    respostaAdmin: text("resposta_admin").notNull().default(""),
+    criadoEm: integer("criado_em", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    atualizadoEm: integer("atualizado_em", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    ativadoEm: integer("ativado_em", { mode: "timestamp" }),
+  },
+  (t) => [uniqueIndex("ativacoes_iptv_cliente_mac_idx").on(t.clienteId, t.mac)],
+);
+
+export type AtivacaoIptv = typeof ativacoesIptv.$inferSelect;
+export type NovaAtivacaoIptv = typeof ativacoesIptv.$inferInsert;

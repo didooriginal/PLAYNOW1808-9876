@@ -25,6 +25,7 @@ import {
   TrendingUp,
   TriangleAlert,
   Wallet,
+  Radio,
 } from "lucide-react";
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
@@ -39,6 +40,7 @@ import { JornadaCliente } from "../components/cliente/jornada";
 import { CodigoRecente } from "../components/cliente/codigo-recente";
 import { AppsAguardandoPagamento } from "../components/cliente/apps-aguardando";
 import { DesbloquearNetflix } from "../components/cliente/netflix-desbloqueio";
+import { AtivacaoIptv } from "../components/cliente/ativacao-iptv";
 import { CombosSugeridos } from "../components/cliente/combos-sugeridos";
 import { PanelShell, type NavItem } from "../components/panel-shell";
 import { GlassCard, NeonButton, Pill, ProgressBar, accentHex, NeonBackdrop } from "../components/ui/kit";
@@ -56,6 +58,7 @@ import { usePainelCliente } from "../queries/usuarios";
 import { useMeusChamados } from "../queries/suporte";
 import { useMinhasFaturas, rotuloCompetencia, dataBr } from "../queries/faturas";
 import { useMinhaTelaNetflix } from "../queries/netflix";
+import { useMinhaAtivacaoIptv } from "../queries/iptv";
 import { ChecklistBoasVindas } from "../components/cliente/boas-vindas";
 import { ContadorVencimento, FaixaConfianca } from "../components/cliente/contador";
 import { TelaBloqueio } from "../components/cliente/bloqueio";
@@ -626,6 +629,7 @@ export default function DashboardPage() {
   const { data, isPending, isError, error } = usePainelCliente();
   const chamados = useMeusChamados();
   const netflix = useMinhaTelaNetflix();
+  const iptv = useMinhaAtivacaoIptv();
   const abertos = (chamados.data ?? []).filter((c) => c.status !== "resolvido").length;
 
   useEffect(() => {
@@ -663,6 +667,20 @@ export default function DashboardPage() {
         icon: Tv,
         badge: netflix.data?.pendente ? "1" : undefined,
       },
+      /**
+       * ATIVAR IPTV: aba condicional. So aparece para quem tem plano de canais
+       * ao vivo ou ja mandou algum MAC — nao poluir o painel de quem nao tem.
+       */
+      ...(iptv.data?.temIptv || (iptv.data?.pedidos.length ?? 0) > 0
+        ? [
+            {
+              id: "iptv",
+              label: "Ativar IPTV",
+              icon: Radio,
+              badge: iptv.data?.pendente ? "1" : undefined,
+            } as NavItem,
+          ]
+        : []),
       { id: "jornada", label: "Jornada / Recompensas", icon: Trophy },
       { id: "jogos", label: "Futebol Ao Vivo", icon: Goal },
       {
@@ -682,7 +700,7 @@ export default function DashboardPage() {
         badge: abertos ? String(abertos) : undefined,
       },
     ],
-    [data, abertos, netflix.data?.pendente],
+    [data, abertos, netflix.data?.pendente, iptv.data],
   );
 
   if (isPending || isError || !data) {
@@ -776,6 +794,7 @@ export default function DashboardPage() {
             <h1 className="font-display text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
               {active === "acessos" && "Meus Acessos"}
               {active === "netflix" && "Desbloquear Tela Netflix"}
+              {active === "iptv" && "Ativar IPTV / Canais ao Vivo"}
               {active === "jornada" && "Jornada do Cliente"}
               {active === "jogos" && "Futebol Ao Vivo"}
               {active === "carteira" &&
@@ -792,6 +811,8 @@ export default function DashboardPage() {
                 "Login e senha de cada app do seu pacote. Nunca troque a senha da conta matriz."}
               {active === "netflix" &&
                 "Tela bloqueada na TV? Escolha o cenário que você está vendo e resolva em menos de 1 minuto."}
+              {active === "iptv" &&
+                "Baixe o app Fun Play, pegue o endereço MAC no canto inferior direito da tela e envie para nós liberarmos os canais."}
               {active === "jornada" &&
                 "Suba de nível, cumpra missões e desbloqueie prêmios indicando amigos."}
               {active === "jogos" &&
@@ -846,6 +867,8 @@ export default function DashboardPage() {
           )}
 
           {active === "netflix" && <DesbloquearNetflix />}
+
+          {active === "iptv" && <AtivacaoIptv />}
 
           {active === "acessos" && <InstalarApp />}
 
