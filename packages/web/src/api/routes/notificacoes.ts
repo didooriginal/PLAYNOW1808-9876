@@ -154,6 +154,18 @@ export async function varrerVencimentos(forcar = false) {
   if (!forcar && agora - ultimaVarredura < INTERVALO_VARREDURA) return { avaliados: 0 };
   ultimaVarredura = agora;
 
+  /**
+   * REDE DE SEGURANCA DOS E-MAILS DE COBRANCA.
+   * O agendador externo (`/api/cron/vencimento`) continua sendo o caminho
+   * principal; isto aqui garante o envio se ele falhar ou ainda nao existir.
+   * Import dinamico porque lib/emails/cron.ts importa `notificar` deste
+   * arquivo — o ciclo so se resolve em tempo de execucao. Nao usa `await`:
+   * a varredura do painel nunca espera o Resend.
+   */
+  void import("../lib/emails/cron")
+    .then((m) => m.dispararLembretesOportunista())
+    .catch(() => {});
+
   const clientes = await db.select().from(usuarios).where(eq(usuarios.admin, false));
   const hojeChave = new Date().toISOString().slice(0, 10);
   let mudancas = 0;
