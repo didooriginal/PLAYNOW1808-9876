@@ -59,12 +59,22 @@ export async function enviarWhatsapp(mensagem: string) {
     try {
       const url = `${ENDPOINT}?phone=${encodeURIComponent(destino.telefone)}&text=${encodeURIComponent(texto)}&apikey=${encodeURIComponent(destino.apikey)}`;
       const resposta = await fetch(url, { method: "GET", signal: AbortSignal.timeout(15_000) });
-      if (resposta.ok) enviados += 1;
+      /**
+       * ATENCAO: o CallMeBot NAO usa o status HTTP para sinalizar erro de forma
+       * confiavel — apikey invalida volta como 203, que o `fetch` considera
+       * "ok". A unica confirmacao real de aceite e a frase "queued" no corpo.
+       * Por isso a checagem e feita no texto, nao no status.
+       */
+      const corpo = await resposta.text().catch(() => "");
+      if (/queued/i.test(corpo)) enviados += 1;
       else {
         falhas += 1;
-        // nunca logar a apikey: so o final do telefone e o status
+        // nunca logar a apikey: so o final do telefone, o status e o motivo
+        const motivo = /apikey is invalid/i.test(corpo)
+          ? "apikey invalida para este numero"
+          : corpo.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 160);
         console.error(
-          `[WhatsApp] falha para ...${destino.telefone.slice(-4)}: HTTP ${resposta.status}`,
+          `[WhatsApp] falha para ...${destino.telefone.slice(-4)}: HTTP ${resposta.status} - ${motivo}`,
         );
       }
     } catch (e) {
