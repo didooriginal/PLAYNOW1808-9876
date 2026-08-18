@@ -44,6 +44,7 @@ import {
   sincronizarAcessosDoCliente,
 } from "../lib/acessos";
 import { garantirFichaDaSessao } from "../lib/sessao";
+import { SLUGS_IPTV } from "../lib/iptv";
 import { notificar, varrerVencimentos } from "./notificacoes";
 import { auth } from "../auth";
 
@@ -592,6 +593,29 @@ export const usuarios = {
               email: convite?.email ?? "",
               observacao: convite?.observacao ?? "",
             },
+          });
+          continue;
+        }
+
+        /**
+         * IPTV (app Fun Play): nao existe conta matriz nem vaga para alocar —
+         * o acesso e liberado pelo ENDERECO MAC do aparelho (routes/iptv.ts).
+         * Por isso ele nunca fica "aguardando estoque" nem entra na fila: o
+         * card do painel mostra o passo a passo e o campo do MAC.
+         */
+        if (SLUGS_IPTV.includes(servico)) {
+          acessos.push({
+            servico,
+            contaId: null,
+            email: "",
+            senha: "",
+            status: "ativo",
+            regiao: "BR",
+            aguardando: false,
+            nome: nomeServico,
+            appSlug: info?.appSlug ?? servico,
+            entrega: "vaga",
+            convite: null,
           });
           continue;
         }

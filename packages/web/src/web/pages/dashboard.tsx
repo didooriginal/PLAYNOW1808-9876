@@ -40,7 +40,7 @@ import { JornadaCliente } from "../components/cliente/jornada";
 import { CodigoRecente } from "../components/cliente/codigo-recente";
 import { AppsAguardandoPagamento } from "../components/cliente/apps-aguardando";
 import { DesbloquearNetflix } from "../components/cliente/netflix-desbloqueio";
-import { AtivacaoIptv } from "../components/cliente/ativacao-iptv";
+import { AtivacaoIptv, AtivacaoIptvCard } from "../components/cliente/ativacao-iptv";
 import { CombosSugeridos } from "../components/cliente/combos-sugeridos";
 import { PanelShell, type NavItem } from "../components/panel-shell";
 import { GlassCard, NeonButton, Pill, ProgressBar, accentHex, NeonBackdrop } from "../components/ui/kit";
@@ -105,7 +105,14 @@ function AccessCard({ cred }: { cred: Acesso }) {
   }
 
   const down = cred.status === "manutencao";
-  const aguardando = cred.aguardando;
+  /**
+   * O IPTV (app Fun Play) nao tem login/senha: o acesso e liberado pelo
+   * ENDERECO MAC do aparelho. Por isso o card dele nao mostra credenciais nem
+   * "estamos preparando o seu acesso" — ele mostra o passo a passo e o campo
+   * onde o cliente manda o MAC pra gente.
+   */
+  const ehIptv = appSlug.startsWith("iptv") || appSlug.includes("funplay");
+  const aguardando = ehIptv ? false : cred.aguardando;
 
   return (
     <GlassCard
@@ -147,7 +154,9 @@ function AccessCard({ cred }: { cred: Acesso }) {
           ) : (
             <BadgeCheck className="size-3" />
           )}
-          {convite && aguardando
+          {ehIptv
+            ? "ativação por MAC"
+            : convite && aguardando
             ? convite.status === "enviado"
               ? "convite enviado"
               : "aguardando"
@@ -159,8 +168,10 @@ function AccessCard({ cred }: { cred: Acesso }) {
         </span>
       </div>
 
-      {/* credenciais */}
-      {convite ? (
+      {/* credenciais (ou, no IPTV, o campo do endereco MAC) */}
+      {ehIptv ? (
+        <AtivacaoIptvCard />
+      ) : convite ? (
         <AcessoConvite
           servico={cred.servico}
           status={convite.status}
