@@ -226,12 +226,20 @@ Para cada conta matriz (ex.: a primeira Netflix):
    - Gmail da matriz → ⚙️ **Ver todas as configurações** →
      **Encaminhamento e POP/IMAP** → **Adicionar um endereço de encaminhamento**
      → `netflix01@mail.playplusnow.com.br`.
-   - O Gmail manda um e-mail de confirmação para esse endereço. Ele vai cair no
-     Worker, **não** na sua caixa. Duas saídas:
-     a) troque o catch-all temporariamente para **Send to an email** (seu e-mail
-        pessoal), confirme o código do Gmail e devolva para **Send to a Worker**; ou
-     b) crie uma regra "Custom address" para `netflix01@…` → **Send to an email**
-        (seu e-mail), confirme, e depois apague a regra.
+   - O Gmail manda um e-mail de confirmação para esse endereço, e ele cai no
+     Worker — **não** na sua caixa. O Worker já resolve isso: ele reconhece as
+     confirmações de encaminhamento e **reenvia para o `ADMIN_EMAIL`**, sem
+     tentar extrair código. Para funcionar, duas condições:
+     - a variável **`ADMIN_EMAIL`** está configurada no Worker
+       (Settings → Variables) com o seu e-mail pessoal;
+     - esse mesmo e-mail está **verificado** em Email Routing →
+       **Destination addresses** (a Cloudflare só reenvia para destino
+       verificado). Se não estiver verificado, o reenvio falha e o e-mail segue
+       para o webhook — você vê o erro em **Workers → Logs**.
+
+     Se você ainda não subiu essa versão do Worker, o plano B manual continua
+     valendo: crie uma regra "Custom address" para `netflix01@…` →
+     **Send to an email** (seu e-mail), confirme e apague a regra depois.
    - Confirmado, ative o encaminhamento. Para não encaminhar tudo, use
      **Filtros** → "De: `info@account.netflix.com`" → ação **Encaminhar para**.
 
@@ -295,7 +303,7 @@ npx wrangler tail playplusnow-email
 | Webhook responde **401** | `WEBHOOK_TOKEN` do Worker ≠ `EMAIL_WEBHOOK_TOKEN` do servidor | igualar os dois e reiniciar o servidor |
 | Webhook responde **422 "e-mail sem código"** | remetente/formato novo que o parser não reconhece | ver o e-mail bruto nos logs e ajustar `extrairCodigo` em `src/api/routes/codigos.ts` |
 | Código entra "sem dono" | ninguém clicou em "Pedi o código agora" nos últimos 10 min, ou o "E-mail de captura" da matriz está vazio/diferente | preencher o campo no admin exatamente igual ao endereço usado |
-| Confirmação do Gmail nunca chega | ela foi para o Worker | usar o desvio do item 6, Opção 1 |
+| Confirmação do Gmail nunca chega | ela foi entregue ao Worker | configure `ADMIN_EMAIL` no Worker **e** verifique esse e-mail em Destination addresses (item 6, Opção 1). Confira **Workers → Logs**: `reenviado para o admin` = deu certo; `nao consegui reenviar` = destino não verificado |
 | E-mail normal do domínio parou de chegar | MX da raiz sobrescrito pela Cloudflare | restaurar o MX do provedor original na raiz |
 
 ---
@@ -305,6 +313,7 @@ npx wrangler tail playplusnow-email
 - [ ] Conta Cloudflare criada, e-mail verificado, 2FA ligado
 - [ ] `playplusnow.com.br` **Active** na Cloudflare, DNS do site conferido
 - [ ] Email Routing habilitado + destino pessoal verificado
+- [ ] `ADMIN_EMAIL` configurado no Worker (recebe as confirmações de encaminhamento)
 - [ ] Subdomínio `mail.playplusnow.com.br` com MX próprios
 - [ ] Worker `playplusnow-email` publicado com `WEBHOOK_URL` e `WEBHOOK_TOKEN`
 - [ ] `EMAIL_WEBHOOK_TOKEN` no `.env` do servidor (mesmo valor) e servidor reiniciado

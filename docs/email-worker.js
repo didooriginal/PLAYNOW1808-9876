@@ -19,9 +19,22 @@
  *   e) Settings → Variables:
  *        WEBHOOK_URL   = https://playplusnow.com.br/api/webhooks/email
  *        WEBHOOK_TOKEN = mesmo valor de EMAIL_WEBHOOK_TOKEN no .env do servidor
+ *        ADMIN_EMAIL   = seu e-mail pessoal, JA VERIFICADO em "Destination
+ *                        addresses". Serve para o Worker te reenviar os e-mails
+ *                        que precisam de acao humana (ver abaixo).
  *   f) No admin, preencha "E-mail de captura de códigos" em cada conta matriz
  *      (ex.: netflix01@mail.playplusnow.com.br) e configure o streaming/Gmail
  *      da matriz para encaminhar os e-mails para esse endereço.
+ *
+ * CONFIRMACOES DE ENCAMINHAMENTO (o caso do Gmail)
+ *   Quando voce cadastra netflix01@mail.playplusnow.com.br como endereco de
+ *   encaminhamento no Gmail da matriz, o Gmail manda um e-mail de confirmacao
+ *   para esse endereco. Como o catch-all entrega tudo aqui, essa confirmacao
+ *   morreria no Worker e voce nunca conseguiria concluir o encaminhamento.
+ *   Por isso o Worker detecta esses e-mails (Gmail, Outlook, Yahoo, iCloud e
+ *   os proprios streamings pedindo "verifique seu e-mail") e os REENVIA para
+ *   ADMIN_EMAIL, sem tentar extrair codigo nenhum. Assim voce nunca precisa
+ *   trocar o catch-all para "Send to an email" e voltar depois.
  *
  * DEPENDÊNCIA
  *   npm i postal-mime   (parser de MIME; roda dentro do Worker)
@@ -39,6 +52,23 @@ export default {
 
     let corpo = "";
     let assunto = message.headers.get("subject") || "";
+
+    /**
+     * DESVIO PARA O HUMANO — antes de qualquer coisa.
+     * Confirmacao de encaminhamento / verificacao de endereco nao e codigo de
+     * streaming: ela precisa chegar numa caixa que voce le. O reenvio so
+     * funciona para um endereco JA VERIFICADO em "Destination addresses".
+     */
+    if (env.ADMIN_EMAIL && precisaDeHumano(message.from, assunto)) {
+      try {
+        await message.forward(env.ADMIN_EMAIL);
+        console.log("reenviado para o admin:", assunto);
+        return;
+      } catch (e) {
+        // destino nao verificado na Cloudflare: segue o fluxo normal e loga
+        console.error("nao consegui reenviar para ADMIN_EMAIL", e);
+      }
+    }
 
     try {
       // o raw do e-mail vem como stream; o parser devolve texto limpo
@@ -86,4 +116,39 @@ function striptags(html) {
     .replace(/&nbsp;/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+/**
+ * true quando o e-mail e um pedido de confirmacao/verificacao de endereco, e
+ * nao um codigo de acesso. Casa pelo remetente (mais confiavel) e, como rede
+ * de seguranca, por frases tipicas no assunto — em portugues e em ingles.
+ */
+function precisaDeHumano(remetente, assunto) {
+  const de = (remetente || "").toLowerCase();
+  const titulo = (assunto || "").toLowerCase();
+
+  const remetentesDeConfirmacao = [
+    "forwarding-noreply@google.com", // Gmail: confirmacao de encaminhamento
+    "noreply-forwarding@google.com",
+    "mail-noreply@google.com",
+    "no-reply@microsoft.com",
+    "account-security-noreply@accountprotection.microsoft.com",
+    "verify@icloud.com",
+  ];
+  if (remetentesDeConfirmacao.some((r) => de.includes(r))) return true;
+
+  const frases = [
+    "confirmação de encaminhamento",
+    "confirmacao de encaminhamento",
+    "verificação de encaminhamento",
+    "forwarding confirmation",
+    "verify your forwarding",
+    "confirm your forwarding",
+    "verifique seu e-mail",
+    "verifique seu endereço de e-mail",
+    "confirme seu e-mail",
+    "confirm your email",
+    "verify your email",
+  ];
+  return frases.some((f) => titulo.includes(f));
 }
