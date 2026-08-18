@@ -5,6 +5,7 @@ import { Check, MessageCircle, TriangleAlert, UserPlus } from "lucide-react";
 import { AuthField, AuthShell, inputClass } from "../components/auth-shell";
 import { AppIcon } from "../components/app-icon";
 import { NeonButton, accentHex } from "../components/ui/kit";
+import { CampoSenha } from "../components/ui/campo-senha";
 import { serviceById, type ServiceId } from "@/lib/mock-data";
 import { authClient, setToken } from "../lib/auth";
 import { client } from "../lib/api";

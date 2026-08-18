@@ -313,7 +313,17 @@ function EditorVagas({
           max={50}
           aria-label="Total de vagas"
           value={valor}
-          onChange={(e) => setValor(Number(e.target.value))}
+          onChange={(e) => {
+            const n = Number(e.target.value);
+            // campo vazio nao vira 0: mantem o valor atual ate digitar de novo
+            setValor(Number.isFinite(n) && n > 0 ? Math.min(50, n) : valor);
+          }}
+          /*
+           * SEM RODA DO MOUSE. Input number muda de valor quando a roda gira
+           * com o campo focado — era assim que o total de vagas "diminuia
+           * sozinho" ao rolar a pagina depois de clicar no campo.
+           */
+          onWheel={(e) => e.currentTarget.blur()}
           className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-center font-display text-sm font-bold text-white focus:border-neon-purple/60 focus:outline-none"
         />
         <button

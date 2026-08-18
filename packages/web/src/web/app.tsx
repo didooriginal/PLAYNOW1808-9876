@@ -1,4 +1,4 @@
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useEffect } from "react";
 import { Route, Switch } from "wouter";
 import Index from "./pages/index";
 import LoginPage from "./pages/login";
@@ -24,7 +24,31 @@ const TermosPage = lazy(() => import("./pages/termos"));
 const PrivacidadePage = lazy(() => import("./pages/privacidade"));
 const TutoriaisPage = lazy(() => import("./pages/tutoriais"));
 
+/**
+ * TRAVA DA RODA DO MOUSE EM CAMPO NUMÉRICO.
+ *
+ * Todo `input[type=number]` do navegador incrementa/decrementa quando a roda
+ * do mouse gira com o campo focado. No admin isso fazia número de vagas,
+ * preço e quantidade "mudarem sozinhos" quando a página era rolada logo depois
+ * de clicar no campo. Aqui o campo simplesmente perde o foco na primeira
+ * rolagem — a página rola normal e o valor não muda.
+ */
+function useSemRodaEmCampoNumerico() {
+  useEffect(() => {
+    const aoRolar = (e: WheelEvent) => {
+      const alvo = document.activeElement as HTMLInputElement | null;
+      if (alvo?.tagName === "INPUT" && alvo.type === "number" && alvo === e.target) {
+        alvo.blur();
+      }
+    };
+    document.addEventListener("wheel", aoRolar, { passive: true });
+    return () => document.removeEventListener("wheel", aoRolar);
+  }, []);
+}
+
 function App() {
+  useSemRodaEmCampoNumerico();
+
   return (
     <Provider>
       <Suspense fallback={<Carregando texto="Carregando" />}>
