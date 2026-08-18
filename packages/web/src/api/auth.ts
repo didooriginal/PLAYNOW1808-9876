@@ -10,6 +10,33 @@ import {
   registrarReset,
   urlRedefinicao,
 } from "./lib/senha";
+import { templates } from "./lib/emails/templates";
+import { enviarEmail } from "./services/email";
+
+/**
+ * E-MAIL DE BOAS-VINDAS.
+ * Disparado no cadastro (hook `user.create.after`). Nunca lança e nunca é
+ * aguardado pelo fluxo de signup: se o Resend estiver fora do ar ou sem chave,
+ * a conta é criada do mesmo jeito e só fica o aviso no log.
+ */
+async function enviarBoasVindas(nome: string, email: string) {
+  const base = (process.env.WEBSITE_URL || "https://playplusnow.com.br").replace(
+    /\/$/,
+    "",
+  );
+  const modelo = templates.boasVindas({
+    nome: nome.split(" ")[0] || "tudo bem",
+    email,
+    linkPainel: `${base}/dashboard`,
+  });
+  const r = await enviarEmail({
+    para: email,
+    assunto: modelo.assunto,
+    texto: modelo.texto,
+    html: modelo.html,
+  });
+  if (!r.ok) console.warn("[boas-vindas] nao enviado:", r.motivo, r.erro);
+}
 
 /**
  * Autenticação e-mail + senha (Better Auth).
@@ -119,6 +146,11 @@ export const auth = betterAuth({
             statusPagamento: "pendente",
             clienteDesde: new Date().toISOString().slice(0, 10),
           });
+
+          // fire-and-forget: o cadastro nao espera o Resend responder
+          void enviarBoasVindas(user.name || email.split("@")[0], email).catch(
+            (e) => console.warn("[boas-vindas] falhou:", e),
+          );
         },
       },
     },

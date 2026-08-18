@@ -243,6 +243,12 @@ export const AJUDA: Record<string, string> = {
   "codigos.expira": "Todo código vale 1 hora. Depois disso ele sai da lista e o cliente precisa pedir de novo.",
   "codigos.copiar": "Copia o código para a área de transferência, sem risco de erro de digitação.",
   "codigos.descartar": "Descarta um código errado ou já usado, tirando-o da fila do cliente.",
+  "codigos.caixa": "Todo e-mail que entra pelo webhook aparece aqui com o texto completo — inclusive os que não têm código nenhum, como a confirmação do Gmail. Fica guardado por 7 dias.",
+  "codigos.abrirEmail": "Abre o conteúdo integral da mensagem, do jeito que o provedor enviou.",
+  "codigos.fixarEmail": "Fixa a mensagem para ela não ser apagada pela limpeza automática de 7 dias.",
+  "codigos.copiarEmail": "Copia o texto completo do e-mail para a área de transferência.",
+  "codigos.excluirEmail": "Apaga esta mensagem da caixa de entrada. Não afeta o código já entregue ao cliente.",
+  "codigos.buscaEmail": "Busca por remetente, destinatário, assunto ou qualquer palavra dentro do corpo do e-mail.",
 
   /* ---------------- senhas & netflix tv ---------------- */
   "senhas.emailCliente": "E-mail do cliente que perdeu o acesso. Gera um link manual de redefinição quando o e-mail automático não chega.",

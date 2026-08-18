@@ -10,6 +10,7 @@ import {
   aplicativos,
   codigosOtp,
   contasMatrizes,
+  emailsRecebidos,
   pedidosCodigo,
   usuarios,
 } from "../database/schema";
@@ -37,6 +38,8 @@ import {
  */
 
 const UMA_HORA_MS = 60 * 60 * 1000;
+/** por quanto tempo o e-mail bruto fica na caixa de entrada do admin (7 dias) */
+const RETENCAO_CAIXA_MS = 7 * 24 * 60 * 60 * 1000;
 
 /* ------------------------------------------------------------------ */
 /* EXTRAÇÃO DO CÓDIGO                                                  */
@@ -273,6 +276,13 @@ function lerCabecalhos(corpo: string) {
 async function purgar() {
   const limite = new Date(Date.now() - UMA_HORA_MS);
   await db.delete(codigosOtp).where(lt(codigosOtp.recebidoEm, limite));
+
+  // a caixa de entrada guarda por mais tempo (o admin precisa LER o e-mail),
+  // e o que estiver fixado nunca some sozinho
+  const limiteCaixa = new Date(Date.now() - RETENCAO_CAIXA_MS);
+  await db
+    .delete(emailsRecebidos)
+    .where(and(lt(emailsRecebidos.recebidoEm, limiteCaixa), eq(emailsRecebidos.fixado, false)));
 }
 
 export async function registrarEmail(entrada: EmailBruto) {
@@ -282,12 +292,30 @@ export async function registrarEmail(entrada: EmailBruto) {
   const assunto = (entrada.assunto || cabecalhos.assunto || "").trim();
 
   const achado = extrairCodigo(`${assunto} ${entrada.corpo}`);
-  if (!achado) return { ok: false as const, motivo: "Nenhum código de 4 a 6 dígitos encontrado" };
-
   const { servicoSlug, servico } = await identificarServico(remetente, assunto, entrada.corpo);
-  const { clienteId, contaIds } = await identificarCliente(destinatario, servicoSlug);
 
   await purgar();
+
+  /*
+   * CAIXA DE ENTRADA: o e-mail inteiro é gravado ANTES de qualquer decisão.
+   * Antes, e-mail sem código de 4 a 6 dígitos (confirmação do Gmail, aviso de
+   * novo aparelho...) era simplesmente descartado e o admin nunca via o
+   * conteúdo. Agora tudo fica legível no painel por 7 dias.
+   */
+  await db.insert(emailsRecebidos).values({
+    remetente,
+    destinatario,
+    assunto,
+    corpo: entrada.corpo.slice(0, 200_000),
+    codigo: achado?.codigo ?? "",
+    servicoSlug,
+    origem: entrada.origem,
+    recebidoEm: new Date(),
+  });
+
+  if (!achado) return { ok: false as const, motivo: "Nenhum código de 4 a 6 dígitos encontrado" };
+
+  const { clienteId, contaIds } = await identificarCliente(destinatario, servicoSlug);
 
   const [row] = await db
     .insert(codigosOtp)
@@ -356,6 +384,61 @@ async function fichaDaSessao(authUserId: string) {
 }
 
 export const codigos = {
+  /* ---------------------------------------------------------------- */
+  /* CAIXA DE ENTRADA — e-mails brutos que chegaram no webhook          */
+  /* ---------------------------------------------------------------- */
+
+  /**
+   * Lista os e-mails recebidos com o CORPO COMPLETO, inclusive os que não
+   * tinham código nenhum. É aqui que o admin lê, por exemplo, o código de
+   * confirmação que o Gmail manda ao adicionar um endereço de envio.
+   */
+  caixaEntrada: adminOnly
+    .input(
+      z
+        .object({
+          busca: z.string().max(120).optional(),
+          limite: z.number().int().min(1).max(200).optional(),
+        })
+        .optional(),
+    )
+    .handler(async ({ input }) => {
+      await purgar();
+      const rows = await db
+        .select()
+        .from(emailsRecebidos)
+        .orderBy(desc(emailsRecebidos.recebidoEm))
+        .limit(input?.limite ?? 60);
+
+      const busca = (input?.busca ?? "").trim().toLowerCase();
+      if (!busca) return rows;
+      return rows.filter((r) =>
+        `${r.remetente} ${r.destinatario} ${r.assunto} ${r.corpo} ${r.codigo}`
+          .toLowerCase()
+          .includes(busca),
+      );
+    }),
+
+  /** fixa/desfixa um e-mail para ele escapar da limpeza automática de 7 dias */
+  fixarEmail: adminOnly
+    .input(z.object({ id: z.number().int(), fixado: z.boolean() }))
+    .handler(async ({ input }) => {
+      const [row] = await db
+        .update(emailsRecebidos)
+        .set({ fixado: input.fixado })
+        .where(eq(emailsRecebidos.id, input.id))
+        .returning();
+      if (!row) throw new ORPCError("NOT_FOUND", { message: "E-mail não encontrado" });
+      return row;
+    }),
+
+  removerEmail: adminOnly
+    .input(z.object({ id: z.number().int() }))
+    .handler(async ({ input }) => {
+      await db.delete(emailsRecebidos).where(eq(emailsRecebidos.id, input.id));
+      return { ok: true };
+    }),
+
   /** central do admin — purga os antigos e devolve os códigos da última hora */
   listar: adminOnly.handler(async () => {
     await purgar();

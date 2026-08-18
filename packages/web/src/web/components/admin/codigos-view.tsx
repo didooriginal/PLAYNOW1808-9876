@@ -24,6 +24,7 @@ import {
   minutosRestantes,
 } from "../../queries/codigos";
 import { useUsuarios } from "../../queries/usuarios";
+import { CaixaEntrada } from "./caixa-entrada";
 
 const inputCls =
   "w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 font-sans text-sm text-white placeholder:text-white/25 focus:border-neon-purple/50 focus:outline-none";
@@ -254,6 +255,8 @@ export function CodigosView() {
           </div>
         )}
       </GlassCard>
+
+      <CaixaEntrada />
 
       <label className="flex items-center gap-2 font-sans text-[11px] text-white/50">
         <input

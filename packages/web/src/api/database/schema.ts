@@ -612,6 +612,37 @@ export const codigosOtp = sqliteTable("codigos_otp", {
 });
 
 export type CodigoOtp = typeof codigosOtp.$inferSelect;
+
+/**
+ * CAIXA DE ENTRADA DO WEBHOOK.
+ *
+ * `codigos_otp` só guarda e-mail do qual saiu um código de 4 a 6 dígitos, e
+ * ainda assim só um trecho de 180 caracteres. Esta tabela guarda o e-mail
+ * INTEIRO de tudo que chega em `/api/webhooks/email`, inclusive quando nenhum
+ * código é encontrado (confirmação do Gmail, aviso de novo aparelho, etc.).
+ * É o que permite o admin ler a mensagem original no painel.
+ */
+export const emailsRecebidos = sqliteTable("emails_recebidos", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  remetente: text("remetente").notNull().default(""),
+  destinatario: text("destinatario").notNull().default(""),
+  assunto: text("assunto").notNull().default(""),
+  /** corpo completo, do jeito que o provedor mandou (texto ou HTML) */
+  corpo: text("corpo").notNull().default(""),
+  /** código extraído, quando houve — "" quando o e-mail não tinha código */
+  codigo: text("codigo").notNull().default(""),
+  /** slug do app identificado (ou "desconhecido") */
+  servicoSlug: text("servico_slug").notNull().default("desconhecido"),
+  /** webhook | manual */
+  origem: text("origem").notNull().default("webhook"),
+  /** e-mail marcado pelo admin: não é apagado pela limpeza automática */
+  fixado: integer("fixado", { mode: "boolean" }).notNull().default(false),
+  recebidoEm: integer("recebido_em", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+export type EmailRecebido = typeof emailsRecebidos.$inferSelect;
 export type NovoCodigoOtp = typeof codigosOtp.$inferInsert;
 
 /* ------------------------------------------------------------------ */

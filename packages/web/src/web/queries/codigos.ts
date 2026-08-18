@@ -27,6 +27,30 @@ export function usePedidosAbertos() {
   );
 }
 
+/**
+ * Caixa de entrada do webhook (admin): e-mails brutos com o corpo completo,
+ * inclusive os que não tinham código nenhum.
+ */
+export function useCaixaEntrada(busca: string) {
+  return useQuery(
+    orpc.codigos.caixaEntrada.queryOptions({
+      input: { busca: busca || undefined, limite: 60 },
+      staleTime: 5_000,
+      refetchInterval: 20_000,
+    }),
+  );
+}
+
+export function useFixarEmail() {
+  const invalidar = useInvalidarCodigos();
+  return useMutation(orpc.codigos.fixarEmail.mutationOptions({ onSuccess: invalidar }));
+}
+
+export function useRemoverEmail() {
+  const invalidar = useInvalidarCodigos();
+  return useMutation(orpc.codigos.removerEmail.mutationOptions({ onSuccess: invalidar }));
+}
+
 function useInvalidarCodigos() {
   const qc = useQueryClient();
   return () => qc.invalidateQueries({ queryKey: orpc.codigos.key() });

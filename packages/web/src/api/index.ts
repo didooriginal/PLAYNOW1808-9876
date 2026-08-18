@@ -128,9 +128,14 @@ app.post("/api/webhooks/email", async (c) => {
     origem: "webhook",
   });
 
+  /*
+   * 200 mesmo sem código: o e-mail já foi salvo na caixa de entrada do admin
+   * (`emails_recebidos`), então não há nada para o provedor reenviar. Devolver
+   * 422 fazia a Cloudflare marcar a entrega como falha e o conteúdo se perdia.
+   */
   return resultado.ok
     ? c.json({ ok: true, codigo: resultado.registro.codigo }, 200)
-    : c.json({ ok: false, erro: resultado.motivo }, 422);
+    : c.json({ ok: true, codigo: null, salvo: true, aviso: resultado.motivo }, 200);
 });
 
 /**

@@ -65,5 +65,37 @@ export const templates = {
       botao: { texto: "Renovar Agora", url: dados.linkPagamento },
       rodape: "Se você já realizou o pagamento, por favor ignore este aviso."
     })
+  }),
+
+  /**
+   * 4. Boas-vindas (disparado no CADASTRO, antes do pagamento).
+   * Não promete acesso liberado — o acesso só chega depois do Pix confirmado,
+   * que é quando sai o template `entregaAcesso`.
+   */
+  boasVindas: (dados: { nome: string; email: string; linkPainel: string }) => ({
+    assunto: "Sua conta PLAYPLUSNOW foi criada 🎬",
+    texto: [
+      `Olá, ${dados.nome}!`,
+      "",
+      "Sua conta na PLAYPLUSNOW foi criada com sucesso.",
+      `Login: ${dados.email}`,
+      "",
+      "O próximo passo é confirmar o pagamento no painel. Assim que o Pix cair, seus acessos são liberados automaticamente.",
+      "",
+      `Painel: ${dados.linkPainel}`,
+    ].join("\n"),
+    html: layoutEmail({
+      titulo: "Conta criada com sucesso",
+      corpo: `
+        <p>Olá, <strong>${dados.nome}</strong>!</p>
+        <p>Sua conta na PLAYPLUSNOW já existe. Falta só um passo: confirmar o pagamento no painel. Assim que o Pix for aprovado, seus acessos são liberados automaticamente e você recebe outro e-mail com os dados.</p>
+        <div style="background:rgba(255,255,255,0.05); padding:20px; border-radius:12px; margin:20px 0;">
+          <p style="margin:0 0 8px; color:#94a3b8; font-size:13px;">SEU LOGIN:</p>
+          <p style="margin:0; color:#ffffff;"><strong>${dados.email}</strong></p>
+        </div>
+      `,
+      botao: { texto: "Ir para o painel", url: dados.linkPainel },
+      rodape: "Se não foi você que criou esta conta, é só ignorar este e-mail."
+    })
   })
 };
