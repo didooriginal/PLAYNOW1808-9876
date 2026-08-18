@@ -335,6 +335,28 @@ export const assinaturasRota = {
       .set({ status: "cancelled", canceladaEm: new Date(), atualizadoEm: new Date() })
       .where(eq(tabelaAssinaturas.id, atual.id));
 
+    // e-mail de confirmação do cancelamento — nunca derruba o cancelamento
+    try {
+      const acessoAte = cliente.proximaCobranca
+        ? cliente.proximaCobranca.split("-").reverse().join("/")
+        : "";
+      const base = (process.env.WEBSITE_URL || "https://playplusnow.com.br").replace(/\/$/, "");
+      const modelo = templates.cancelamento({
+        nome: cliente.nome,
+        titulo: atual.titulo,
+        acessoAte,
+        linkPainel: `${base}/dashboard`,
+      });
+      await enviarEmail({
+        para: cliente.email,
+        assunto: modelo.assunto,
+        texto: modelo.texto,
+        html: modelo.html,
+      });
+    } catch (e) {
+      console.error("[Email] falha ao enviar a confirmação de cancelamento:", e);
+    }
+
     await notificar({
       escopo: "admin",
       clienteId: cliente.id,

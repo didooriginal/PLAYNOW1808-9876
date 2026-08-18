@@ -97,5 +97,98 @@ export const templates = {
       botao: { texto: "Ir para o painel", url: dados.linkPainel },
       rodape: "Se não foi você que criou esta conta, é só ignorar este e-mail."
     })
-  })
+  }),
+
+  /**
+   * 5. Fatura ATRASADA (o vencimento já passou).
+   * `dias` = há quantos dias venceu. `diasParaBloqueio` = quantos ainda faltam
+   * para a suspensão automática (0 quando o acesso já foi suspenso).
+   */
+  faturaAtrasada: (dados: {
+    nome: string;
+    dias: number;
+    valor: string;
+    vencimento: string;
+    linkPagamento: string;
+    diasParaBloqueio: number;
+  }) => {
+    const bloqueado = dados.diasParaBloqueio <= 0;
+    const plural = dados.dias === 1 ? "1 dia" : `${dados.dias} dias`;
+    const aviso = bloqueado
+      ? "Seu acesso foi suspenso. Assim que o pagamento for confirmado, tudo volta automaticamente."
+      : `Faltam ${dados.diasParaBloqueio === 1 ? "1 dia" : `${dados.diasParaBloqueio} dias`} para a suspensão automática do acesso.`;
+    return {
+      assunto: bloqueado
+        ? "Seu acesso foi suspenso por falta de pagamento"
+        : `Sua fatura venceu há ${plural} ⏰`,
+      texto: [
+        `Olá, ${dados.nome}!`,
+        "",
+        `Sua fatura de ${dados.valor} venceu em ${dados.vencimento} (há ${plural}) e ainda não identificamos o pagamento.`,
+        aviso,
+        "",
+        `Pagar agora: ${dados.linkPagamento}`,
+        "",
+        "Se você já pagou nas últimas horas, pode ignorar este e-mail.",
+      ].join("\n"),
+      html: layoutEmail({
+        titulo: bloqueado ? "Acesso suspenso" : "Sua fatura está atrasada",
+        corpo: `
+        <p>Olá, <strong>${dados.nome}</strong>!</p>
+        <p>Sua fatura venceu em <strong>${dados.vencimento}</strong> (há ${plural}) e ainda não identificamos o pagamento.</p>
+        <table style="width:100%; border-collapse:collapse; margin:20px 0;">
+          <tr>
+            <td style="padding:8px 0; color:#94a3b8;">Valor em aberto:</td>
+            <td style="padding:8px 0; color:#ffffff; text-align:right;"><strong>${dados.valor}</strong></td>
+          </tr>
+          <tr>
+            <td style="padding:8px 0; color:#94a3b8;">Venceu em:</td>
+            <td style="padding:8px 0; color:#ffffff; text-align:right;"><strong>${dados.vencimento}</strong></td>
+          </tr>
+        </table>
+        <p style="color:${bloqueado ? "#ff6b74" : "#fbbf24"};"><strong>${aviso}</strong></p>
+      `,
+        botao: { texto: "Pagar agora", url: dados.linkPagamento },
+        rodape: "Se você já realizou o pagamento nas últimas horas, ignore este aviso.",
+      }),
+    };
+  },
+
+  /**
+   * 6. Cancelamento da recorrência no cartão.
+   * O acesso NÃO cai na hora: vale até o fim do período já pago.
+   */
+  cancelamento: (dados: {
+    nome: string;
+    titulo: string;
+    acessoAte: string;
+    linkPainel: string;
+  }) => ({
+    assunto: "Sua assinatura foi cancelada",
+    texto: [
+      `Olá, ${dados.nome}!`,
+      "",
+      `Confirmamos o cancelamento da renovação automática${dados.titulo ? ` de ${dados.titulo}` : ""}.`,
+      "Não haverá novas cobranças no seu cartão.",
+      dados.acessoAte
+        ? `Seu acesso continua liberado até ${dados.acessoAte}.`
+        : "Seu acesso continua liberado até o fim do período já pago.",
+      "",
+      `Mudou de ideia? É só reativar pelo painel: ${dados.linkPainel}`,
+    ].join("\n"),
+    html: layoutEmail({
+      titulo: "Assinatura cancelada",
+      corpo: `
+        <p>Olá, <strong>${dados.nome}</strong>!</p>
+        <p>Confirmamos o cancelamento da renovação automática${dados.titulo ? ` de <strong>${dados.titulo}</strong>` : ""}. <strong>Não haverá novas cobranças</strong> no seu cartão.</p>
+        <div style="background:rgba(255,255,255,0.05); padding:20px; border-radius:12px; margin:20px 0;">
+          <p style="margin:0 0 8px; color:#94a3b8; font-size:13px;">SEU ACESSO CONTINUA ATÉ:</p>
+          <p style="margin:0; color:#ffffff; font-size:18px;"><strong>${dados.acessoAte || "o fim do período já pago"}</strong></p>
+        </div>
+        <p>Sentimos muito em ver você indo embora. Se mudar de ideia, dá para reativar a qualquer momento pelo painel — os mesmos preços continuam valendo.</p>
+      `,
+      botao: { texto: "Reativar assinatura", url: dados.linkPainel },
+      rodape: "Se você não pediu este cancelamento, fale com a gente o quanto antes.",
+    }),
+  }),
 };
