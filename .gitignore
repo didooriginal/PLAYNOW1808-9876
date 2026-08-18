@@ -75,3 +75,6 @@ packages/mobile/scripts/*
 
 # dumps do banco (dados reais — nunca versionar)
 backups/
+
+# valor para copiar no Cloudflare — nunca versionar
+CRON_SECRET.txt
