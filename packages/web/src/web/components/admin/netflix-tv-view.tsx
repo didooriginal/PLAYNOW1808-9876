@@ -25,6 +25,13 @@ import { useFilaTvNetflix, useResponderTv, haQuantoTempoTv, horaCurta } from "..
 
 const NETFLIX = "#e50914";
 
+/**
+ * Pagina onde o codigo da TV e autorizado. E aqui que o admin cola o codigo
+ * que o cliente mandou, por isso o link e botao de destaque na fila e tambem
+ * atalho por linha (copia o codigo e abre a pagina no mesmo clique).
+ */
+const NETFLIX_TV2 = "https://www.netflix.com/tv2";
+
 const ESTILO: Record<string, string> = {
   pendente: "border-amber-400/40 bg-amber-400/10 text-amber-300",
   aprovado: "border-emerald-400/40 bg-emerald-400/10 text-emerald-300",
@@ -89,13 +96,19 @@ export function NetflixTvView() {
                 {pendentes} com prioridade
               </Pill>
             )}
+            <a href={NETFLIX_TV2} target="_blank" rel="noopener noreferrer">
+              <NeonButton accent="red" size="sm" data-testid="tv-abrir-tv2">
+                Abrir netflix.com/tv2
+                <ExternalLink className="size-3.5" />
+              </NeonButton>
+            </a>
             <a
               href="https://www.netflix.com/account/travel-verification"
               target="_blank"
               rel="noreferrer"
               className="flex items-center gap-1.5 font-sans text-[11px] text-white/40 transition-colors hover:text-white"
             >
-              abrir Netflix <ExternalLink className="size-3" />
+              verificação de viagem <ExternalLink className="size-3" />
             </a>
           </div>
         </div>
@@ -201,6 +214,25 @@ export function NetflixTvView() {
                         <X className="size-3.5" />
                         Recusar
                       </NeonButton>
+                      {/*
+                        Atalho de trabalho: copia o codigo do cliente e abre o
+                        netflix.com/tv2 na mesma acao — e so colar e confirmar.
+                      */}
+                      <button
+                        type="button"
+                        data-testid={`tv-copiar-e-abrir-${s.id}`}
+                        onClick={() => {
+                          void navigator.clipboard?.writeText(s.codigoTv);
+                          setCopiado(s.id);
+                          setTimeout(() => setCopiado(null), 1800);
+                          window.open(NETFLIX_TV2, "_blank", "noopener,noreferrer");
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 font-sans text-[11px] font-semibold transition-colors"
+                        style={{ borderColor: `${NETFLIX}66`, background: `${NETFLIX}14`, color: "#ff8f96" }}
+                      >
+                        <ExternalLink className="size-3" />
+                        Copiar e abrir tv2
+                      </button>
                     </div>
                   ) : (
                     <div className="flex min-w-[150px] flex-col items-end gap-1">
@@ -234,7 +266,7 @@ export function NetflixTvView() {
           {[
             "Copie o código da TV clicando nele aqui na fila.",
             "Abra a Netflix logado na conta matriz indicada ao lado do cliente.",
-            "Acesse netflix.com/tv2 (ou o link de verificação) e cole o código.",
+            "Toque em \"Copiar e abrir tv2\" na linha do cliente: o código já vai copiado e a página abre.",
             "Confirme a autorização e volte aqui para tocar em Aprovar.",
             "O painel do cliente muda para liberado em até 10 segundos e a TV destrava sozinha.",
           ].map((passo, i) => (
