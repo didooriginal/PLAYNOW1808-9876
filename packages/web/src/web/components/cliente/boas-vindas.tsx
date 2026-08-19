@@ -1,5 +1,6 @@
 // CHECKLIST DE BOAS-VINDAS — pop-up obrigatorio no primeiro acesso.
 // O cliente so entra no painel depois de marcar todas as regras e aceitar.
+// Textos no imperativo: sao as regras de uso da PLAYPLUSNOW, nao um juramento do cliente.
 import { useState } from "react";
 import { Check, Loader2, ShieldCheck } from "lucide-react";
 import { NeonButton } from "../ui/kit";
@@ -8,31 +9,31 @@ import { useAceitarTermos } from "../../queries/usuarios";
 const REGRAS = [
   {
     id: "senhas",
-    titulo: "Não repasso login nem senha para ninguém",
+    titulo: "Não repasse login nem senha para ninguém",
     detalhe:
       "As credenciais são pessoais e intransferíveis. Compartilhar cancela o plano sem reembolso.",
   },
   {
     id: "tela",
-    titulo: "Uso apenas o meu perfil e os meus aparelhos",
+    titulo: "Use apenas o seu perfil e os seus aparelhos",
     detalhe:
       "Cada assinatura dá direito a 2 aparelhos cadastrados e 1 tela simultânea por app. Não compartilhe com terceiros.",
   },
   {
     id: "perfil",
-    titulo: "Uso apenas o perfil indicado no meu card",
+    titulo: "Entre somente no perfil indicado no seu card",
     detalhe:
       "Nunca crie novos perfis, nunca renomeie perfis existentes e nunca entre em perfis que não foram indicados para você.",
   },
   {
     id: "pagamento",
-    titulo: "Pago até a data de vencimento",
+    titulo: "Pague até a data de vencimento",
     detalhe:
       "Depois do vencimento os logins e o suporte ficam bloqueados automaticamente até a regularização.",
   },
   {
     id: "suporte",
-    titulo: "Problema de acesso eu resolvo primeiro pelo painel",
+    titulo: "Resolva problema de acesso primeiro pelo painel",
     detalhe:
       "Código por e-mail, desbloqueio de TV e assistente de IA resolvem quase tudo em menos de 1 minuto.",
   },
