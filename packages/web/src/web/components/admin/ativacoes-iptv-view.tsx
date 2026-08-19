@@ -197,15 +197,22 @@ export function AtivacoesIptvView() {
                       <X className="size-3.5" />
                       Recusar
                     </NeonButton>
-                    <a
-                      href={PAINEL_IPTV}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-white/12 bg-white/5 px-3 py-1.5 font-sans text-[11px] font-semibold text-white/60 transition hover:text-white"
+                    {/*
+                      Atalho de trabalho: copia o MAC do cliente e ja abre o
+                      painel do provedor na tela de usuarios IPTV, e so colar.
+                    */}
+                    <button
+                      type="button"
+                      data-testid="iptv-copiar-e-abrir"
+                      onClick={() => {
+                        void copiar(item.id, item.mac);
+                        window.open(PAINEL_IPTV, "_blank", "noopener,noreferrer");
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-neon-cyan/40 bg-neon-cyan/10 px-3 py-1.5 font-sans text-[11px] font-semibold text-neon-cyan transition hover:bg-neon-cyan/20"
                     >
                       <ExternalLink className="size-3" />
-                      Cadastrar MAC no painel
-                    </a>
+                      Copiar MAC e abrir painel
+                    </button>
                   </div>
                 )}
               </div>

@@ -252,8 +252,18 @@ function AccessCard({ cred }: { cred: Acesso }) {
       </div>
       )}
 
-      {/* acesso direto + guia */}
-      <div className="relative mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+      {/*
+        acesso direto + guia. No IPTV o "site do IPTV" nao serve para o cliente
+        (o acesso e liberado pelo MAC no painel do provedor, coisa da equipe),
+        entao o card mostra apenas o guia em largura cheia.
+      */}
+      <div
+        className={cn(
+          "relative mt-4 grid grid-cols-1 gap-2",
+          !ehIptv && "sm:grid-cols-2",
+        )}
+      >
+        {!ehIptv && (
         <a
           href={info.url}
           target="_blank"
@@ -272,6 +282,7 @@ function AccessCard({ cred }: { cred: Acesso }) {
             <ExternalLink className="size-3.5 shrink-0" />
           </NeonButton>
         </a>
+        )}
         <NeonButton
           accent="cyan"
           variant="outline"

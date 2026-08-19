@@ -25,6 +25,11 @@ export function ComoAcessarModal({
   onClose: () => void;
 }) {
   const info = servicoInfo(slug, nome);
+  /**
+   * IPTV: o site do provedor e area da equipe (cadastro de MAC), nao do
+   * cliente. O rodape do guia entao nao oferece o link do site.
+   */
+  const ehIptv = slug.startsWith("iptv") || slug.includes("funplay");
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -147,18 +152,20 @@ export function ComoAcessarModal({
           <NeonButton variant="ghost" size="sm" className="shrink-0" onClick={onClose}>
             Fechar
           </NeonButton>
-          <a
-            href={info.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex-1"
-            data-testid="modal-abrir-servico"
-          >
-            <NeonButton accent="red" size="sm" className="w-full">
-              {info.rotulo}
-              <ExternalLink className="size-3.5" />
-            </NeonButton>
-          </a>
+          {!ehIptv && (
+            <a
+              href={info.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1"
+              data-testid="modal-abrir-servico"
+            >
+              <NeonButton accent="red" size="sm" className="w-full">
+                {info.rotulo}
+                <ExternalLink className="size-3.5" />
+              </NeonButton>
+            </a>
+          )}
         </div>
       </div>
     </div>,
