@@ -13,8 +13,18 @@
  *   WHATSAPP_DESTINOS="5521995777108:123456,5511999999999:654321"
  * Formato de cada item: <telefone com DDI, so digitos>:<apikey do CallMeBot>.
  * A apikey e individual: cada numero precisa mandar uma vez
- * "I allow callmebot to send me messages" para +34 644 51 95 23 e o bot
+ * "I allow callmebot to send me messages" para o bot do CallMeBot e o bot
  * responde com a chave daquele numero.
+ *
+ * ATENCAO: o numero do BOT muda de destino para destino (o CallMeBot tem
+ * varios). Cada destino so recebe pelo bot que respondeu a apikey dele:
+ *   21 99577-7108 -> bot +34 694 25 79 52
+ *   21 96472-7746 -> o bot que respondeu naquele aparelho
+ * Se um destino para de receber, o contato a desbloquear/desarquivar e o bot
+ * DELE. O mapa fica em docs/whatsapp-alertas.md.
+ *
+ * Grupo de WhatsApp nao e possivel aqui: o FAQ do CallMeBot diz que so da para
+ * enviar a contatos (grupo existe apenas no Telegram deles).
  *
  * Regra de ouro: falha de rede aqui NUNCA derruba o fluxo que chamou. O alerta
  * continua no painel do admin de qualquer forma.

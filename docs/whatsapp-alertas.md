@@ -33,12 +33,34 @@ Itens malformados são ignorados; a apikey nunca é logada.
 **Números configurados hoje:** o oficial da empresa (21 96472-7746) e o pessoal
 (21 99577-7108). Ambos testados com envio real.
 
+### O número do bot MUDA de destino para destino
+
+Atenção: o CallMeBot usa vários números de bot e **cada destino fica atrelado ao bot
+que respondeu a ele**. Não existe um número único. Mapa atual:
+
+| Destino | Bot do CallMeBot |
+| --- | --- |
+| 21 99577-7108 | **+34 694 25 79 52** |
+| 21 96472-7746 | o que respondeu a apikey desse aparelho (confirmar no histórico dele) |
+
+Se um destino para de receber, o bloqueio/arquivamento a checar é o **bot dele**, não o
+de outro número.
+
 ### Como conseguir a apikey de um número novo
 
 1. No WhatsApp **do número que vai receber**, envie a mensagem
-   `I allow callmebot to send me messages` para **+34 644 51 95 23**.
+   `I allow callmebot to send me messages` para o bot do CallMeBot
+   (o site indica o número da vez; hoje circulam +34 644 51 95 23, +34 694 25 79 52 e
+   +34 623 80 11 90).
 2. O bot responde com a apikey **daquele número** (a chave é por número, não por conta).
+   Anote **qual bot respondeu** — é esse contato que não pode ficar bloqueado ou arquivado.
 3. Acrescente `,55DDNUMERO:APIKEY` no fim do `WHATSAPP_DESTINOS`.
+
+### Grupo do WhatsApp: não dá
+
+O FAQ oficial do CallMeBot é explicito: *"Can I send WhatsApp messages to groups? No,
+you can only send WhatsApp messages to contacts."* Grupo só funciona no Telegram deles.
+Para grupo de WhatsApp de verdade seria TextMeBot (pago) ou a Meta Cloud API.
 
 Para remover um número da lista, basta apagar o item dele — nada mais precisa mudar.
 
