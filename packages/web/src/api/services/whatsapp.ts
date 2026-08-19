@@ -47,43 +47,102 @@ export function whatsappConfigurado() {
  * Manda a mesma mensagem para todos os numeros configurados.
  * Devolve quantos foram entregues — usado nos testes e no painel de saude.
  */
+/**
+ * LIMITE DO CALLMEBOT (importante): cada numero aceita cerca de 16 mensagens
+ * por 240 minutos, e chamadas em rajada voltam 403 Forbidden. Quando isso
+ * acontece a mensagem simplesmente NAO chega — era essa a causa dos alertas
+ * "que nao chegam direito". Por isso aqui existem:
+ *   - espera entre os destinos (o bot rejeita disparos simultaneos);
+ *   - 3 tentativas com recuo progressivo em 403 / erro de rede;
+ *   - deteccao explicita de limite atingido no log, para a equipe saber que a
+ *     culpa e da cota e nao do codigo.
+ */
+const TENTATIVAS = 3;
+const ESPERA_ENTRE_DESTINOS = 1500;
+
+function dormir(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+function limparCorpo(corpo: string) {
+  return corpo.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+}
+
+type ResultadoEnvio = {
+  ok: boolean;
+  /** motivo curto quando falhou, para log e para o painel de saude */
+  motivo: string;
+  /** true quando a cota do CallMeBot foi atingida */
+  limite: boolean;
+};
+
+/** Um destino, com retentativas. Nunca lanca. */
+async function enviarPara(destino: Destino, texto: string): Promise<ResultadoEnvio> {
+  let ultimo = "sem resposta";
+  let limite = false;
+
+  for (let tentativa = 1; tentativa <= TENTATIVAS; tentativa += 1) {
+    try {
+      const url = `${ENDPOINT}?phone=${encodeURIComponent(destino.telefone)}&text=${encodeURIComponent(texto)}&apikey=${encodeURIComponent(destino.apikey)}`;
+      const resposta = await fetch(url, { method: "GET", signal: AbortSignal.timeout(20_000) });
+      const corpo = limparCorpo(await resposta.text().catch(() => ""));
+
+      /**
+       * ATENCAO: o CallMeBot NAO usa o status HTTP de forma confiavel — apikey
+       * invalida volta 203 e aceite volta 210. A unica confirmacao real de que
+       * a mensagem entrou na fila e a palavra "queued" no corpo.
+       */
+      if (/queued/i.test(corpo)) return { ok: true, motivo: "", limite: false };
+
+      if (/apikey is invalid/i.test(corpo)) {
+        // chave errada nunca melhora com retentativa
+        return { ok: false, motivo: "apikey invalida para este numero", limite: false };
+      }
+
+      if (/limit|too many|exceeded/i.test(corpo)) {
+        limite = true;
+        ultimo = "cota do CallMeBot atingida (16 msgs / 4h por numero)";
+        break;
+      }
+
+      ultimo = `HTTP ${resposta.status} - ${corpo.slice(0, 140) || "corpo vazio"}`;
+    } catch (e) {
+      ultimo = `erro de rede: ${e instanceof Error ? e.message : String(e)}`;
+    }
+
+    if (tentativa < TENTATIVAS) await dormir(tentativa * 2500);
+  }
+
+  return { ok: false, motivo: ultimo, limite };
+}
+
+/**
+ * Manda a mesma mensagem para todos os numeros configurados.
+ * Devolve quantos foram entregues — usado nos testes e no painel de saude.
+ */
 export async function enviarWhatsapp(mensagem: string) {
   const destinos = destinosWhatsapp();
-  if (!destinos.length) return { enviados: 0, falhas: 0, configurado: false as const };
+  if (!destinos.length) return { enviados: 0, falhas: 0, configurado: false as const, limite: false };
 
   const texto = mensagem.slice(0, 900);
   let enviados = 0;
   let falhas = 0;
+  let limite = false;
 
-  for (const destino of destinos) {
-    try {
-      const url = `${ENDPOINT}?phone=${encodeURIComponent(destino.telefone)}&text=${encodeURIComponent(texto)}&apikey=${encodeURIComponent(destino.apikey)}`;
-      const resposta = await fetch(url, { method: "GET", signal: AbortSignal.timeout(15_000) });
-      /**
-       * ATENCAO: o CallMeBot NAO usa o status HTTP para sinalizar erro de forma
-       * confiavel — apikey invalida volta como 203, que o `fetch` considera
-       * "ok". A unica confirmacao real de aceite e a frase "queued" no corpo.
-       * Por isso a checagem e feita no texto, nao no status.
-       */
-      const corpo = await resposta.text().catch(() => "");
-      if (/queued/i.test(corpo)) enviados += 1;
-      else {
-        falhas += 1;
-        // nunca logar a apikey: so o final do telefone, o status e o motivo
-        const motivo = /apikey is invalid/i.test(corpo)
-          ? "apikey invalida para este numero"
-          : corpo.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 160);
-        console.error(
-          `[WhatsApp] falha para ...${destino.telefone.slice(-4)}: HTTP ${resposta.status} - ${motivo}`,
-        );
-      }
-    } catch (e) {
+  for (const [i, destino] of destinos.entries()) {
+    if (i > 0) await dormir(ESPERA_ENTRE_DESTINOS);
+    const r = await enviarPara(destino, texto);
+    if (r.ok) {
+      enviados += 1;
+    } else {
       falhas += 1;
-      console.error(`[WhatsApp] erro de rede para ...${destino.telefone.slice(-4)}:`, e);
+      if (r.limite) limite = true;
+      // nunca logar a apikey: so o final do telefone e o motivo
+      console.error(`[WhatsApp] falha para ...${destino.telefone.slice(-4)}: ${r.motivo}`);
     }
   }
 
-  return { enviados, falhas, configurado: true as const };
+  return { enviados, falhas, configurado: true as const, limite };
 }
 
 /** dispara sem esperar e sem nunca lancar — para usar dentro de mutations */

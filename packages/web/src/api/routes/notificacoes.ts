@@ -136,7 +136,9 @@ async function dispararWebhook(alerta: typeof tabelaNotificacoes.$inferSelect) {
    * equipe abrir direto no celular e cadastrar o MAC sem procurar o endereco.
    */
   const linkPainelIptv =
-    alerta.destino === "iptv" ? `Ativar IPTV: ${PAINEL_IPTV}` : "";
+    alerta.destino === "iptv"
+      ? `Cadastrar o MAC no painel:\n${PAINEL_IPTV}`
+      : "";
 
   enviarWhatsappSeguro(
     [
