@@ -5,6 +5,7 @@ import { adminOnly, authed } from "../middleware/auth";
 import { notificar } from "./notificacoes";
 import { estaBloqueado } from "../lib/cobranca";
 import { db } from "../database";
+import { decodificarAssunto, limparCorpoEmail } from "../lib/email-mime";
 import {
   alocacoes,
   aplicativos,
@@ -45,74 +46,143 @@ const RETENCAO_CAIXA_MS = 7 * 24 * 60 * 60 * 1000;
 /* EXTRAÇÃO DO CÓDIGO                                                  */
 /* ------------------------------------------------------------------ */
 
-/** rótulos que costumam anteceder o código no corpo do e-mail */
+/**
+ * Rotulos que costumam anteceder o codigo, do MAIS ESPECIFICO para o mais
+ * generico. A ordem importa: "codigo" sozinho casa em qualquer lugar e
+ * roubaria a vez de "codigo de acesso".
+ */
 const ROTULOS = [
+  "informe este codigo",
+  "digite este codigo",
+  "digite o codigo",
+  "use este codigo",
+  "insira o codigo",
   "codigo de verificacao",
   "codigo de acesso",
+  "codigo de seguranca",
   "codigo temporario",
-  "codigo",
+  "codigo de login",
+  "codigo unico",
+  "seu codigo",
   "verification code",
   "security code",
   "access code",
+  "one-time code",
   "one-time",
+  "codigo",
   "otp",
   "pin",
   "token",
 ];
 
-/** remove acentos e baixa a caixa — deixa a busca por rótulo previsível */
+/**
+ * Baixa a caixa e tira acentos SEM mudar o tamanho da string: os indices do
+ * texto normalizado precisam valer no texto original, senao o trecho sai
+ * deslocado (era uma das fontes do codigo errado).
+ */
 const normalizar = (v: string) =>
-  v
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
+  Array.from(v)
+    .map((c) => {
+      const semAcento = c.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+      return semAcento.length === 1 ? semAcento : c.toLowerCase();
+    })
+    .join("");
 
-/** parece ano (1900–2099) ou valor de 4 dígitos redondo demais para ser código */
+/** parece ano (1900-2099) — nunca e codigo */
 const pareceAno = (n: string) => /^(19|20)\d{2}$/.test(n);
 
+/** distancia maxima entre o fim do rotulo e o inicio do numero */
+const JANELA_DEPOIS = 60;
+/** distancia maxima quando o numero vem ANTES do rotulo ("3290 e o seu codigo") */
+const JANELA_ANTES = 40;
+
 /**
- * Acha o código no texto. Primeiro procura números perto de um rótulo
- * ("seu código é 481920"); se não achar, cai no primeiro número isolado de
- * 4 a 6 dígitos que não pareça um ano.
+ * true quando o numero esta sozinho na "palavra" — sem letra, hex ou hifen
+ * colado. Barra uuid de rastreio ("...-4783-afd4..."), IP e id de cabecalho.
+ */
+function numeroIsolado(plano: string, inicio: number, tamanho: number) {
+  let de = inicio;
+  while (de > 0 && !/\s/.test(plano[de - 1] as string)) de--;
+  let ate = inicio + tamanho;
+  while (ate < plano.length && !/\s/.test(plano[ate] as string)) ate++;
+  const palavra = plano.slice(de, ate);
+  // aceita "3290", "3290.", "(3290)", "codigo:3290" -> nunca letra ou hifen
+  return !/[A-Za-z]/.test(palavra) && !/[-_/\\]/.test(palavra);
+}
+
+/**
+ * Acha o codigo no e-mail.
+ *
+ * 1. o corpo passa por `limparCorpoEmail()`: e-mail cru vira o texto que o
+ *    humano leria (parte text/plain decodificada, sem cabecalhos e sem URLs);
+ * 2. junta os numeros de 4 a 6 digitos ISOLADOS (nada de uuid/IP/hex);
+ * 3. escolhe o que estiver mais perto de um rotulo, do rotulo mais especifico
+ *    para o mais generico, aceitando o numero depois OU antes do rotulo;
+ * 4. sem rotulo nenhum, cai no primeiro numero isolado plausivel.
  */
 export function extrairCodigo(texto: string): { codigo: string; trecho: string } | null {
-  const plano = texto.replace(/\s+/g, " ");
+  const plano = limparCorpoEmail(texto).replace(/\s+/g, " ");
   const alvo = normalizar(plano);
+
+  const candidatos = [...plano.matchAll(/(?<![0-9A-Za-z])(\d{4,6})(?![0-9A-Za-z])/g)]
+    .map((m) => ({ valor: m[1] as string, pos: m.index ?? 0 }))
+    .filter((c) => !pareceAno(c.valor) && numeroIsolado(plano, c.pos, c.valor.length));
+
+  if (!candidatos.length) return null;
+
+  const comTrecho = (c: { valor: string; pos: number }) => ({
+    codigo: c.valor,
+    trecho: plano
+      .slice(Math.max(0, c.pos - 70), c.pos + c.valor.length + 90)
+      .trim()
+      .slice(0, 180),
+  });
+
+  const posicoesDeRotulo: number[] = [];
 
   for (const rotulo of ROTULOS) {
     let de = 0;
     while (de < alvo.length) {
       const pos = alvo.indexOf(rotulo, de);
       if (pos === -1) break;
-      const janela = plano.slice(pos, pos + rotulo.length + 80);
-      const achou = janela.match(/(?<!\d)(\d{4,6})(?!\d)/);
-      if (achou && !pareceAno(achou[1])) {
-        return { codigo: achou[1], trecho: janela.trim().slice(0, 180) };
-      }
-      de = pos + rotulo.length;
+      const fimRotulo = pos + rotulo.length;
+
+      const depois = candidatos
+        .filter((c) => c.pos >= fimRotulo && c.pos <= fimRotulo + JANELA_DEPOIS)
+        .sort((a, b) => a.pos - b.pos)[0];
+      if (depois) return comTrecho(depois);
+
+      const antes = candidatos
+        .filter((c) => c.pos + c.valor.length <= pos && c.pos + c.valor.length >= pos - JANELA_ANTES)
+        .sort((a, b) => b.pos - a.pos)[0];
+      if (antes) return comTrecho(antes);
+
+      de = fimRotulo;
+      posicoesDeRotulo.push(fimRotulo);
     }
   }
 
-  // padrão invertido: "481920 é o seu código"
-  const invertido = plano.match(
-    /(?<!\d)(\d{4,6})(?!\d)(?=[^0-9]{0,30}(?:e o seu|é o seu|is your|para|to ))/i,
-  );
-  if (invertido && !pareceAno(invertido[1])) {
-    const pos = plano.indexOf(invertido[1]);
-    return { codigo: invertido[1], trecho: plano.slice(Math.max(0, pos - 60), pos + 90).trim() };
+  /*
+   * Segunda passada: existe rotulo no e-mail, mas o numero ficou mais longe
+   * (layout com tabela/HTML no meio). Pega o numero isolado mais proximo de
+   * algum rotulo, ate 200 caracteres.
+   */
+  if (posicoesDeRotulo.length) {
+    const perto = candidatos
+      .map((c) => ({
+        c,
+        dist: Math.min(...posicoesDeRotulo.map((r) => Math.abs(c.pos - r))),
+      }))
+      .filter((x) => x.dist <= 200)
+      .sort((a, b) => a.dist - b.dist)[0];
+    if (perto) return comTrecho(perto.c);
   }
 
-  // fallback: primeiro número isolado plausível
-  const todos = [...plano.matchAll(/(?<!\d)(\d{4,6})(?!\d)/g)];
-  const bom = todos.find((m) => !pareceAno(m[1]));
-  if (bom) {
-    const pos = bom.index ?? 0;
-    return {
-      codigo: bom[1],
-      trecho: plano.slice(Math.max(0, pos - 60), pos + 90).trim(),
-    };
-  }
-
+  /*
+   * Nenhum rotulo: NAO adivinha. Antes o extrator devolvia o primeiro numero
+   * de 4 a 6 digitos que achasse, e aviso do tipo "novo login" virava codigo
+   * falso no painel do cliente (CEP, telefone 0800, endereco da empresa).
+   */
   return null;
 }
 
@@ -289,10 +359,18 @@ export async function registrarEmail(entrada: EmailBruto) {
   const cabecalhos = lerCabecalhos(entrada.corpo);
   const remetente = (entrada.remetente || cabecalhos.remetente || "").trim();
   const destinatario = (entrada.destinatario || cabecalhos.destinatario || "").trim();
-  const assunto = (entrada.assunto || cabecalhos.assunto || "").trim();
+  const assunto = decodificarAssunto((entrada.assunto || cabecalhos.assunto || "").trim());
 
-  const achado = extrairCodigo(`${assunto} ${entrada.corpo}`);
-  const { servicoSlug, servico } = await identificarServico(remetente, assunto, entrada.corpo);
+  /*
+   * O corpo pode chegar CRU (Worker antigo publicado, ou admin colando o
+   * e-mail inteiro): cabecalhos, multipart e quoted-printable. Limpar aqui
+   * garante que o codigo venha do texto que o cliente le, e nao de um uuid
+   * de cabecalho ou de um link de rastreio.
+   */
+  const corpoLimpo = limparCorpoEmail(entrada.corpo);
+
+  const achado = extrairCodigo(`${assunto}\n${corpoLimpo}`);
+  const { servicoSlug, servico } = await identificarServico(remetente, assunto, corpoLimpo);
 
   await purgar();
 
@@ -404,11 +482,17 @@ export const codigos = {
     )
     .handler(async ({ input }) => {
       await purgar();
-      const rows = await db
+      const brutos = await db
         .select()
         .from(emailsRecebidos)
         .orderBy(desc(emailsRecebidos.recebidoEm))
         .limit(input?.limite ?? 60);
+
+      /*
+       * Assunto legivel tambem para o que ja esta gravado: e-mail antigo foi
+       * salvo com o assunto codificado ("=?UTF-8?Q?Netflix:_seu_c=C3=B3digo?=").
+       */
+      const rows = brutos.map((r) => ({ ...r, assunto: decodificarAssunto(r.assunto) }));
 
       const busca = (input?.busca ?? "").trim().toLowerCase();
       if (!busca) return rows;

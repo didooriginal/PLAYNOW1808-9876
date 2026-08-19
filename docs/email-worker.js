@@ -86,7 +86,9 @@ export default {
       // é o endereço de captura da matriz — é ele que casa a conta no backend
       destinatario: message.to,
       assunto,
-      corpo: corpo.slice(0, 20000),
+      // limite generoso: se o parser falhar e sobrar MIME cru, o corte curto
+      // deixava o codigo de fora e o backend achava numero de cabecalho
+      corpo: corpo.slice(0, 50000),
     };
 
     const envio = fetch(url, {
