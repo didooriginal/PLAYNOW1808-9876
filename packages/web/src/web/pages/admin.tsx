@@ -61,6 +61,11 @@ import { AtivacoesIptvView } from "../components/admin/ativacoes-iptv-view";
 import { CopilotoAdmin } from "../components/admin/copiloto";
 import { MarketingView } from "../components/admin/marketing-view";
 import { AlertasView } from "../components/admin/alertas-view";
+import {
+  ResumoEntrada,
+  usePreferenciaResumo,
+  type ItemResumo,
+} from "../components/admin/resumo-entrada";
 import { GestaoContasView } from "../components/admin/gestao-contas-view";
 import { EstoqueGiftView } from "../components/admin/estoque-gift-view";
 import { JogosView } from "../components/admin/jogos-view";
@@ -111,6 +116,7 @@ import { useCodigos } from "../queries/codigos";
 import { useResumoEstoqueGift } from "../queries/estoque-gift";
 import { useFilaTvNetflix } from "../queries/netflix";
 import { useFilaIptv } from "../queries/iptv";
+import { useFilaSenha } from "../queries/senha";
 import {
   useFaturas,
   useResumoFaturas,
@@ -3050,6 +3056,12 @@ export default function AdminPage() {
   const convitesPendentes = (convites.data ?? []).filter((c) => c.status === "pendente").length;
   const alertas = useAlertasAdmin();
   const estoqueGift = useResumoEstoqueGift();
+  const filaSenha = useFilaSenha();
+
+  /* ---- pop-up de resumo ao entrar (liga/desliga por aparelho) ---- */
+  const preferenciaResumo = usePreferenciaResumo();
+  const [resumoAberto, setResumoAberto] = useState(false);
+  const [resumoJaAbriu, setResumoJaAbriu] = useState(false);
 
   const esgotadas = (contas.data ?? []).filter(
     (c) => c.vagasOcupadas >= c.totalVagas,
@@ -3060,6 +3072,95 @@ export default function AdminPage() {
     (c) => c.statusPagamento !== "ativo",
   ).length;
   const avisosGamificacao = gamificacao.data?.avisosPendentes ?? 0;
+  const senhasPendentes = (filaSenha.data?.itens ?? []).filter(
+    (s) => s.situacao === "pendente",
+  ).length;
+
+  // cada linha do pop-up leva direto para a secao responsavel
+  const itensResumo: ItemResumo[] = [
+    {
+      destino: "codigos",
+      rotulo: "Códigos de verificação",
+      quantidade: codigos.data?.length ?? 0,
+      descricao: "Códigos extraídos do e-mail esperando entrega ao cliente (expiram em 1 hora).",
+      severidade: "critico",
+    },
+    {
+      destino: "netflixtv",
+      rotulo: "Solicitações de TV Netflix",
+      quantidade: filaTv.data?.pendentes ?? 0,
+      descricao: "Clientes com a TV travada no netflix.com/tv2 esperando aprovação.",
+      severidade: "critico",
+    },
+    {
+      destino: "iptv",
+      rotulo: "Ativações de IPTV (MAC)",
+      quantidade: filaIptv.data?.pendentes ?? 0,
+      descricao: "Endereços MAC enviados para cadastrar no painel do IPTV.",
+      severidade: "critico",
+    },
+    {
+      destino: "suporte",
+      rotulo: "Chamados de suporte",
+      quantidade: pendentesSuporte,
+      descricao: "Problemas abertos ou em andamento relatados pelos clientes.",
+      severidade: "alerta",
+    },
+    {
+      destino: "senhas",
+      rotulo: "Pedidos de senha",
+      quantidade: senhasPendentes,
+      descricao: "Links de redefinição gerados e ainda não usados pelo cliente.",
+      severidade: "alerta",
+    },
+    {
+      destino: "convites",
+      rotulo: "Convites de membro extra",
+      quantidade: convitesPendentes,
+      descricao: "E-mails informados pelo cliente aguardando o convite do provedor.",
+      severidade: "alerta",
+    },
+    {
+      destino: "faturas",
+      rotulo: "Faturas em atraso / a vencer",
+      quantidade: aVencer,
+      descricao: "Clientes fora do status ativo — cobrança ou bloqueio pendente.",
+      severidade: "alerta",
+    },
+    {
+      destino: "estoque",
+      rotulo: "Contas matrizes esgotadas",
+      quantidade: esgotadas,
+      descricao: "Matrizes sem vaga livre: novas vendas desse serviço vão travar.",
+      severidade: "alerta",
+    },
+    {
+      destino: "afiliados",
+      rotulo: "Prêmios de gamificação",
+      quantidade: avisosGamificacao,
+      descricao: "Indicações que bateram meta e têm prêmio para liberar.",
+      severidade: "info",
+    },
+    {
+      destino: "alertas",
+      rotulo: "Alertas não lidos",
+      quantidade: alertas.data?.naoLidas ?? 0,
+      descricao: "Fila automática da Central de Alertas ainda sem leitura.",
+      severidade: "info",
+    },
+  ];
+
+  const totalResumo = itensResumo.reduce((soma, i) => soma + i.quantidade, 0);
+  const carregouResumo =
+    !codigos.isLoading && !filaTv.isLoading && !filaIptv.isLoading && !alertas.isLoading;
+
+  // abre uma vez por sessao de painel, so se a preferencia estiver ligada
+  useEffect(() => {
+    if (resumoJaAbriu || !carregouResumo || !preferenciaResumo.ligado) return;
+    setResumoJaAbriu(true);
+    if (totalResumo > 0) setResumoAberto(true);
+  }, [resumoJaAbriu, carregouResumo, preferenciaResumo.ligado, totalResumo]);
+
 
   const nav: NavItem[] = [
     { id: "visao", label: "Visão Geral", icon: LayoutDashboard },
@@ -3271,9 +3372,28 @@ export default function AdminPage() {
                 {titles[active].sub}
               </p>
             </div>
-            <Pill accent="purple" icon={<ShieldCheck className="size-3" />}>
-              Sessão admin · dados do banco
-            </Pill>
+            <div className="flex flex-wrap items-center gap-2">
+              <Tooltip texto="resumo.botao" titulo="Novidades e pendências">
+                <NeonButton
+                  accent="purple"
+                  size="sm"
+                  variant="outline"
+                  data-testid="abrir-resumo"
+                  onClick={() => setResumoAberto(true)}
+                >
+                  <BellRing className="size-4" />
+                  Novidades
+                  {totalResumo > 0 && (
+                    <span className="ml-0.5 rounded-full bg-neon-purple/25 px-2 py-0.5 font-display text-[11px] font-bold tabular-nums text-white">
+                      {totalResumo}
+                    </span>
+                  )}
+                </NeonButton>
+              </Tooltip>
+              <Pill accent="purple" icon={<ShieldCheck className="size-3" />}>
+                Sessão admin · dados do banco
+              </Pill>
+            </div>
           </div>
 
           <SeedBanner />
@@ -3332,6 +3452,16 @@ export default function AdminPage() {
           {active === "manual" && <ManualView />}
         </div>
       </PanelShell>
+
+      <ResumoEntrada
+        aberto={resumoAberto}
+        itens={itensResumo}
+        alertas={(alertas.data?.itens ?? []).filter((n) => !n.lida)}
+        ligado={preferenciaResumo.ligado}
+        onAlternarLigado={preferenciaResumo.alternar}
+        onFechar={() => setResumoAberto(false)}
+        onIr={setActive}
+      />
 
       {/* Copiloto Admin — assistente de IA exclusivo desta area */}
       <CopilotoAdmin nome={eu.data?.nome} />

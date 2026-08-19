@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { GlassCard, NeonButton, Pill } from "../ui/kit";
 import { Ajuda, Tooltip } from "../ui/tooltip";
+import { InterruptorResumo, usePreferenciaResumo } from "./resumo-entrada";
 import {
   haQuantoTempo,
   useAlertasAdmin,
@@ -44,6 +45,7 @@ export function AlertasView({ onIr }: { onIr?: (destino: string) => void }) {
   const marcarTodas = useMarcarTodasLidas();
   const resolver = useResolverAlerta();
   const varrer = useVarrerVencimentos();
+  const preferenciaResumo = usePreferenciaResumo();
 
   // some da tela na hora do clique, sem esperar o refetch
   function encerrar(id: number, reabrir = false) {
@@ -80,6 +82,17 @@ export function AlertasView({ onIr }: { onIr?: (destino: string) => void }) {
           </GlassCard>
         ))}
       </div>
+
+      <GlassCard className="flex flex-wrap items-center justify-between gap-3 p-4">
+        <InterruptorResumo
+          ligado={preferenciaResumo.ligado}
+          onAlternar={preferenciaResumo.alternar}
+        />
+        <div className="flex items-center gap-1.5 font-sans text-[11px] text-white/35">
+          Pop-up de entrada
+          <Ajuda ajuda="resumo.interruptor" />
+        </div>
+      </GlassCard>
 
       <div className="flex flex-wrap items-center gap-2">
         <Tooltip texto="alertas.filtroNaoLidas" titulo="Somente não lidos">

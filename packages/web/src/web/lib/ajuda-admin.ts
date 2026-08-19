@@ -299,6 +299,15 @@ export const AJUDA: Record<string, string> = {
   "netflix.codigoTv": "Código de 4 dígitos que o cliente leu na TV (netflix.com/tv2). Aprovar libera o aparelho dele na hora.",
 
   /* ---------------- alertas ---------------- */
+  /* ---------------- resumo de entrada (pop-up) ---------------- */
+  "resumo.popup":
+    "Pop-up que abre quando voce entra no painel com tudo que esta parado esperando acao: codigos, TV, MAC, chamados, senhas, convites, faturas e estoque. Cada linha leva direto para a secao responsavel.",
+  "resumo.alertas":
+    "Os alertas mais recentes da Central de Alertas que ainda nao foram lidos. Serve de contexto rapido; a fila completa fica na propria Central.",
+  "resumo.botao":
+    "Abre o resumo de pendencias na hora, mesmo com o pop-up automatico desligado. O numero ao lado e o total de itens esperando acao.",
+  "resumo.interruptor":
+    "Liga ou desliga a abertura automatica do resumo quando voce entra no painel. A escolha vale para este navegador/aparelho; o botao Novidades continua funcionando dos dois modos.",
   "alertas.fila":
     "Alertas gerados pelo sistema: vencimento próximo, saldo crítico, falha de login e ocupação alta.",
   "alertas.filtroNaoLidas": "Esconde os alertas já lidos e deixa só o que ainda precisa de ação.",
