@@ -14,6 +14,7 @@ import {
 import { GlassCard, NeonButton, Pill } from "../ui/kit";
 import { Ajuda, Tooltip } from "../ui/tooltip";
 import { InterruptorResumo, usePreferenciaResumo } from "./resumo-entrada";
+import { CanaisAlertaCard } from "./canais-alerta";
 import {
   haQuantoTempo,
   useAlertasAdmin,
@@ -82,6 +83,8 @@ export function AlertasView({ onIr }: { onIr?: (destino: string) => void }) {
           </GlassCard>
         ))}
       </div>
+
+      <CanaisAlertaCard />
 
       <GlassCard className="flex flex-wrap items-center justify-between gap-3 p-4">
         <InterruptorResumo

@@ -2,7 +2,11 @@ import { z } from "zod";
 import { and, desc, eq, inArray, like, or, sql } from "drizzle-orm";
 import { adminOnly, authed } from "../middleware/auth";
 import { db } from "../database";
-import { enviarWhatsappSeguro } from "../services/whatsapp";
+import {
+  espalharAlerta,
+  espalharAlertaSeguro,
+  statusCanais,
+} from "../lib/alertas-canais";
 import { notificacoes as tabelaNotificacoes, usuarios } from "../database/schema";
 import {
   DIAS_AVISO_PREVIO,
@@ -121,36 +125,21 @@ const PAINEL_IPTV = "https://searchdefense.top/#/users-iptv";
 
 async function dispararWebhook(alerta: typeof tabelaNotificacoes.$inferSelect) {
   /**
-   * WHATSAPP DO ADMIN: todo alerta de admin tambem vira mensagem no WhatsApp
-   * dos numeros configurados em `WHATSAPP_DESTINOS`. Independe do webhook
-   * generico abaixo e nunca derruba nada (ver services/whatsapp.ts).
-   */
-  const marca =
-    alerta.severidade === "critico"
-      ? "[URGENTE]"
-      : alerta.severidade === "alerta"
-        ? "[ATENCAO]"
-        : "[AVISO]";
-  /**
+   * CANAIS EXTERNOS: todo alerta de admin sai tambem por WhatsApp, Telegram e
+   * e-mail (o que estiver configurado). Ver lib/alertas-canais.ts - o WhatsApp
+   * do CallMeBot e instavel, por isso a redundancia. Nunca derruba nada.
    * Alerta de IPTV leva o link do painel de ativacao do provedor, para a
-   * equipe abrir direto no celular e cadastrar o MAC sem procurar o endereco.
+   * equipe cadastrar o MAC sem procurar o endereco.
    */
-  const linkPainelIptv =
-    alerta.destino === "iptv"
-      ? `Cadastrar o MAC no painel:\n${PAINEL_IPTV}`
-      : "";
-
-  enviarWhatsappSeguro(
-    [
-      `${marca} PLAYPLUSNOW`,
-      alerta.titulo,
-      alerta.mensagem || "",
-      alerta.destino ? `Painel: aba ${alerta.destino}` : "",
-      linkPainelIptv,
-    ]
-      .filter(Boolean)
-      .join("\n"),
-  );
+  espalharAlertaSeguro({
+    tipo: alerta.tipo,
+    severidade: alerta.severidade,
+    titulo: alerta.titulo,
+    mensagem: alerta.mensagem,
+    destino: alerta.destino,
+    link: alerta.destino === "iptv" ? PAINEL_IPTV : undefined,
+    linkRotulo: alerta.destino === "iptv" ? "Cadastrar o MAC no painel" : undefined,
+  });
 
   const url = process.env.ALERTAS_WEBHOOK_URL;
   if (!url) return;
@@ -467,4 +456,26 @@ export const notificacoes = {
 
   /** roda a varredura na hora (botão "reavaliar" do admin) */
   varrer: adminOnly.handler(() => varrerVencimentos(true)),
+
+  /**
+   * Situação dos canais externos (WhatsApp / Telegram / e-mail). Só diz se
+   * estão configurados — nunca devolve apikey nem número completo.
+   */
+  canais: adminOnly.handler(() => statusCanais()),
+
+  /**
+   * Botão "testar canais": manda uma mensagem real por todos os canais
+   * configurados e devolve o que cada um respondeu. É o jeito de descobrir
+   * qual canal está entregando de verdade sem depender de palpite.
+   */
+  testarCanais: adminOnly.handler(async () => {
+    const resultados = await espalharAlerta({
+      tipo: "sistema",
+      severidade: "critico",
+      titulo: "Teste de canais de alerta",
+      mensagem: `Disparo manual do painel admin em ${new Date().toLocaleString("pt-BR")}. Se você recebeu esta mensagem, este canal está funcionando.`,
+      destino: "alertas",
+    });
+    return { resultados, canais: statusCanais() };
+  }),
 };

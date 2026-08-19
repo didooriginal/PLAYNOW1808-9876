@@ -299,6 +299,18 @@ export const AJUDA: Record<string, string> = {
   "netflix.codigoTv": "Código de 4 dígitos que o cliente leu na TV (netflix.com/tv2). Aprovar libera o aparelho dele na hora.",
 
   /* ---------------- alertas ---------------- */
+  /* ---------------- canais de alerta ---------------- */
+  "canais.card":
+    "Por onde os alertas do painel saem para fora: WhatsApp, Telegram e e-mail. Todos os que estiverem configurados recebem o mesmo aviso - e proposital receber em mais de um canal, porque canal de alerta que nao chega e pior do que nenhum.",
+  "canais.whatsapp":
+    "WhatsApp via CallMeBot (WHATSAPP_DESTINOS no .env). Atencao: a API deles aceita a mensagem e as vezes nao entrega, porque o WhatsApp bloqueia o numero do bot. Limite de 16 mensagens por 4 horas por numero.",
+  "canais.telegram":
+    "Telegram via CallMeBot. Bem mais estavel que o WhatsApp deles e aceita GRUPO (TELEGRAM_GRUPO_APIKEY), entao a equipe toda ve o mesmo alerta. Tambem aceita usuarios pessoais em TELEGRAM_DESTINOS.",
+  "canais.email":
+    "E-mail pelo Resend para o endereco de ADMIN_EMAIL. Por padrao so alerta critico virou e-mail; ALERTAS_EMAIL_NIVEL=todos manda tudo e =off desliga o canal.",
+  "canais.testar":
+    "Manda uma mensagem real agora por todos os canais configurados e mostra o que cada um respondeu. Use para descobrir qual canal esta entregando de verdade.",
+
   /* ---------------- resumo de entrada (pop-up) ---------------- */
   "resumo.popup":
     "Pop-up que abre quando voce entra no painel com tudo que esta parado esperando acao: codigos, TV, MAC, chamados, senhas, convites, faturas e estoque. Cada linha leva direto para a secao responsavel.",

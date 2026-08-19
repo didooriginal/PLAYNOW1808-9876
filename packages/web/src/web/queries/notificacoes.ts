@@ -40,6 +40,16 @@ export function useResolverAlerta() {
   return useMutation(orpc.notificacoes.resolver.mutationOptions({ onSuccess: invalidar }));
 }
 
+/** situacao dos canais externos de alerta (WhatsApp / Telegram / e-mail) */
+export function useCanaisAlerta() {
+  return useQuery(orpc.notificacoes.canais.queryOptions({ staleTime: 60_000 }));
+}
+
+/** dispara um alerta de teste por todos os canais configurados */
+export function useTestarCanais() {
+  return useMutation(orpc.notificacoes.testarCanais.mutationOptions());
+}
+
 export function useVarrerVencimentos() {
   const qc = useQueryClient();
   return useMutation(
