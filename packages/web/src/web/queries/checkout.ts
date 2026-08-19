@@ -39,6 +39,19 @@ export function usePagarCheckout() {
   );
 }
 
+/** pedido de R$ 0,00 — ativa na hora, sem Pix (usado para testar o fluxo) */
+export function useAtivarGratis() {
+  const qc = useQueryClient();
+  return useMutation(
+    orpc.checkout.ativarGratis.mutationOptions({
+      onSuccess: () => {
+        void qc.invalidateQueries({ queryKey: orpc.checkout.key() });
+        void qc.invalidateQueries({ queryKey: orpc.usuarios.key() });
+      },
+    }),
+  );
+}
+
 export function useStatusCheckout(txid: string | null) {
   return useQuery(
     orpc.checkout.status.queryOptions({

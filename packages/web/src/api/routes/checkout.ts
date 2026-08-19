@@ -7,12 +7,14 @@ import { cobrancasPix, usuarios } from "../database/schema";
 import { abrirCobranca, sincronizarCobranca } from "./pix";
 import { CICLOS } from "../lib/ciclos";
 import {
+  aplicarPedido,
   cobrancaViva,
   enxugar,
   faturaDoPedido,
   precificarPedido,
   type EntradaPedido,
 } from "../lib/pedidos";
+import { notificar } from "./notificacoes";
 
 /**
  * CHECKOUT NA PLATAFORMA
@@ -98,6 +100,43 @@ export const checkout = {
     });
 
     return { ...cobranca, pedido };
+  }),
+
+  /**
+   * PEDIDO DE VALOR ZERO (R$ 0,00).
+   * Acontece quando o preco cadastrado da opcao e 0 — hoje usado para testar o
+   * fluxo de ponta a ponta. Nao existe Pix de R$ 0, entao o pedido e aplicado
+   * na hora e o admin recebe um alerta, porque venda gratuita quase sempre e
+   * preco mal cadastrado.
+   */
+  ativarGratis: authed.input(entrada).handler(async ({ context, input }) => {
+    const cliente = await clienteDaSessao(context.user.id);
+
+    let pedido;
+    try {
+      pedido = await precificarPedido(comoEntrada(input));
+    } catch (e) {
+      throw new ORPCError("BAD_REQUEST", { message: (e as Error).message });
+    }
+    if (pedido.valor > 0)
+      throw new ORPCError("BAD_REQUEST", {
+        message: "Este pedido tem valor a pagar — use o Pix ou o cartao.",
+      });
+
+    await aplicarPedido(cliente.id, enxugar(pedido));
+
+    await notificar({
+      escopo: "admin",
+      clienteId: cliente.id,
+      tipo: "sistema",
+      severidade: "alerta",
+      titulo: `Pedido de R$ 0,00 ativado: ${cliente.nome}`,
+      mensagem: `${pedido.titulo} - preco cadastrado e 0. Confira o preco da opcao no catalogo.`,
+      destino: "apps",
+      chave: `gratis:${cliente.id}:${pedido.titulo}:${new Date().toISOString().slice(0, 10)}`,
+    });
+
+    return { ok: true as const, titulo: pedido.titulo, valor: pedido.valor };
   }),
 
   /** o checkout consulta até virar "pago" e então libera o painel */

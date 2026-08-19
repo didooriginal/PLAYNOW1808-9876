@@ -2,6 +2,9 @@ import { and, asc, eq, inArray } from "drizzle-orm";
 import { db } from "../database";
 import { aplicativos, planosApps } from "../database/schema";
 
+/** dinheiro sempre com 2 casas — evita 19.999999 virar preco */
+const cent = (v: number) => Math.round((Number(v) || 0) * 100) / 100;
+
 /**
  * RESOLVEDOR DE SERVIÇOS (app x opção).
  *
@@ -82,8 +85,13 @@ export async function resolverServicos(slugs: string[]): Promise<ServicoResolvid
     resolvidos.set(plano.slug, {
       slug: plano.slug,
       nome: `${pai.nome} · ${plano.nome}`,
-      preco: plano.preco || pai.preco,
-      precoAvulso: plano.precoAvulso || plano.preco || pai.precoAvulso,
+      /**
+       * O preco da OPCAO e a verdade absoluta, inclusive quando e 0.
+       * Nunca cair no preco do app pai: era isso que fazia a Netflix
+       * Individual (preco 0) ser cobrada com o valor da Compartilhada.
+       */
+      preco: cent(plano.preco),
+      precoAvulso: cent(plano.precoAvulso || plano.preco),
       entrega: plano.entrega === "convite" ? "convite" : "vaga",
       appSlug: pai.slug,
       planoId: plano.id,
@@ -163,7 +171,7 @@ export async function catalogoComOpcoes() {
       ...app,
       opcoes: minhas,
       /** preço exibido na vitrine: o da opção padrão quando o app tem opções */
-      precoVitrine: padrao ? padrao.preco || app.preco : app.preco,
+      precoVitrine: padrao ? cent(padrao.preco) : app.preco,
       /** slug que o botão "contratar" usa quando ninguém escolhe nada */
       slugPadrao: padrao ? padrao.slug : app.slug,
       temOpcoes: ativas.length > 1,

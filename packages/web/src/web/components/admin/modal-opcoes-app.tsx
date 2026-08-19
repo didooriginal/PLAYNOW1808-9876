@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, Loader2, Mail, Plus, Star, Trash2, X } from "lucide-react";
+import { Check, Loader2, Mail, Plus, Star, Trash2, X, TriangleAlert } from "lucide-react";
 import { AppIcon } from "../app-icon";
 import { Ajuda, Campo } from "../ui/tooltip";
 import { GlassCard, NeonButton } from "../ui/kit";
@@ -130,6 +130,15 @@ export function ModalOpcoesApp({
                     <span className="inline-flex items-center gap-1 rounded-full bg-neon-cyan/15 px-2 py-0.5 font-sans text-[10px] font-semibold text-neon-cyan">
                       <Mail className="size-2.5" />
                       Convite do provedor
+                    </span>
+                  )}
+                  {o.ativo && o.preco <= 0 && (
+                    <span
+                      className="inline-flex items-center gap-1 rounded-full bg-neon-red/15 px-2 py-0.5 font-sans text-[10px] font-semibold text-neon-red"
+                      data-testid={`opcao-preco-zero-${o.id}`}
+                    >
+                      <TriangleAlert className="size-2.5" />
+                      Preço 0 — sai de graça
                     </span>
                   )}
                   {!o.ativo && (

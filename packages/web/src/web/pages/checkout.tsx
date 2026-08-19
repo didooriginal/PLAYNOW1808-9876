@@ -20,6 +20,7 @@ import { authClient } from "../lib/auth";
 import { usePacotes } from "../queries/pacotes";
 import type { Ciclo } from "../queries/ciclos";
 import {
+  useAtivarGratis,
   usePagarCheckout,
   useResumoCheckout,
   useStatusCheckout,
@@ -79,6 +80,7 @@ export default function CheckoutPage() {
   const resumo = useResumoCheckout(pedido, pronto);
 
   const pagar = usePagarCheckout();
+  const ativarGratis = useAtivarGratis();
   const assinar = useCriarAssinatura();
   /** Pix (pagamento único) ou cartão (assinatura recorrente do Mercado Pago) */
   const [metodo, setMetodo] = useState<"pix" | "cartao">("pix");
@@ -103,6 +105,13 @@ export default function CheckoutPage() {
     const t = window.setTimeout(() => navigate("/dashboard"), 2600);
     return () => window.clearTimeout(t);
   }, [pago, navigate]);
+
+  /**
+   * Pedido de R$ 0,00: o preco cadastrado da opcao e zero. Nao existe Pix de
+   * R$ 0, entao em vez de "Nada a cobrar" o cliente ativa direto — e o valor
+   * mostrado e sempre o configurado no catalogo, nunca o de outra opcao.
+   */
+  const gratis = Boolean(resumo.data && resumo.data.valor <= 0);
 
   const semSessao = !sessaoCarregando && !session;
   const destinoCadastro = `/signup?${params.toString()}&next=checkout`;
@@ -261,8 +270,63 @@ export default function CheckoutPage() {
           </div>
         )}
 
+        {/* ---------------- pedido de R$ 0,00 ---------------- */}
+        {session && pronto && gratis && (
+          <div
+            className="rounded-2xl border border-neon-cyan/30 bg-neon-cyan/[0.06] p-5"
+            data-testid="checkout-gratis"
+          >
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="size-4 text-neon-cyan" />
+              <span className="font-display text-sm font-bold text-white">
+                Nada a pagar neste pedido
+              </span>
+            </div>
+
+            <p className="mt-2 font-sans text-[12px] leading-relaxed text-white/50">
+              O preço cadastrado para este item é {brl(0)}, então não há Pix a gerar. Clique
+              abaixo para ativar o acesso agora mesmo.
+            </p>
+
+            {!ativarGratis.isSuccess ? (
+              <NeonButton
+                accent="cyan"
+                size="lg"
+                className="mt-4 w-full"
+                data-testid="ativar-gratis"
+                disabled={ativarGratis.isPending}
+                onClick={() => {
+                  ativarGratis.mutate(pedido, {
+                    onSuccess: () => {
+                      window.setTimeout(() => navigate("/dashboard"), 1800);
+                    },
+                  });
+                }}
+              >
+                {ativarGratis.isPending ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Check className="size-4" />
+                )}
+                Ativar agora por {brl(0)}
+              </NeonButton>
+            ) : (
+              <p className="mt-4 inline-flex items-center gap-2 font-sans text-sm text-neon-cyan">
+                <Check className="size-4" /> Ativado. Levando você para o painel…
+              </p>
+            )}
+
+            {ativarGratis.isError && (
+              <p className="mt-3 inline-flex items-start gap-2 font-sans text-xs text-neon-red">
+                <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
+                {ativarGratis.error?.message}
+              </p>
+            )}
+          </div>
+        )}
+
         {/* ---------------- escolha da forma de pagamento ---------------- */}
-        {session && pronto && resumo.data && !pagar.data && (
+        {session && pronto && resumo.data && !gratis && !pagar.data && (
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
             <div className="font-sans text-[10px] uppercase tracking-[0.2em] text-white/35">
               Como você quer pagar
@@ -317,7 +381,7 @@ export default function CheckoutPage() {
         )}
 
         {/* ---------------- cartão: assinatura recorrente ---------------- */}
-        {session && pronto && resumo.data && metodo === "cartao" && !pagar.data && (
+        {session && pronto && resumo.data && !gratis && metodo === "cartao" && !pagar.data && (
           <div className="rounded-2xl border border-neon-purple/25 bg-neon-purple/[0.05] p-5">
             <div className="flex items-center gap-2">
               <RefreshCw className="size-4 text-neon-purple" />
@@ -374,7 +438,7 @@ export default function CheckoutPage() {
         )}
 
         {/* ---------------- pix ---------------- */}
-        {session && pronto && resumo.data && (metodo === "pix" || pagar.data) && (
+        {session && pronto && resumo.data && !gratis && (metodo === "pix" || pagar.data) && (
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
