@@ -63,7 +63,7 @@ export function Hero() {
                 Ativação em 10 min
               </Pill>
               <Pill accent="purple" icon={<Star className="size-3" />}>
-                5.4k+ Clientes
+                600+ Clientes
               </Pill>
             </div>
 

@@ -267,7 +267,7 @@ export function Faq() {
 
 export function Stats() {
   const items = [
-    { label: "Assinaturas Ativas", value: "5.432", icon: Users, accent: "red" as const },
+    { label: "Assinaturas Ativas", value: "600", icon: Users, accent: "red" as const },
     { label: "Economia Gerada", value: "R$ 1.2M+", icon: Gift, accent: "cyan" as const },
     { label: "Apps Disponíveis", value: "20+", icon: AppWindow, accent: "purple" as const },
     { label: "Suporte 24/7", value: "100%", icon: BadgeCheck, accent: "red" as const },

@@ -286,7 +286,7 @@ export const testimonials: Testimonial[] = [
 ];
 
 export const socialStats = [
-  { value: "5.4k+", label: "clientes satisfeitos" },
+  { value: "600+", label: "clientes satisfeitos" },
   { value: "R$ 192", label: "economia média por mês" },
   { value: "76%", label: "mais barato que assinar separado" },
   { value: "< 3 min", label: "tempo médio de suporte" },

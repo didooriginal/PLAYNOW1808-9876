@@ -45,7 +45,7 @@ export function SocialProof() {
           eyebrow="Quem acredita na gente"
           title={
             <>
-              <span className="text-neon-red glow-red">5.4k+</span> assinaturas ativas pagando
+              <span className="text-neon-red glow-red">600+</span> assinaturas ativas pagando
               menos todo mês
             </>
           }
