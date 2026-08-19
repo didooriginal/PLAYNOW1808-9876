@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   Copy,
   Loader2,
+  ExternalLink,
   MonitorSmartphone,
   Radio,
   X,
@@ -21,6 +22,12 @@ import { useFilaIptv, useResponderIptv, dataHoraCurta } from "../../queries/iptv
  * IPTV e marca "ativado" — o painel do cliente reage sozinho (polling de 15s)
  * e ele recebe o aviso na hora.
  */
+
+/**
+ * Painel do provedor de IPTV: e nele que o MAC do cliente e cadastrado.
+ * Fica como botao aqui para a equipe nao precisar guardar o endereco.
+ */
+const PAINEL_IPTV = "https://searchdefense.top/#/users-iptv";
 
 const ESTILO: Record<string, string> = {
   pendente: "border-amber-400/40 bg-amber-400/10 text-amber-300",
@@ -97,11 +104,22 @@ export function AtivacoesIptvView() {
             </span>
             <Ajuda ajuda="iptv.fila" />
           </div>
-          {pendentes > 0 && (
-            <Pill accent="red" icon={<AlertTriangle className="size-3" />}>
-              {pendentes} aguardando
-            </Pill>
-          )}
+          <div className="flex items-center gap-2">
+            {pendentes > 0 && (
+              <Pill accent="red" icon={<AlertTriangle className="size-3" />}>
+                {pendentes} aguardando
+              </Pill>
+            )}
+            <a
+              href={PAINEL_IPTV}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-neon-cyan/35 bg-neon-cyan/10 px-3 py-1.5 font-sans text-[11px] font-semibold text-neon-cyan transition hover:bg-neon-cyan/20"
+            >
+              <ExternalLink className="size-3" />
+              Abrir painel IPTV
+            </a>
+          </div>
         </div>
 
         {isPending ? (
@@ -179,6 +197,15 @@ export function AtivacoesIptvView() {
                       <X className="size-3.5" />
                       Recusar
                     </NeonButton>
+                    <a
+                      href={PAINEL_IPTV}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-white/12 bg-white/5 px-3 py-1.5 font-sans text-[11px] font-semibold text-white/60 transition hover:text-white"
+                    >
+                      <ExternalLink className="size-3" />
+                      Cadastrar MAC no painel
+                    </a>
                   </div>
                 )}
               </div>

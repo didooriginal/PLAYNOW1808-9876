@@ -186,6 +186,8 @@ function OpcaoTv({
   const cancelar = useCancelarTv();
   const [codigo, setCodigo] = useState("");
   const [dispositivo, setDispositivo] = useState("");
+  /** o caminho principal e o cliente liberar sozinho; o envio para a equipe fica recolhido */
+  const [mostrarEnvio, setMostrarEnvio] = useState(false);
 
   const limpo = codigo.toUpperCase().replace(/[^A-Z0-9]/g, "");
   const valido = limpo.length >= 4;
@@ -234,13 +236,63 @@ function OpcaoTv({
           </div>
         </div>
       ) : (
-        <div className="rounded-2xl border border-white/[0.07] bg-black/25 p-5">
-          <div className="flex items-center gap-2">
-            <Tv className="size-4" style={{ color: "#ff6b74" }} />
-            <span className="font-display text-sm font-bold text-white">
-              Digite o código que apareceu na TV
-            </span>
+        <>
+          {/*
+            FOCO DO CARD: o cliente resolve sozinho em netflix.com/tv2. So quem
+            nao conseguir cai no plano B (mandar o codigo para a equipe).
+          */}
+          <div
+            className="rounded-2xl border p-5"
+            style={{ borderColor: `${NETFLIX}66`, background: `${NETFLIX}14` }}
+          >
+            <div className="flex items-center gap-2">
+              <Tv className="size-4" style={{ color: "#ff6b74" }} />
+              <span className="font-display text-sm font-bold text-white">
+                Libere na hora em netflix.com/tv2
+              </span>
+            </div>
+            <p className="mt-2 font-sans text-[12.5px] leading-relaxed text-white/70">
+              Clique no botão para inserir o código da Netflix. Se você já estiver logado na
+              conta correta pelo celular ou computador, basta digitar o código que aparece na sua
+              TV. Se não estiver logado, faça o login primeiro para inserir o código.
+            </p>
+            <div className="mt-4">
+              <a
+                href="https://www.netflix.com/tv2"
+                target="_blank"
+                rel="noopener noreferrer"
+                data-testid="netflix-abrir-tv2"
+              >
+                <NeonButton accent="red" size="lg">
+                  Abrir netflix.com/tv2
+                  <ExternalLink className="size-4" />
+                </NeonButton>
+              </a>
+            </div>
+            <p className="mt-3 font-sans text-[11px] leading-relaxed text-white/40">
+              Dica: use o celular ou o computador para abrir o endereço — é mais rápido que
+              digitar na TV.
+            </p>
           </div>
+
+          {mostrarEnvio ? (
+            <div className="rounded-2xl border border-white/[0.07] bg-black/25 p-5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Send className="size-3.5 text-white/45" />
+                  <span className="font-display text-[13px] font-bold text-white/80">
+                    Não consegui sozinho — enviar o código para a equipe
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setMostrarEnvio(false)}
+                  data-testid="netflix-fechar-envio"
+                  className="font-sans text-[11px] text-white/35 transition-colors hover:text-white"
+                >
+                  fechar
+                </button>
+              </div>
           <p className="mt-1.5 font-sans text-xs text-white/40">
             É o código curto exibido junto do endereço{" "}
             <span className="font-mono text-white/60">netflix.com/tv2</span>.
@@ -310,8 +362,24 @@ function OpcaoTv({
               )}
               Enviar código para liberação
             </NeonButton>
-          </div>
-        </div>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setMostrarEnvio(true)}
+              data-testid="netflix-abrir-envio"
+              className="w-full rounded-2xl border border-white/[0.07] bg-white/[0.02] px-5 py-3.5 text-left transition hover:border-white/15 hover:bg-white/[0.04]"
+            >
+              <span className="font-display text-[12.5px] font-semibold text-white/70">
+                Não consegui liberar sozinho
+              </span>
+              <span className="mt-0.5 block font-sans text-[11px] text-white/35">
+                Envie o código da TV para a nossa equipe autorizar por você.
+              </span>
+            </button>
+          )}
+        </>
       )}
 
       {aprovadaAgora && (
@@ -335,11 +403,11 @@ function OpcaoTv({
         </div>
         <Passos
           itens={[
-            'Na TV, escolha a opção que mostra o endereço netflix.com/tv2 e um código curto.',
+            "Na TV, escolha a opção que mostra o endereço netflix.com/tv2 e um código curto.",
             "Anote o código exatamente como aparece (letras e números).",
-            "Digite o código no campo acima e toque em Enviar código para liberação.",
-            "Nós autorizamos pela conta principal — normalmente em poucos minutos.",
-            "Quando o status aqui virar liberado, a tela da TV destrava sozinha. Não feche a TV.",
+            "Toque em \"Abrir netflix.com/tv2\" aqui em cima e digite o código. Se pedir login, entre com o e-mail e a senha que estão no seu painel.",
+            "Confirme na página da Netflix: a TV destrava sozinha em alguns segundos.",
+            "Não conseguiu? Abra \"Não consegui liberar sozinho\" e mande o código para a nossa equipe autorizar por você.",
           ]}
         />
       </div>

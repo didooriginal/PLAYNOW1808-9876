@@ -193,7 +193,58 @@ export const templates = {
   }),
 
   /**
-   * 7. Boas-vindas do IPTV (slug "iptv" - PLAYPLUSNOW + Canais ao vivo).
+   * 7. REATIVAÇÃO DO SERVIÇO.
+   * Disparado quando um cliente que estava suspenso, atrasado ou cancelado
+   * volta a ficar ativo (pagou de novo). É o e-mail que diz "está tudo de
+   * volta" e evita o suporte "já paguei, e agora?".
+   */
+  reativacao: (dados: {
+    nome: string;
+    plano: string;
+    proximaCobranca: string;
+    linkPainel: string;
+  }) => ({
+    assunto: "Bem-vindo de volta! Seu acesso foi reativado",
+    texto: [
+      `Olá, ${dados.nome}!`,
+      "",
+      "Recebemos seu pagamento e reativamos seu acesso PLAYPLUSNOW.",
+      dados.plano ? `Plano: ${dados.plano}` : null,
+      dados.proximaCobranca ? `Próximo vencimento: ${dados.proximaCobranca}` : null,
+      "",
+      "Seus aplicativos já estão liberados no painel. Se alguma TV pedir login ou",
+      "código de verificação, é só pedir o código pelo painel — a gente entrega na hora.",
+      "",
+      `Abrir meu painel: ${dados.linkPainel}`,
+    ]
+      .filter((linha) => linha !== null)
+      .join("\n"),
+    html: layoutEmail({
+      titulo: "Seu acesso está de volta",
+      corpo: `
+        <p>Olá, <strong>${dados.nome}</strong>!</p>
+        <p>Recebemos seu pagamento e <strong>reativamos seu acesso</strong>. Tudo voltou exatamente como estava: mesmos apps, mesmo painel.</p>
+        <table style="width:100%; border-collapse:collapse; margin:20px 0;">
+          ${
+            dados.plano
+              ? `<tr><td style="padding:8px 0; color:#94a3b8;">Plano:</td><td style="padding:8px 0; color:#ffffff; text-align:right;"><strong>${dados.plano}</strong></td></tr>`
+              : ""
+          }
+          ${
+            dados.proximaCobranca
+              ? `<tr><td style="padding:8px 0; color:#94a3b8;">Próximo vencimento:</td><td style="padding:8px 0; color:#ffffff; text-align:right;"><strong>${dados.proximaCobranca}</strong></td></tr>`
+              : ""
+          }
+        </table>
+        <p>Se alguma TV pedir código de verificação, pede o código direto no painel que a gente entrega na hora.</p>
+      `,
+      botao: { texto: "Abrir meu painel", url: dados.linkPainel },
+      rodape: "Obrigado por continuar com a PLAYPLUSNOW.",
+    }),
+  }),
+
+  /**
+   * 8. Boas-vindas do IPTV (slug "iptv" - PLAYPLUSNOW + Canais ao vivo).
    * Disparado junto da entrega de acesso, so quando o pedido inclui IPTV.
    * O app Funplay e liberado por ENDERECO MAC do aparelho, entao o e-mail tem
    * um unico objetivo: fazer o cliente instalar o app e mandar o MAC de volta

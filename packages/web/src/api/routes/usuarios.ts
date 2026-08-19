@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { enviarEmailReativacao } from "../lib/reativacao";
 import { ORPCError } from "@orpc/server";
 import { base } from "../__core/app";
 import { adminOnly, authed } from "../middleware/auth";
@@ -293,8 +294,27 @@ export const usuarios = {
         }
       }
 
+      /**
+       * REATIVACAO MANUAL: admin tirou o cliente de suspenso/atrasado/cancelado
+       * e colocou como ativo. O cliente recebe o e-mail avisando que o acesso
+       * voltou (o envio nunca derruba a edicao).
+       */
+      let statusAnterior: string | null = null;
+      if (patch.statusPagamento === "ativo") {
+        const [antes] = await db
+          .select({ status: tabelaUsuarios.statusPagamento })
+          .from(tabelaUsuarios)
+          .where(eq(tabelaUsuarios.id, id));
+        statusAnterior = antes?.status ?? null;
+      }
+
       const [row] = await db.update(tabelaUsuarios).set(patch).where(eq(tabelaUsuarios.id, id)).returning();
       if (!row) throw new ORPCError("NOT_FOUND", { message: "Usuário não encontrado" });
+
+      if (statusAnterior && statusAnterior !== "ativo") {
+        await enviarEmailReativacao(id, statusAnterior);
+      }
+
       return row;
     }),
 

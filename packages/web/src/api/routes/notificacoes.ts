@@ -116,6 +116,9 @@ export function resolverAlertasSemVaga(clienteId: number, servico?: string) {
  * Configure `ALERTAS_WEBHOOK_URL` no .env para receber os alertas do admin
  * fora do painel. Falha de rede nunca quebra a operacao.
  */
+/** painel do provedor onde a equipe cadastra o MAC do cliente no IPTV */
+const PAINEL_IPTV = "https://searchdefense.top/#/users-iptv";
+
 async function dispararWebhook(alerta: typeof tabelaNotificacoes.$inferSelect) {
   /**
    * WHATSAPP DO ADMIN: todo alerta de admin tambem vira mensagem no WhatsApp
@@ -128,12 +131,20 @@ async function dispararWebhook(alerta: typeof tabelaNotificacoes.$inferSelect) {
       : alerta.severidade === "alerta"
         ? "[ATENCAO]"
         : "[AVISO]";
+  /**
+   * Alerta de IPTV leva o link do painel de ativacao do provedor, para a
+   * equipe abrir direto no celular e cadastrar o MAC sem procurar o endereco.
+   */
+  const linkPainelIptv =
+    alerta.destino === "iptv" ? `Ativar IPTV: ${PAINEL_IPTV}` : "";
+
   enviarWhatsappSeguro(
     [
       `${marca} PLAYPLUSNOW`,
       alerta.titulo,
       alerta.mensagem || "",
       alerta.destino ? `Painel: aba ${alerta.destino}` : "",
+      linkPainelIptv,
     ]
       .filter(Boolean)
       .join("\n"),
@@ -152,6 +163,7 @@ async function dispararWebhook(alerta: typeof tabelaNotificacoes.$inferSelect) {
         titulo: alerta.titulo,
         mensagem: alerta.mensagem,
         destino: alerta.destino,
+        painelIptv: alerta.destino === "iptv" ? PAINEL_IPTV : undefined,
         criadoEm: alerta.criadoEm,
       }),
     });

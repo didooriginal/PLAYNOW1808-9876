@@ -7,6 +7,10 @@ import { orpc } from "../lib/api";
  * texto da tela) e a fila que o admin acompanha.
  */
 
+export function usePedirResetSenha() {
+  return useMutation(orpc.senha.pedir.mutationOptions());
+}
+
 export function useCanalSenha() {
   return useQuery(orpc.senha.canal.queryOptions({ staleTime: 5 * 60_000 }));
 }

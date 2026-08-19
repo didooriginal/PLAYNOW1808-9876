@@ -6,6 +6,7 @@ import { notificar, resolverAlertasDeCobranca } from "./notificacoes";
 import { lerParametros } from "../lib/config";
 import { db } from "../database";
 import { cobrancasPix, faturas, usuarios } from "../database/schema";
+import { enviarEmailReativacao } from "../lib/reativacao";
 import { aplicarPedido, type Pedido } from "../lib/pedidos";
 import { liberarAppsPagos } from "../lib/cobranca-apps";
 import { apurarComissoes } from "./afiliados";
@@ -256,6 +257,12 @@ export async function confirmarPagamento(
       .where(eq(faturas.id, cobranca.faturaId));
   }
 
+  /** status antes de quitar: se nao estava ativo, o cliente esta REATIVANDO */
+  const [antesDoPagamento] = await db
+    .select({ statusPagamento: usuarios.statusPagamento })
+    .from(usuarios)
+    .where(eq(usuarios.id, cobranca.clienteId));
+
   await db
     .update(usuarios)
     .set({ statusPagamento: "ativo" })
@@ -283,6 +290,16 @@ export async function confirmarPagamento(
           .where(eq(usuarios.id, cobranca.clienteId));
       }
     }
+
+    /**
+     * Quitou a fatura estando suspenso/atrasado: e uma REATIVACAO, entao o
+     * cliente recebe o e-mail avisando que o acesso voltou. Pedido de
+     * checkout nao passa por aqui (quem cuida e o aplicarPedido).
+     */
+    await enviarEmailReativacao(
+      cobranca.clienteId,
+      antesDoPagamento?.statusPagamento,
+    );
   }
 
   // pedido do checkout: ativa o pacote/adicional comprado na hora

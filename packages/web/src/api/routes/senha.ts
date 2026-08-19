@@ -5,6 +5,7 @@ import { adminOnly, authed } from "../middleware/auth";
 import { auth } from "../auth";
 import { db } from "../database";
 import { resetsSenha, usuarios } from "../database/schema";
+import { user as contasLogin } from "../database/auth-schema";
 import { emailConfigurado, remetente } from "../services/email";
 import { garantirFichaDaSessao } from "../lib/sessao";
 
@@ -51,6 +52,76 @@ export const senha = {
     emailAtivo: emailConfigurado(),
     remetente: emailConfigurado() ? remetente() : "",
   })),
+
+  /**
+   * PEDIDO DO CLIENTE (publico, tela /esqueci-senha).
+   *
+   * Antes o front chamava o Better Auth direto. O problema: quando o e-mail
+   * existe como CLIENTE (`usuarios`) mas ainda nao tem conta de login
+   * (`user`) - caso de quem foi cadastrado pelo admin - o Better Auth nao
+   * gera nada e o cliente ficava esperando um e-mail que nunca vinha.
+   * Aqui a gente cria a conta de login na hora (senha aleatoria que ninguem
+   * conhece) e ai dispara o link: o cliente define a senha e entra.
+   *
+   * A resposta nunca revela se o e-mail existe.
+   */
+  pedir: base
+    .input(z.object({ email: z.string().email() }))
+    .handler(async ({ input, context }) => {
+      const email = input.email.trim().toLowerCase();
+      const origem = context.headers.get("origin") ?? undefined;
+      const headers = origem ? new Headers({ origin: origem }) : undefined;
+
+      const [contaLogin] = await db
+        .select({ id: contasLogin.id })
+        .from(contasLogin)
+        .where(eq(contasLogin.email, email))
+        .limit(1);
+
+      if (!contaLogin) {
+        const [cliente] = await db
+          .select({ id: usuarios.id, nome: usuarios.nome })
+          .from(usuarios)
+          .where(eq(usuarios.email, email))
+          .limit(1);
+
+        if (cliente) {
+          try {
+            await auth.api.signUpEmail({
+              body: {
+                email,
+                name: cliente.nome || email.split("@")[0],
+                password: `Prov-${crypto.randomUUID()}`,
+              },
+              headers,
+            });
+          } catch (e) {
+            console.warn("[reset] falha ao criar conta de login:", e);
+          }
+        }
+      }
+
+      try {
+        await auth.api.requestPasswordReset({ body: { email }, headers });
+      } catch (e) {
+        console.warn("[reset] falha ao pedir link:", e);
+      }
+
+      const [linha] = await db
+        .select({ entrega: resetsSenha.entrega, criadoEm: resetsSenha.criadoEm })
+        .from(resetsSenha)
+        .where(eq(resetsSenha.email, email))
+        .orderBy(desc(resetsSenha.id))
+        .limit(1);
+
+      const recente =
+        linha && Date.now() - linha.criadoEm.getTime() < 2 * 60 * 1000;
+      const falhouEnvio = Boolean(
+        recente && (linha.entrega === "falhou" || linha.entrega === "sem_provedor"),
+      );
+
+      return { ok: true as const, falhouEnvio, emailAtivo: emailConfigurado() };
+    }),
 
   /** Fila de pedidos para o admin acompanhar. */
   fila: adminOnly.handler(async () => {

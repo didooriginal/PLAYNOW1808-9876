@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import { CheckCircle2, KeyRound, MailCheck, TriangleAlert } from "lucide-react";
 import { AuthField, AuthShell, inputClass } from "../components/auth-shell";
 import { NeonButton } from "../components/ui/kit";
-import { authClient } from "../lib/auth";
+import { usePedirResetSenha } from "../queries/senha";
 
 /**
  * "Esqueci minha senha" — 100% automático: o Better Auth gera um link de uso
@@ -15,24 +15,28 @@ export default function EsqueciSenhaPage() {
   const [email, setEmail] = useState("");
   const [enviado, setEnviado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
-  const [carregando, setCarregando] = useState(false);
+  const pedirReset = usePedirResetSenha();
+  const carregando = pedirReset.isPending;
 
   async function pedir(e: React.FormEvent) {
     e.preventDefault();
     setErro(null);
-    setCarregando(true);
-    const { error } = await authClient.requestPasswordReset({
-      email: email.trim().toLowerCase(),
-    });
-    setCarregando(false);
-    if (error) {
+    try {
+      const r = await pedirReset.mutateAsync({
+        email: email.trim().toLowerCase(),
+      });
+      if (r.falhouEnvio) {
+        setErro(
+          "O link foi gerado, mas o envio do e-mail falhou. Chame o suporte no WhatsApp que a gente manda o link por lá.",
+        );
+        return;
+      }
+      setEnviado(true);
+    } catch {
       setErro(
-        error.message ||
-          "Não foi possível enviar agora. Tente de novo em alguns instantes.",
+        "Não foi possível enviar agora. Tente de novo em alguns instantes.",
       );
-      return;
     }
-    setEnviado(true);
   }
 
   return (

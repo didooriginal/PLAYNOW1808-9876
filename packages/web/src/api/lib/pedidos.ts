@@ -8,6 +8,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { enviarEmail } from "../services/email";
 import { templates } from "./emails/templates";
+import { enviarEmailReativacao } from "./reativacao";
 import { LINK_APP_IPTV, SLUGS_IPTV } from "./iptv";
 import { db } from "../database";
 import { resolverServicos, slugsDePacote } from "./planos";
@@ -296,6 +297,8 @@ export async function aplicarPedido(clienteId: number, pedido: Pedido) {
     return;
   }
 
+  /** status antes do pagamento: se nao era "ativo", isto e uma REATIVACAO */
+  const statusAnterior = cliente.statusPagamento;
   const hoje = iso(new Date());
   /**
    * Pagar adiantado NÃO pode encurtar o que o cliente já pagou: quando o
@@ -361,22 +364,31 @@ export async function aplicarPedido(clienteId: number, pedido: Pedido) {
   // entra na fila e gera alerta crítico com link de WhatsApp para o admin
   await sincronizarAcessosDoCliente(clienteId, "compra");
 
-  // e-mail de entrega de acesso — nunca derruba a ativação se o envio falhar
-  try {
-    const linkPainel = `${process.env.WEBSITE_URL || "https://playplusnow.com.br"}/dashboard`;
-    const email = templates.entregaAcesso({
-      nome: cliente.nome,
-      email: cliente.email,
-      linkPainel,
-    });
-    await enviarEmail({
-      para: cliente.email,
-      assunto: email.assunto,
-      texto: email.texto,
-      html: email.html,
-    });
-  } catch (e) {
-    console.error("[Email] falha ao enviar a entrega de acesso:", e);
+  /**
+   * Cliente que estava suspenso/atrasado/cancelado e voltou: em vez da entrega
+   * de acesso (que e para quem chegou agora), recebe o e-mail de REATIVACAO.
+   */
+  const ehReativacao = Boolean(statusAnterior && statusAnterior !== "ativo");
+  if (ehReativacao) {
+    await enviarEmailReativacao(clienteId, statusAnterior);
+  } else {
+    // e-mail de entrega de acesso — nunca derruba a ativação se o envio falhar
+    try {
+      const linkPainel = `${process.env.WEBSITE_URL || "https://playplusnow.com.br"}/dashboard`;
+      const email = templates.entregaAcesso({
+        nome: cliente.nome,
+        email: cliente.email,
+        linkPainel,
+      });
+      await enviarEmail({
+        para: cliente.email,
+        assunto: email.assunto,
+        texto: email.texto,
+        html: email.html,
+      });
+    } catch (e) {
+      console.error("[Email] falha ao enviar a entrega de acesso:", e);
+    }
   }
 
   /**

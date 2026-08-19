@@ -117,6 +117,7 @@ export const auth = betterAuth({
       "/sign-in/email": { window: 60, max: 8 },
       "/sign-up/email": { window: 300, max: 5 },
       "/forget-password": { window: 300, max: 4 },
+      "/request-password-reset": { window: 300, max: 4 },
       "/reset-password": { window: 300, max: 8 },
     },
   },

@@ -1,10 +1,7 @@
-# Rodada atual
-
-1. [x] /signup tela branca (import CampoSenha) — corrigido, verificado, commitado
-2. [x] Vagas mudando sozinhas (roda do mouse) — corrigido, verificado, commitado
-3. [ ] Caixa de entrada no admin: tabela `emails_recebidos` + gravar SEMPRE + aba em codigos-view
-4. [ ] Gatilhos Resend: boas-vindas no cadastro (auth.ts hook + templates.boasVindas) — código escrito, falta verificar
-   - redefinição de senha JÁ existia (auth.ts sendResetPassword -> lib/senha.ts registrarReset)
-
-Verificação: typecheck 3/3, build 2/2, 9 rotas 200, screenshot ERROS: [], commit+push, deliver.
-Backup antes de db:push: `bun run db:backup`.
+# Tarefas abertas (19/08)
+1. [ ] E-mail de reativacao do servico
+2. [x] Esqueci minha senha -> nova procedure senha.pedir com fallback de conta de login + rate limit da rota certa (falta typecheck/teste)
+3. [ ] Botao "Pedir codigo" no card de cada app (dar opiniao + implementar generico por emailCaptura)
+4. [ ] Link searchdefense.top/#/users-iptv no admin de MAC + na mensagem do alerta
+5. [ ] Card netflix.com/tv2 em destaque, envio de codigo como 2a opcao
+Fim: typecheck 3/3, build 2/2, screenshots ERROS [], commit+push, deliver

@@ -11,6 +11,7 @@ import {
   EyeOff,
   Gift,
   HelpCircle,
+  KeyRound,
   LifeBuoy,
   Loader2,
   Trophy,
@@ -73,6 +74,7 @@ import { ContadorEconomia } from "../components/cliente/economia";
 import { PagarPix } from "../components/cliente/pagar-pix";
 import { AreaPagamento } from "../components/cliente/pagamento";
 import { AcessoConvite } from "../components/cliente/acesso-convite";
+import { CodigoAcesso } from "../components/cliente/codigo-acesso";
 import { exibirData } from "../lib/datas";
 
 /** dados vindos do banco (usuarios.painel) */
@@ -96,6 +98,8 @@ function AccessCard({ cred }: { cred: Acesso }) {
   const convite = cred.entrega === "convite" ? cred.convite : null;
   const [revealed, setRevealed] = useState(false);
   const [guia, setGuia] = useState(false);
+  /** bloco "pedir codigo" recolhido: aparece so quando o cliente precisa */
+  const [pedirCodigo, setPedirCodigo] = useState(false);
   const [copied, setCopied] = useState<"email" | "password" | null>(null);
 
   function copy(kind: "email" | "password", value: string) {
@@ -280,6 +284,41 @@ function AccessCard({ cred }: { cred: Acesso }) {
           <span className="min-w-0 truncate">Como acessar</span>
         </NeonButton>
       </div>
+
+      {/*
+        PEDIR CODIGO no proprio card: Disney, Prime, HBO e companhia mandam um
+        codigo de verificacao para o e-mail da conta matriz. Antes o cliente
+        precisava abrir "Como acessar" para achar o botao. Fica recolhido para
+        ninguem pedir codigo sem precisar (cada pedido reserva a fila por 15min).
+        Nao aparece no IPTV (ativacao por MAC) nem em acesso por convite
+        (o codigo vai para o e-mail do proprio cliente).
+      */}
+      {!ehIptv && !convite && !aguardando && (
+        <div className="relative mt-3">
+          {pedirCodigo ? (
+            <div className="space-y-2">
+              <CodigoAcesso slug={appSlug} nome={nomeExibido} compacto />
+              <button
+                type="button"
+                onClick={() => setPedirCodigo(false)}
+                className="w-full font-sans text-[11px] text-white/35 transition-colors hover:text-white"
+              >
+                recolher
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              data-testid="pedir-codigo-card"
+              onClick={() => setPedirCodigo(true)}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-neon-cyan/35 bg-neon-cyan/[0.07] px-3 py-2.5 font-sans text-[11.5px] font-semibold text-neon-cyan transition-colors hover:border-neon-cyan/70"
+            >
+              <KeyRound className="size-3.5 shrink-0" />
+              <span className="min-w-0 truncate">Pedir código de verificação</span>
+            </button>
+          )}
+        </div>
+      )}
 
       {appSlug.startsWith("netflix") && !convite && (
         <button
