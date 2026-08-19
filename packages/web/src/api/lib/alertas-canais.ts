@@ -16,9 +16,11 @@
  * (entrega auditavel no Resend). Redundancia proposital: e normal receber o
  * mesmo aviso em mais de um canal.
  *
- * ANTI-SPAM DO E-MAIL: so alerta "critico" virou e-mail por padrao, senao a
- * caixa de entrada viraria lixo. `ALERTAS_EMAIL_NIVEL="todos"` no .env manda
- * tudo; `="off"` desliga o canal de e-mail.
+ * NIVEL DO E-MAIL: o padrao e "todos" — TODA solicitacao de cliente e todo
+ * alerta de admin saem por e-mail, WhatsApp e Telegram ao mesmo tempo. Isso e
+ * decisao de operacao: perder um pedido custa mais caro do que uma caixa de
+ * entrada cheia. `ALERTAS_EMAIL_NIVEL` no .env permite apertar o filtro
+ * ("alerta" ou "critico") ou desligar o canal de e-mail ("off").
  *
  * Regra de ouro: nada aqui pode lancar. O alerta ja esta gravado no painel.
  */
@@ -61,7 +63,7 @@ export function textoDoAlerta(alerta: AlertaParaCanais) {
 }
 
 function nivelEmail() {
-  return (process.env.ALERTAS_EMAIL_NIVEL || "critico").trim().toLowerCase();
+  return (process.env.ALERTAS_EMAIL_NIVEL || "todos").trim().toLowerCase();
 }
 
 /** true quando este alerta deve virar e-mail */

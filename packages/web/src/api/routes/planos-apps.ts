@@ -14,6 +14,7 @@ import {
 } from "../database/schema";
 import { catalogoComOpcoes, resolverServico } from "../lib/planos";
 import { garantirFichaDaSessao } from "../lib/sessao";
+import { notificar } from "./notificacoes";
 
 /**
  * OPÇÕES DE APLICATIVO (variantes) + FILA DE CONVITES.
@@ -21,6 +22,38 @@ import { garantirFichaDaSessao } from "../lib/sessao";
  * Leitura do catálogo é pública (a vitrine precisa mostrar "a partir de R$ X"
  * e abrir o seletor de opções). Escrita e fila de convites são do admin.
  */
+
+/**
+ * AVISO DO PEDIDO DE CONVITE.
+ * O pedido de "membro extra" depende 100% de acao humana (alguem tem que
+ * cadastrar o e-mail no painel do provedor). Antes ele so caia na fila da aba
+ * Convites e ninguem era avisado — pedido dormia. Agora sai por e-mail,
+ * WhatsApp e Telegram como alerta CRITICO, com o e-mail do cliente pronto para
+ * copiar. A `chave` leva o horario para nunca engolir um pedido novo.
+ */
+async function avisarPedidoConvite(
+  cliente: { id: number; nome: string; telefone?: string | null },
+  servico: { slug: string; nome: string },
+  email: string,
+  origem: string,
+) {
+  await notificar({
+    escopo: "admin",
+    clienteId: cliente.id,
+    tipo: "sistema",
+    severidade: "critico",
+    titulo: `Pedido de convite (membro extra): ${cliente.nome}`,
+    mensagem:
+      `Cliente: ${cliente.nome} (#${cliente.id})\n` +
+      `Opcao: ${servico.nome}\n` +
+      `E-mail para o convite: ${email}\n` +
+      (cliente.telefone ? `WhatsApp do cliente: ${cliente.telefone}\n` : "") +
+      `Pedido: ${origem}\n` +
+      `Acao: cadastre esse e-mail como membro extra no painel do provedor e marque como enviado na aba Convites.`,
+    destino: "convites",
+    chave: `convite:${cliente.id}:${servico.slug}:${email}:${Date.now()}`,
+  });
+}
 
 const slugify = (v: string) =>
   v
@@ -217,12 +250,16 @@ export const planosDeApps = {
         );
 
       if (aberto) {
-        if (aberto.email === email) return aberto;
+        if (aberto.email === email) {
+          await avisarPedidoConvite(ficha, servico, email, "cliente reenviou o mesmo pedido");
+          return aberto;
+        }
         const [atualizado] = await db
           .update(convitesApps)
           .set({ email, status: "pendente", atendidoEm: null })
           .where(eq(convitesApps.id, aberto.id))
           .returning();
+        await avisarPedidoConvite(ficha, servico, email, "e-mail trocado pelo cliente");
         return atualizado;
       }
 
@@ -230,6 +267,7 @@ export const planosDeApps = {
         .insert(convitesApps)
         .values({ clienteId: ficha.id, servico: servico.slug, email })
         .returning();
+      await avisarPedidoConvite(ficha, servico, email, "novo pedido");
       return row;
     }),
 

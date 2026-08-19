@@ -8,6 +8,7 @@ import { resetsSenha, usuarios } from "../database/schema";
 import { user as contasLogin } from "../database/auth-schema";
 import { emailConfigurado, remetente } from "../services/email";
 import { garantirFichaDaSessao } from "../lib/sessao";
+import { notificar } from "./notificacoes";
 
 /**
  * RECUPERAÇÃO DE SENHA
@@ -119,6 +120,26 @@ export const senha = {
       const falhouEnvio = Boolean(
         recente && (linha.entrega === "falhou" || linha.entrega === "sem_provedor"),
       );
+
+      /**
+       * O pedido de senha e a solicitacao mais sensivel: se o e-mail nao sai
+       * (dominio nao verificado, provedor fora), o cliente fica travado na
+       * porta e ninguem descobre. Agora o admin recebe o aviso por e-mail,
+       * WhatsApp e Telegram e consegue mandar o link na mao pela aba Senhas.
+       */
+      await notificar({
+        escopo: "admin",
+        tipo: "sistema",
+        severidade: falhouEnvio ? "critico" : "alerta",
+        titulo: falhouEnvio
+          ? `Redefinicao de senha NAO enviada: ${mascarar(email)}`
+          : `Pedido de redefinicao de senha: ${mascarar(email)}`,
+        mensagem: falhouEnvio
+          ? `O envio do link falhou (${linha?.entrega}). Gere o link na aba Senhas e mande por WhatsApp.`
+          : `Link de redefinicao solicitado e enviado por e-mail. Acompanhe na aba Senhas.`,
+        destino: "senhas",
+        chave: `reset:${email}:${Date.now()}`,
+      });
 
       return { ok: true as const, falhouEnvio, emailAtivo: emailConfigurado() };
     }),

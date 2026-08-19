@@ -173,6 +173,28 @@ export async function abrirCobranca(entrada: {
     expiraEm: resposta.expiraEm,
   });
 
+  /**
+   * PEDIDO ABERTO PELO CLIENTE = SOLICITACAO. `abrirCobranca` e o unico caminho
+   * de Pix do sistema (checkout, renovacao, antecipacao e fatura), por isso o
+   * aviso mora aqui: um pedido gerado nunca passa em branco, mesmo que o
+   * cliente nao chegue a pagar. Dedupe pelo txid — um aviso por cobranca.
+   */
+  await notificar({
+    escopo: "admin",
+    clienteId: entrada.clienteId,
+    tipo: "pagamento",
+    severidade: "alerta",
+    titulo: `Pedido de Pix aberto: ${pagador?.nome || `Cliente #${entrada.clienteId}`}`,
+    mensagem:
+      `Cliente: ${pagador?.nome || "-"} (#${entrada.clienteId})\n` +
+      `Descricao: ${entrada.descricao}\n` +
+      `Valor: R$ ${entrada.valor.toFixed(2)}\n` +
+      `Txid: ${txid}\n` +
+      `Situacao: aguardando pagamento — a baixa e automatica quando o Pix cair.`,
+    destino: "pix",
+    chave: `pix:aberto:${txid}`,
+  });
+
   return {
     txid,
     valor: entrada.valor,

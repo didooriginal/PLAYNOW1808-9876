@@ -13,6 +13,7 @@ import {
 } from "../database/schema";
 import { lerParametros } from "../lib/config";
 import { recalcularProgresso, tituloDoNivel, xpParaProximoNivel } from "./recompensas";
+import { notificar } from "./notificacoes";
 
 /** nivel minimo para a area de afiliados (carteira, comissao e saque) */
 export const NIVEL_AFILIADO = 3;
@@ -35,6 +36,31 @@ export const NIVEL_AFILIADO = 3;
  * dispositivo do afiliado, a comissão nasce `bloqueada` com o motivo e vai
  * para a fila de revisão do admin, sem entrar no saldo disponível.
  */
+
+/**
+ * Toda movimentacao da area de afiliado e uma SOLICITACAO: saque espera Pix da
+ * empresa, credito reduz a mensalidade e a ativacao muda o status do cliente.
+ * Nenhuma delas pode ficar so no banco — todas saem por e-mail, WhatsApp e
+ * Telegram pela central de alertas.
+ */
+async function avisarAfiliado(
+  cliente: { id: number; nome: string },
+  severidade: "info" | "alerta" | "critico",
+  titulo: string,
+  mensagem: string,
+  chave: string,
+) {
+  await notificar({
+    escopo: "admin",
+    clienteId: cliente.id,
+    tipo: "pagamento",
+    severidade,
+    titulo,
+    mensagem,
+    destino: "afiliados",
+    chave,
+  });
+}
 
 function centavos(v: number) {
   return Math.round(v * 100) / 100;
@@ -360,6 +386,14 @@ export const afiliados = {
       .set({ afiliadoAtivo: true })
       .where(eq(usuarios.id, cliente.id))
       .returning();
+    await avisarAfiliado(
+      cliente,
+      "info",
+      `Novo afiliado ativado: ${cliente.nome}`,
+      `Cliente: ${cliente.nome} (#${cliente.id})\n` +
+        `Ativou a area de afiliado e passa a gerar comissao sobre os indicados.`,
+      `afiliado-ativo:${cliente.id}`,
+    );
     return { ok: true, afiliadoAtivo: row.afiliadoAtivo };
   }),
 
@@ -449,6 +483,18 @@ export const afiliados = {
           .returning();
 
         await recalcularCarteira(cliente.id);
+        await avisarAfiliado(
+          cliente,
+          "critico",
+          `Pedido de saque de afiliado: ${cliente.nome}`,
+          `Cliente: ${cliente.nome} (#${cliente.id})\n` +
+            `Valor bruto: R$ ${centavos(input.valor).toFixed(2)}\n` +
+            `Taxa: R$ ${params.saqueTaxa.toFixed(2)}\n` +
+            `Valor liquido a pagar: R$ ${centavos(input.valor - params.saqueTaxa).toFixed(2)}\n` +
+            `Chave Pix: ${input.chavePix.trim()}\n` +
+            `Acao: pagar e marcar o saque #${row.id} na aba Afiliados.`,
+          `saque:${row.id}`,
+        );
         return row;
       }
 
@@ -474,6 +520,16 @@ export const afiliados = {
         .returning();
 
       await recalcularCarteira(cliente.id);
+      await avisarAfiliado(
+        cliente,
+        "info",
+        `Comissao virou credito: ${cliente.nome}`,
+        `Cliente: ${cliente.nome} (#${cliente.id})\n` +
+          `Resgatado como credito: R$ ${centavos(input.valor).toFixed(2)}\n` +
+          `Bonus: R$ ${bonus.toFixed(2)}${extra ? ` + performance R$ ${extra.toFixed(2)}` : ""}\n` +
+          `Vira desconto na proxima mensalidade. Nao ha nada a pagar.`,
+        `credito:${row.id}`,
+      );
       return row;
     }),
 

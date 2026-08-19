@@ -5,6 +5,7 @@ import { base } from "../__core/app";
 import { adminOnly, authed } from "../middleware/auth";
 import { db } from "../database";
 import { recompensasEventos, recompensasProgresso, usuarios } from "../database/schema";
+import { notificar } from "./notificacoes";
 
 /**
  * GAMIFICACAO / AFILIADOS
@@ -506,6 +507,19 @@ export const recompensas = {
 
       await db.update(usuarios).set({ indicadoPor: padrinho.id }).where(eq(usuarios.id, novo.id));
       await recalcularProgresso(padrinho.id);
+      await notificar({
+        escopo: "admin",
+        clienteId: novo.id,
+        tipo: "sistema",
+        severidade: "info",
+        titulo: `Nova indicacao: ${padrinho.nome} indicou ${novo.nome}`,
+        mensagem:
+          `Indicado: ${novo.nome} (#${novo.id})\n` +
+          `Padrinho: ${padrinho.nome} (#${padrinho.id}) - codigo ${codigo}\n` +
+          `A comissao entra quando a primeira fatura do indicado for paga.`,
+        destino: "recompensas",
+        chave: `indicacao:${padrinho.id}:${novo.id}`,
+      });
       return { ok: true, jaVinculado: false, padrinho: padrinho.nome };
     }),
 
