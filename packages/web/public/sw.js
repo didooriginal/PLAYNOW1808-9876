@@ -90,6 +90,14 @@ self.addEventListener("push", (event) => {
     data: { url: dados.url || "/dashboard" },
   };
 
+  /* Botão "Copiar código". O service worker NÃO tem acesso à área de
+     transferência, então a ação não copia nada aqui: ela abre o painel com
+     `copiar=1` e a página faz a cópia ao montar. Um toque, mesmo resultado.
+     No iPhone o Safari ignora `actions` — o toque normal abre o app igual. */
+  if (dados.acao === "copiar") {
+    opcoes.actions = [{ action: "copiar", title: "Copiar código" }];
+  }
+
   event.waitUntil(self.registration.showNotification(titulo, opcoes));
 });
 
@@ -97,7 +105,13 @@ self.addEventListener("push", (event) => {
    abrir uma nova. */
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const destino = (event.notification.data && event.notification.data.url) || "/dashboard";
+  let destino = (event.notification.data && event.notification.data.url) || "/dashboard";
+
+  /* A ação "copiar" leva o mesmo destino com um sinalizador: quem copia é a
+     página, assim que montar. */
+  if (event.action === "copiar") {
+    destino += (destino.includes("?") ? "&" : "?") + "copiar=1";
+  }
 
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((abas) => {

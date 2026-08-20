@@ -1,7 +1,10 @@
 // Bloco "Preciso de um código" — pedido, espera e entrega do código do app.
 import { useEffect, useState } from "react";
-import { Check, Copy, KeyRound, Loader2, RefreshCw, ShieldAlert, Timer } from "lucide-react";
+import { Bell, Check, Copy, KeyRound, Loader2, RefreshCw, ShieldAlert, Timer } from "lucide-react";
 import { GlassCard, NeonButton, Pill } from "../ui/kit";
+import { ehIOS, estaInstalado } from "@/lib/pwa";
+import { criarInscricao, inscricaoAtual, pushSuportado } from "@/lib/push-cliente";
+import { useChavePush, useInscreverPush } from "../../queries/push";
 import {
   contagem,
   useCancelarPedido,
@@ -19,6 +22,78 @@ import {
  * só então o próximo código daquela conta é entregue a ele — por 15 minutos,
  * ou até clicar em "já usei este código".
  */
+/**
+ * EMPURRAO PARA LIGAR OS AVISOS.
+ *
+ * Aparece dentro do card do codigo, e nao so no card de notificacoes la na
+ * aba Acessos, porque este e o momento de maior intencao: o cliente esta
+ * esperando um codigo agora. Sem push, o codigo so existe para quem fica
+ * encarando a tela.
+ *
+ * Some sozinho quando o aparelho ja esta inscrito ou nao suporta push.
+ */
+function LigarAvisos() {
+  const chave = useChavePush();
+  const inscrever = useInscreverPush();
+  const [inscrito, setInscrito] = useState<boolean | null>(null);
+  const [erro, setErro] = useState("");
+
+  useEffect(() => {
+    void inscricaoAtual().then((i) => setInscrito(Boolean(i)));
+  }, []);
+
+  if (!pushSuportado() || inscrito !== false) return null;
+
+  // iPhone so recebe push com o PWA na tela de inicio: nem adianta o botao
+  if (ehIOS() && !estaInstalado()) {
+    return (
+      <p className="flex items-start gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 font-sans text-[11px] leading-relaxed text-white/50">
+        <Bell className="mt-px size-3.5 shrink-0" />
+        <span>
+          Quer o codigo direto no celular? No iPhone, instale o app na tela de inicio primeiro
+          (menu Compartilhar &rarr; &quot;Adicionar a Tela de Inicio&quot;).
+        </span>
+      </p>
+    );
+  }
+
+  async function ligar() {
+    setErro("");
+    const resultado = await criarInscricao(chave.data?.chave ?? "");
+    if (!resultado.ok) {
+      setErro(resultado.motivo);
+      return;
+    }
+    const gravado = await inscrever.mutateAsync(resultado.dados).catch(() => null);
+    if (!gravado?.ok) {
+      setErro("Nao consegui salvar a inscricao. Tente de novo em instantes.");
+      return;
+    }
+    setInscrito(true);
+  }
+
+  return (
+    <div className="rounded-xl border border-neon-cyan/20 bg-neon-cyan/[0.05] px-3 py-2.5">
+      <p className="flex items-start gap-2 font-sans text-[11px] leading-relaxed text-white/70">
+        <Bell className="mt-px size-3.5 shrink-0 text-neon-cyan" />
+        <span>
+          Ligue os avisos e o código chega no seu celular sozinho &mdash; sem ficar olhando esta
+          tela.
+        </span>
+      </p>
+      <button
+        type="button"
+        onClick={() => void ligar()}
+        disabled={inscrever.isPending}
+        className="mt-2 rounded-lg border border-neon-cyan/40 px-3 py-1.5 font-sans text-[11px] font-semibold text-neon-cyan transition-colors hover:bg-neon-cyan/10 disabled:opacity-50"
+      >
+        {inscrever.isPending ? "Ligando..." : "Ligar avisos"}
+      </button>
+      {erro ? <p className="mt-2 font-sans text-[11px] text-red-300">{erro}</p> : null}
+    </div>
+  );
+}
+
 export function CodigoAcesso({
   slug,
   nome,
@@ -47,6 +122,23 @@ export function CodigoAcesso({
   // 45s sem nada chegar: o app provavelmente nao reenviou. Sugere o reenvio.
   const demorou = !!pedido && Date.now() - new Date(pedido.criadoEm).getTime() > 45_000;
   const erro = pedir.error ? (pedir.error as Error).message : "";
+
+  /*
+   * CHEGOU PELA NOTIFICACAO. O botao "Copiar codigo" do push nao copia nada
+   * sozinho — service worker nao alcanca a area de transferencia. Ele abre o
+   * painel com `copiar=1` e quem copia e esta pagina, assim que o codigo
+   * carrega. O parametro sai da URL depois, para um F5 nao recopiar.
+   */
+  useEffect(() => {
+    if (!codigo) return;
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("copiar") !== "1") return;
+    void navigator.clipboard?.writeText(codigo.codigo).catch(() => undefined);
+    setCopiado(true);
+    setTimeout(() => setCopiado(false), 1800);
+    url.searchParams.delete("copiar");
+    window.history.replaceState({}, "", url.toString());
+  }, [codigo]);
 
   const Moldura = ({ children }: { children: React.ReactNode }) =>
     compacto ? (
@@ -133,6 +225,7 @@ export function CodigoAcesso({
           <p className="font-sans text-[11px] text-white/40">
             Este pedido vale por mais {contagem(pedido.expiraEm)}.
           </p>
+          <LigarAvisos />
           <button
             type="button"
             onClick={() => cancelar.mutate({ id: pedido.id })}
@@ -155,6 +248,7 @@ export function CodigoAcesso({
           >
             {pedir.isPending ? "Abrindo..." : "Pedi o código agora"}
           </NeonButton>
+          <LigarAvisos />
           {erro ? (
             <p className="flex items-start gap-2 font-sans text-[11px] text-red-300">
               <ShieldAlert className="mt-px size-3.5 shrink-0" />

@@ -179,6 +179,14 @@ export async function espalharAlerta(alerta: AlertaParaCanais) {
 
 /** dispara sem esperar e sem nunca lancar - para usar dentro de mutations */
 export function espalharAlertaSeguro(alerta: AlertaParaCanais) {
+  /*
+   * MODO SILENCIOSO DOS TESTES. Os scripts de `scripts/teste-*.ts` chamam o
+   * fluxo real de ponta a ponta, e isso disparava WhatsApp/Telegram/e-mail de
+   * verdade a cada rodada — chegamos a estourar a cota do CallMeBot
+   * (16 msgs / 4h por numero) so testando. Com TESTE_SILENCIOSO=1 o alerta
+   * continua sendo GRAVADO no painel; so nao sai para fora.
+   */
+  if (process.env.TESTE_SILENCIOSO === "1") return;
   void espalharAlerta(alerta).catch(() => {});
 }
 

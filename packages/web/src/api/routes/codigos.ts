@@ -21,6 +21,7 @@ import {
   expirarPedidosVencidos,
   meusCodigosVisiveis,
   minhasContasDoServico,
+  agendarAvisoDeEspera,
   resgatarCodigoOrfao,
   slugsDaFamilia,
 } from "../lib/codigos-entrega";
@@ -470,6 +471,9 @@ export async function registrarEmail(entrada: EmailBruto) {
         servicoSlug,
         contaIds,
         clienteDireto: clienteId,
+        // texto do push: "Seu codigo do Disney+ chegou / 739412"
+        servico,
+        codigo: achado.codigo,
       })
     : null;
 
@@ -744,6 +748,14 @@ export const codigos = {
           criadoEm: new Date(),
         })
         .returning();
+
+      /*
+       * Nada foi resgatado: o cliente vai esperar. Se em 1 minuto nenhum
+       * codigo casar, avisa no celular para ele pedir reenvio no app — sem
+       * precisar ficar com esta tela aberta.
+       */
+      if (pedido) agendarAvisoDeEspera(pedido.id, cliente.id, input.servicoSlug);
+
       return pedido;
     }),
 

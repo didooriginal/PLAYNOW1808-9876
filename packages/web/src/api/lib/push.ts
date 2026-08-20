@@ -54,6 +54,14 @@ export type PayloadPush = {
   url?: string;
   /** agrupa notificações do mesmo assunto: a nova substitui a anterior */
   tag?: string;
+  /**
+   * Botão de ação na notificação. Hoje só `"copiar"`, usado pelo código de
+   * acesso: o service worker abre o painel com `&copiar=1` e a página copia o
+   * código sozinha (service worker não tem acesso à área de transferência).
+   * No iPhone o Safari ignora `actions` — o toque normal abre o app do mesmo
+   * jeito, então nada quebra.
+   */
+  acao?: "copiar";
 };
 
 export type ResultadoPush = {
@@ -96,6 +104,7 @@ export async function enviarPush(
     corpo: payload.corpo,
     url: payload.url ?? "/dashboard",
     tag: payload.tag ?? "playplusnow",
+    acao: payload.acao ?? null,
   });
 
   let enviados = 0;

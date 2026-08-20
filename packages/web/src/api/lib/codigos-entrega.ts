@@ -1,6 +1,13 @@
 import { and, asc, desc, eq, gt, inArray, isNull, lt, or } from "drizzle-orm";
 import { db } from "../database";
-import { alocacoes, codigosOtp, contasMatrizes, pedidosCodigo } from "../database/schema";
+import {
+  alocacoes,
+  aplicativos,
+  codigosOtp,
+  contasMatrizes,
+  pedidosCodigo,
+} from "../database/schema";
+import { enviarPush } from "./push";
 
 /**
  * ENTREGA DIRIGIDA DE CODIGO.
@@ -90,6 +97,58 @@ export async function minhasContasDoServico(clienteId: number, servicoSlug: stri
 }
 
 /**
+ * PUSH DO CODIGO — o aviso que tira o cliente da frente da tela.
+ *
+ * Sem isto o codigo so existe para quem esta com o painel aberto olhando. O
+ * cliente esta de pe na frente da TV: o push chega no celular dele sozinho,
+ * com o codigo no proprio texto, e um toque abre o painel com o codigo ja
+ * copiado (ver `acao: "copiar"` no sw.js).
+ *
+ * Escolha consciente: o codigo APARECE na tela de bloqueio. Trocamos um pouco
+ * de sigilo por velocidade — e um OTP de 15 minutos de app de streaming, nao
+ * uma senha de banco.
+ *
+ * Nunca lanca e nunca bloqueia: `enviarPush` devolve `{enviados:0}` quando o
+ * cliente nao ligou os avisos, e um push que falha NAO pode derrubar a entrega
+ * do codigo.
+ */
+export async function avisarCodigoPronto(params: {
+  clienteId: number;
+  /** rotulo humano do app ("Disney+"); cai para o slug quando faltar */
+  servico: string;
+  codigo: string;
+  codigoId: number;
+}) {
+  const { clienteId, servico, codigo, codigoId } = params;
+  try {
+    const envio = await enviarPush(clienteId, {
+      titulo: `Seu código do ${servico} chegou`,
+      corpo: `${codigo} — toque para abrir e copiar. Vale por 15 minutos.`,
+      url: `/dashboard?aba=acessos&codigo=${codigoId}`,
+      // a notificacao nova substitui a anterior: nunca dois codigos na barra
+      tag: "codigo",
+      acao: "copiar",
+    });
+    if (envio.enviados === 0) {
+      // separa "ninguem ligou os avisos" de "o envio falhou": sao problemas
+      // diferentes — o primeiro e adocao, o segundo e infra.
+      const motivo =
+        envio.falhas > 0
+          ? `${envio.falhas} envio(s) falharam`
+          : envio.removidos > 0
+            ? `${envio.removidos} inscricao(oes) morta(s) removida(s)`
+            : "nenhum aparelho inscrito";
+      console.log(
+        `[push] codigo ${codigoId} entregue ao cliente ${clienteId} sem aviso — ${motivo}`,
+      );
+    }
+    return envio;
+  } catch {
+    return { enviados: 0, falhas: 0, removidos: 0 };
+  }
+}
+
+/**
  * Casa um codigo recem-chegado com um pedido em aberto.
  *
  * `contaIds` sao as matrizes cujo e-mail (login ou captura) bate com o
@@ -102,6 +161,10 @@ export async function entregarCodigo(params: {
   contaIds: number[];
   /** quando o destinatario era o e-mail pessoal do cliente, o dono ja e certo */
   clienteDireto?: number | null;
+  /** rotulo humano do app, so para o texto do push */
+  servico?: string;
+  /** o codigo em si, so para o texto do push */
+  codigo?: string;
 }) {
   const { codigoId, servicoSlug, contaIds, clienteDireto } = params;
   await expirarPedidosVencidos();
@@ -152,6 +215,21 @@ export async function entregarCodigo(params: {
       expiraEm: new Date(agora.getTime() + VALIDADE_CODIGO_MS),
     })
     .where(eq(codigosOtp.id, codigoId));
+
+  /*
+   * Push SO aqui, no caminho do webhook: o codigo chegou por e-mail e o
+   * cliente nao esta olhando a tela. No resgate (`resgatarCodigoOrfao`) ele
+   * acabou de clicar no painel e ve o codigo na hora — avisar ali seria
+   * barulho duplicado.
+   */
+  if (params.codigo) {
+    await avisarCodigoPronto({
+      clienteId: pedido.clienteId,
+      servico: params.servico || servicoSlug,
+      codigo: params.codigo,
+      codigoId,
+    });
+  }
 
   return pedido;
 }
@@ -264,6 +342,68 @@ export async function resgatarCodigoOrfao(clienteId: number, servicoSlug: string
   }
 
   return { pedido, codigo: tomado[0] };
+}
+
+/** quanto esperar antes de avisar que nenhum codigo chegou */
+export const AVISO_ESPERA_MS = 60 * 1000;
+
+/** pedidos que ja tem aviso agendado — evita dois timers no mesmo pedido */
+const avisosAgendados = new Set<number>();
+
+/** nome bonito do app a partir do slug ("disney" -> "Disney+") */
+async function nomeDoApp(servicoSlug: string) {
+  const [app] = await db
+    .select({ nome: aplicativos.nome })
+    .from(aplicativos)
+    .where(eq(aplicativos.slug, servicoSlug))
+    .limit(1);
+  return app?.nome || servicoSlug;
+}
+
+/**
+ * AVISO DE ESPERA — o espelho, no celular, do bloco ambar da tela.
+ *
+ * Passou um minuto e nenhum codigo casou com o pedido: quase sempre porque o
+ * app nao mandou e-mail nenhum (o codigo ja tinha sido enviado antes). O
+ * caminho e pedir o reenvio dentro do proprio app — e o cliente precisa saber
+ * disso mesmo tendo fechado o painel.
+ *
+ * Best-effort de proposito: o timer vive no processo do servidor. Se ele
+ * reiniciar dentro do minuto, o aviso se perde. Nao vale uma tabela de
+ * agendamento para uma mensagem de conveniencia — o pedido continua valendo
+ * seus 10 minutos de qualquer forma.
+ */
+export function agendarAvisoDeEspera(pedidoId: number, clienteId: number, servicoSlug: string) {
+  if (avisosAgendados.has(pedidoId)) return;
+  avisosAgendados.add(pedidoId);
+
+  const timer = setTimeout(() => {
+    void (async () => {
+      avisosAgendados.delete(pedidoId);
+      try {
+        const [atual] = await db
+          .select({ status: pedidosCodigo.status })
+          .from(pedidosCodigo)
+          .where(eq(pedidosCodigo.id, pedidoId))
+          .limit(1);
+        // ja recebeu, cancelou ou expirou: silencio
+        if (!atual || atual.status !== "aguardando") return;
+
+        const nome = await nomeDoApp(servicoSlug);
+        await enviarPush(clienteId, {
+          titulo: "Nenhum código chegou ainda",
+          corpo: `Volte no ${nome} e toque em "reenviar código" — assim que chegar, eu te aviso.`,
+          url: "/dashboard?aba=acessos",
+          tag: "codigo-espera",
+        });
+      } catch {
+        /* aviso e best-effort */
+      }
+    })();
+  }, AVISO_ESPERA_MS);
+
+  // nao segura o processo vivo so por causa de um aviso
+  if (typeof timer.unref === "function") timer.unref();
 }
 
 /** codigos que ESTE cliente pode ver agora: entregues a ele, nao usados e no prazo */
