@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, inArray, isNull, lt, or } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, isNull, lt, or } from "drizzle-orm";
 import { db } from "../database";
 import { alocacoes, codigosOtp, contasMatrizes, pedidosCodigo } from "../database/schema";
 
@@ -154,6 +154,116 @@ export async function entregarCodigo(params: {
     .where(eq(codigosOtp.id, codigoId));
 
   return pedido;
+}
+
+/** quanto tempo olhar PARA TRAS atras de um codigo orfao no resgate */
+export const JANELA_RESGATE_MS = 5 * 60 * 1000;
+
+/**
+ * RESGATE DE CODIGO ORFAO.
+ *
+ * O problema: a ordem real do cliente e o inverso do que o fluxo assumia. Ele
+ * tenta entrar na TV, o app dispara o e-mail, e SO ENTAO ele lembra do painel e
+ * clica em "Pedi o codigo agora". Quando clica, o codigo ja chegou e ficou sem
+ * dono — `entregarCodigo` so enxerga pedidos que existiam no instante do
+ * e-mail. Resultado: o cliente esperava um codigo que ja estava no banco.
+ * (Visto na pratica: codigos 37 e 38 chegaram 8s ANTES do pedido 25.)
+ *
+ * Aqui olhamos para tras. As travas sao as mesmas da entrega normal:
+ *   - so codigo SEM DONO (`entregueClienteId` nulo) — nunca rouba de ninguem;
+ *   - so de matriz onde ESTE cliente tem vaga ativa no MESMO app;
+ *   - nao usado e dentro da janela curta;
+ *   - o MAIS RECENTE primeiro: se o cliente pediu reenvio, o valido e o ultimo;
+ *   - o UPDATE exige `entregueClienteId is null`, entao dois clientes clicando
+ *     junto nao levam o mesmo codigo — o segundo nao atualiza nada.
+ *
+ * Limite honesto: numa matriz compartilhada nao da para saber QUEM disparou o
+ * codigo (o app manda para a conta, nao para a pessoa). Por isso a janela e
+ * curta. Esse risco ja existe no FIFO da entrega normal; aqui ele nao aumenta
+ * de natureza, so de alcance.
+ */
+export async function resgatarCodigoOrfao(clienteId: number, servicoSlug: string) {
+  const contas = await minhasContasDoServico(clienteId, servicoSlug);
+  if (!contas.length) return null;
+
+  /*
+   * Enderecos onde o codigo PODE ter caido. Nao basta a captura da propria
+   * conta: um mesmo Gmail hospeda varias matrizes e o encaminhamento aponta
+   * para uma so (o e-mail do Disney+ cai em netflix166@). Por isso entram
+   * tambem as capturas das contas IRMAS do mesmo login.
+   */
+  const logins = [...new Set(contas.map((c) => c.email).filter(Boolean))];
+  const irmas = logins.length
+    ? await db
+        .select({ email: contasMatrizes.email, emailCaptura: contasMatrizes.emailCaptura })
+        .from(contasMatrizes)
+        .where(inArray(contasMatrizes.email, logins))
+    : [];
+
+  const destinos = [
+    ...new Set(
+      [...contas, ...irmas]
+        .flatMap((c) => [c.email, c.emailCaptura])
+        .filter((e): e is string => !!e)
+        .map((e) => e.toLowerCase()),
+    ),
+  ];
+  if (!destinos.length) return null;
+
+  const [orfao] = await db
+    .select()
+    .from(codigosOtp)
+    .where(
+      and(
+        isNull(codigosOtp.entregueClienteId),
+        isNull(codigosOtp.usadoEm),
+        gt(codigosOtp.recebidoEm, new Date(Date.now() - JANELA_RESGATE_MS)),
+        inArray(codigosOtp.servicoSlug, slugsDaFamilia(servicoSlug)),
+        inArray(codigosOtp.destinatario, destinos),
+      ),
+    )
+    // o mais NOVO: se houve reenvio, o codigo que presta e o ultimo
+    .orderBy(desc(codigosOtp.recebidoEm))
+    .limit(1);
+
+  if (!orfao) return null;
+
+  const agora = new Date();
+  const [pedido] = await db
+    .insert(pedidosCodigo)
+    .values({
+      clienteId,
+      contaId: contas[0].contaId,
+      servicoSlug,
+      status: "entregue",
+      criadoEm: agora,
+      atendidoEm: agora,
+      codigoId: orfao.id,
+    })
+    .returning();
+
+  /*
+   * A condicao `entregueClienteId is null` no WHERE e o que torna isto seguro
+   * numa corrida: quem chegar depois nao atualiza linha nenhuma.
+   */
+  const tomado = await db
+    .update(codigosOtp)
+    .set({
+      pedidoId: pedido.id,
+      entregueClienteId: clienteId,
+      clienteId,
+      expiraEm: new Date(agora.getTime() + VALIDADE_CODIGO_MS),
+    })
+    .where(and(eq(codigosOtp.id, orfao.id), isNull(codigosOtp.entregueClienteId)))
+    .returning();
+
+  if (!tomado.length) {
+    // outro cliente levou no meio do caminho: desfaz o pedido de resgate
+    await db.delete(pedidosCodigo).where(eq(pedidosCodigo.id, pedido.id));
+    return null;
+  }
+
+  return { pedido, codigo: tomado[0] };
 }
 
 /** codigos que ESTE cliente pode ver agora: entregues a ele, nao usados e no prazo */

@@ -1,6 +1,6 @@
 // Bloco "Preciso de um código" — pedido, espera e entrega do código do app.
 import { useEffect, useState } from "react";
-import { Check, Copy, KeyRound, Loader2, ShieldAlert, Timer } from "lucide-react";
+import { Check, Copy, KeyRound, Loader2, RefreshCw, ShieldAlert, Timer } from "lucide-react";
 import { GlassCard, NeonButton, Pill } from "../ui/kit";
 import {
   contagem,
@@ -44,6 +44,8 @@ export function CodigoAcesso({
 
   const codigo = data?.codigos?.[0] ?? null;
   const pedido = data?.pedido ?? null;
+  // 45s sem nada chegar: o app provavelmente nao reenviou. Sugere o reenvio.
+  const demorou = !!pedido && Date.now() - new Date(pedido.criadoEm).getTime() > 45_000;
   const erro = pedir.error ? (pedir.error as Error).message : "";
 
   const Moldura = ({ children }: { children: React.ReactNode }) =>
@@ -113,9 +115,23 @@ export function CodigoAcesso({
               Esperando o código chegar... aparece aqui sozinho, sem recarregar a página.
             </span>
           </div>
+          {demorou ? (
+            /*
+             * PLANO B. Quase todo código já chega resgatado no clique. Se
+             * passou deste tempo, é porque o app não mandou e-mail nenhum —
+             * normalmente porque o código já tinha sido enviado antes. Aí o
+             * caminho é pedir o reenvio no próprio app.
+             */
+            <p className="flex items-start gap-2 rounded-xl border border-amber-400/25 bg-amber-400/[0.07] px-3 py-2 font-sans text-[11px] leading-relaxed text-amber-100/90">
+              <RefreshCw className="mt-px size-3.5 shrink-0" />
+              <span>
+                Ainda nada. Volte no {nome} e toque em <strong>&quot;reenviar código&quot;</strong>{" "}
+                — assim que chegar, aparece aqui sozinho.
+              </span>
+            </p>
+          ) : null}
           <p className="font-sans text-[11px] text-white/40">
-            Este pedido vale por mais {contagem(pedido.expiraEm)}. Se o código não chegar, peça de
-            novo pelo aplicativo e clique outra vez no botão.
+            Este pedido vale por mais {contagem(pedido.expiraEm)}.
           </p>
           <button
             type="button"

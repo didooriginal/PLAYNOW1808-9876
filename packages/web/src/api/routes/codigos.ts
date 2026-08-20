@@ -21,6 +21,7 @@ import {
   expirarPedidosVencidos,
   meusCodigosVisiveis,
   minhasContasDoServico,
+  resgatarCodigoOrfao,
   slugsDaFamilia,
 } from "../lib/codigos-entrega";
 
@@ -692,6 +693,30 @@ export const codigos = {
 
       await expirarPedidosVencidos();
 
+      /*
+       * RESGATE PRIMEIRO. O cliente tenta entrar na TV, o app dispara o e-mail
+       * e so entao ele vem clicar aqui — o codigo ja chegou. Se existe um
+       * codigo recente sem dono desta matriz, ele e entregue na hora e o
+       * cliente nao espera nada.
+       *
+       * Tem de vir ANTES do early-return abaixo: quem ja tem um pedido velho em
+       * aberto tambem precisa ser atendido, senao fica preso no "aguardando".
+       */
+      const resgatado = await resgatarCodigoOrfao(cliente.id, input.servicoSlug);
+      if (resgatado) {
+        // fecha um pedido antigo que ficou orbitando, para nao duplicar a fila
+        await db
+          .update(pedidosCodigo)
+          .set({ status: "cancelado" })
+          .where(
+            and(
+              eq(pedidosCodigo.clienteId, cliente.id),
+              eq(pedidosCodigo.status, "aguardando"),
+            ),
+          );
+        return resgatado.pedido;
+      }
+
       // já existe um pedido em aberto? devolve o mesmo, sem duplicar a fila
       const [aberto] = await db
         .select()
@@ -771,8 +796,8 @@ export const codigos = {
     if (estaBloqueado(cliente.statusPagamento, cliente.confiancaAte))
       return { codigos: [], pedido: null };
 
-    const codigos = await meusCodigosVisiveis(cliente.id);
-    const [pedido] = await db
+    let codigos = await meusCodigosVisiveis(cliente.id);
+    let [pedido] = await db
       .select()
       .from(pedidosCodigo)
       .where(
@@ -780,6 +805,23 @@ export const codigos = {
       )
       .orderBy(desc(pedidosCodigo.criadoEm))
       .limit(1);
+
+    /*
+     * AUTO-RESGATE: o painel faz polling. Se o cliente esta com um pedido em
+     * aberto e existe um codigo orfao recente da matriz dele (chegou antes do
+     * clique, ou entrou logo depois sem casar), entrega sem ele fazer nada.
+     */
+    if (pedido && !codigos.length) {
+      const resgatado = await resgatarCodigoOrfao(cliente.id, pedido.servicoSlug);
+      if (resgatado) {
+        await db
+          .update(pedidosCodigo)
+          .set({ status: "cancelado" })
+          .where(eq(pedidosCodigo.id, pedido.id));
+        codigos = await meusCodigosVisiveis(cliente.id);
+        pedido = undefined as never;
+      }
+    }
 
     return {
       codigos,
