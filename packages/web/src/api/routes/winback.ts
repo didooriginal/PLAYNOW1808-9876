@@ -6,6 +6,7 @@ import { diasAteVencimento } from "../lib/cobranca";
 import { lerParametros } from "../lib/config";
 import { db } from "../database";
 import { recompensasProgresso, usuarios, winbackEnvios } from "../database/schema";
+import { avisarCliente } from "../lib/avisos-cliente";
 
 /**
  * WIN-BACK — régua automática de reativação
@@ -209,6 +210,13 @@ export const winback = {
         mensagem: `Use o cupom ${envio.cupom} para reativar seu plano com ${envio.desconto}% de desconto.`,
         destino: "faturas",
         chave: `winback:cupom:${envio.id}`,
+      });
+
+      // push automatico com a oferta (o WhatsApp desta etapa ja e manual aqui)
+      await avisarCliente(envio.clienteId, "winback", {
+        cupom: envio.cupom,
+        desconto: envio.desconto,
+        chave: `envio:${envio.id}`,
       });
 
       return { ok: true };

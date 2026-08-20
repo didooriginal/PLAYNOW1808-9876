@@ -13,6 +13,7 @@ import {
   usuarios,
 } from "../database/schema";
 import { meusCodigosVisiveis } from "../lib/codigos-entrega";
+import { avisarCliente } from "../lib/avisos-cliente";
 
 /**
  * CENTRAL DE DESBLOQUEIO NETFLIX.
@@ -335,6 +336,14 @@ export const netflix = {
         destino: "netflix",
         chave: `tv-resp:${row.id}:${input.status}`,
       });
+
+      // acesso reposto: push automatico + WhatsApp na fila do admin
+      if (input.status === "aprovado") {
+        await avisarCliente(row.clienteId, "acesso", {
+          app: "Netflix",
+          chave: `tv:${row.id}`,
+        });
+      }
 
       return row;
     }),

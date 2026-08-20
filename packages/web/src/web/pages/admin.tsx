@@ -71,6 +71,8 @@ import { EstoqueGiftView } from "../components/admin/estoque-gift-view";
 import { JogosView } from "../components/admin/jogos-view";
 import { SaudeView } from "../components/admin/saude-view";
 import { RecuperacaoView } from "../components/admin/recuperacao-view";
+import { FilaWhatsView } from "../components/admin/fila-whats-view";
+import { useFilaWhats } from "../queries/fila-whats";
 import { SenhasView } from "../components/admin/senhas-view";
 import { CampoSenha } from "../components/ui/campo-senha";
 import { ConvitesView } from "../components/admin/convites-view";
@@ -3056,6 +3058,7 @@ export default function AdminPage() {
   const convitesPendentes = (convites.data ?? []).filter((c) => c.status === "pendente").length;
   const alertas = useAlertasAdmin();
   const estoqueGift = useResumoEstoqueGift();
+  const filaWhats = useFilaWhats({ status: "pendente", limite: 1 });
   const filaSenha = useFilaSenha();
 
   /* ---- pop-up de resumo ao entrar (liga/desliga por aparelho) ---- */
@@ -3195,6 +3198,12 @@ export default function AdminPage() {
     { id: "saude", label: "Saúde & Estoque", icon: HeartPulse },
     { id: "jogos", label: "Futebol Ao Vivo", icon: Goal },
     { id: "winback", label: "Recuperação", icon: HeartHandshake },
+    {
+      id: "filawhats",
+      label: "Fila de WhatsApp",
+      icon: MessageCircle,
+      badge: filaWhats.data?.resumo.pendentes ? String(filaWhats.data.resumo.pendentes) : undefined,
+    },
     { id: "marketing", label: "Marketing", icon: Megaphone },
     {
       id: "afiliados",
@@ -3293,6 +3302,10 @@ export default function AdminPage() {
     jogos: {
       title: "Futebol Ao Vivo",
       sub: "Pool de contas do adicional. A liberação para o cliente é automática — você só mantém o pool abastecido.",
+    },
+    filawhats: {
+      title: "Fila de WhatsApp",
+      sub: "Os 7 avisos do cliente saem sozinhos por push; aqui ficam as mesmas mensagens prontas para você disparar no WhatsApp e marcar como enviadas.",
     },
     winback: {
       title: "Recuperação de Clientes",
@@ -3430,6 +3443,7 @@ export default function AdminPage() {
           {active === "saude" && <SaudeView />}
           {active === "jogos" && <JogosView />}
           {active === "winback" && <RecuperacaoView />}
+          {active === "filawhats" && <FilaWhatsView />}
           {active === "marketing" && <MarketingView />}
           {active === "suporte" && <SuporteView />}
           {active === "faturas" && (

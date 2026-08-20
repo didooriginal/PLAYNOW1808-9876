@@ -35,6 +35,7 @@ import { AppIcon } from "../components/app-icon";
 import { RelatarProblema } from "../components/cliente/relatar-problema";
 import { ComoAcessarModal } from "../components/cliente/como-acessar";
 import { InstalarApp } from "../components/cliente/instalar-app";
+import { NotificacoesPush } from "../components/cliente/notificacoes-push";
 import { AssistenteIA } from "../components/cliente/assistente";
 import { SuporteClienteView } from "../components/cliente/suporte-view";
 import { JornadaCliente } from "../components/cliente/jornada";
@@ -931,7 +932,12 @@ export default function DashboardPage() {
 
           {active === "iptv" && <AtivacaoIptv />}
 
-          {active === "acessos" && <InstalarApp />}
+          {active === "acessos" && (
+            <>
+              <NotificacoesPush />
+              <InstalarApp />
+            </>
+          )}
 
           {active === "jornada" && <JornadaCliente />}
           {active === "novidades" && <UpgradesView />}

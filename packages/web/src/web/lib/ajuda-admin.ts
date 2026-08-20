@@ -311,6 +311,16 @@ export const AJUDA: Record<string, string> = {
   "canais.testar":
     "Manda uma mensagem real agora por todos os canais configurados e mostra o que cada um respondeu. Use para descobrir qual canal esta entregando de verdade.",
 
+  /* ---------------- fila de whatsapp ---------------- */
+  "filawhats.pendentes":
+    "Mensagens que o sistema já escreveu e estão esperando você clicar em enviar. Elas entram sozinhas nos 7 eventos do cliente: vencimento chegando, pagamento confirmado, acesso reposto, convite liberado, assinatura vencida, oferta de volta e promoção.",
+  "filawhats.semtelefone":
+    "Cliente sem telefone no cadastro: a mensagem existe, mas não dá para montar o link do WhatsApp. Preencha o telefone na ficha do cliente para o link aparecer.",
+  "filawhats.promocao":
+    "Dispara uma campanha para a base inteira. O push vai sozinho para quem ligou os avisos no painel; o WhatsApp de cada cliente entra nesta fila para você mandar. O nome da campanha evita mandar a mesma promoção duas vezes.",
+  "filawhats.limpar":
+    "Apaga da lista o que já foi enviado ou descartado. Não afeta nada do cliente, é só faxina da fila.",
+
   /* ---------------- resumo de entrada (pop-up) ---------------- */
   "resumo.popup":
     "Pop-up que abre quando voce entra no painel com tudo que esta parado esperando acao: codigos, TV, MAC, chamados, senhas, convites, faturas e estoque. Cada linha leva direto para a secao responsavel.",

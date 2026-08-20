@@ -6,6 +6,7 @@ import { notificar } from "./notificacoes";
 import { MSG_BLOQUEIO, estaBloqueado } from "../lib/cobranca";
 import { db } from "../database";
 import { alocacoes, ativacoesIptv, usuarios } from "../database/schema";
+import { avisarCliente } from "../lib/avisos-cliente";
 import {
   LINK_APP_IPTV,
   MAX_PENDENTES_IPTV,
@@ -263,6 +264,14 @@ export const iptv = {
         destino: "iptv",
         chave: `iptv-resp:${row.id}:${input.status}`,
       });
+
+      // acesso reposto: push automatico + WhatsApp na fila do admin
+      if (input.status === "ativado") {
+        await avisarCliente(row.clienteId, "acesso", {
+          app: "IPTV",
+          chave: `iptv:${row.id}`,
+        });
+      }
 
       return row;
     }),

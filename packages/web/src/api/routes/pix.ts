@@ -20,6 +20,7 @@ import {
   urlPublicaSegura,
 } from "../lib/mercadopago";
 import { avisarAdminPagamento } from "../lib/aviso-pagamento";
+import { avisarCliente } from "../lib/avisos-cliente";
 import {
   comoOrigem,
   mesesDoCiclo,
@@ -371,6 +372,12 @@ export async function confirmarPagamento(
     mensagem: `Recebemos R$ ${cobranca.valor.toFixed(2).replace(".", ",")}. Seu acesso está liberado.`,
     destino: "faturas",
     chave: `pago:cliente:${cobranca.txid}`,
+  });
+
+  // push automatico no aparelho + WhatsApp na fila do admin
+  await avisarCliente(cobranca.clienteId, "pagamento", {
+    valor: cobranca.valor,
+    chave: cobranca.txid,
   });
 
   return { ok: true, jaEstava: false, clienteId: cobranca.clienteId };

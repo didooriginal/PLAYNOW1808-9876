@@ -6,6 +6,7 @@ import { templates } from "./templates";
 import { paraIso } from "../ciclos";
 import { DIAS_PARA_SUSPENDER } from "../cobranca";
 import { notificar } from "../../routes/notificacoes";
+import { avisarCliente } from "../avisos-cliente";
 
 /**
  * CRON DE COBRANÇA POR E-MAIL
@@ -113,6 +114,13 @@ export async function processarLembretesVencimento(): Promise<ResultadoCron> {
           continue;
         }
 
+        // push automatico no aparelho + WhatsApp na fila do admin
+        await avisarCliente(cliente.id, "vencimento", {
+          dias,
+          valor: cliente.valor,
+          chave: vencimento,
+        });
+
         const modelo = templates.avisoVencimento({
           nome: cliente.nome,
           dias,
@@ -164,6 +172,13 @@ export async function processarLembretesVencimento(): Promise<ResultadoCron> {
         }
 
         const diasParaBloqueio = Math.max(0, DIAS_PARA_SUSPENDER - atraso);
+        // push automatico no aparelho + WhatsApp na fila do admin
+        await avisarCliente(cliente.id, "atraso", {
+          dias: atraso,
+          valor: cliente.valor,
+          chave: `${vencimento}:${marcoDoEmail}`,
+        });
+
         const modelo = templates.faturaAtrasada({
           nome: cliente.nome,
           dias: atraso,

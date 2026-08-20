@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real, index, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 /**
  * Banco real da PLAYPLUSNOW (Turso/SQLite via Drizzle).
@@ -1414,3 +1414,90 @@ export const ativacoesIptv = sqliteTable(
 
 export type AtivacaoIptv = typeof ativacoesIptv.$inferSelect;
 export type NovaAtivacaoIptv = typeof ativacoesIptv.$inferInsert;
+
+/* ------------------------------------------------------------------ */
+/* PUSH WEB (PWA)                                                      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Inscricoes de push do navegador (Web Push / VAPID).
+ *
+ * Cada navegador em cada aparelho gera um "endpoint" unico no servico de
+ * push do fabricante (FCM no Chrome/Android, Mozilla, Apple). Um cliente
+ * pode ter varias linhas aqui: celular, notebook, tablet.
+ *
+ * Importante: no iPhone o push SO funciona se o cliente instalar o PWA na
+ * tela de inicio - Safari em aba nao recebe nada.
+ *
+ * Quando o servico de push devolve 404/410 a inscricao morreu (app
+ * desinstalado, permissao revogada) e a linha e apagada automaticamente.
+ */
+export const pushInscricoes = sqliteTable("push_inscricoes", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  clienteId: integer("cliente_id")
+    .notNull()
+    .references(() => usuarios.id, { onDelete: "cascade" }),
+  /** URL unica do servico de push para este navegador */
+  endpoint: text("endpoint").notNull().unique(),
+  /** chave publica da inscricao (criptografia da mensagem) */
+  p256dh: text("p256dh").notNull(),
+  /** segredo de autenticacao da inscricao */
+  auth: text("auth").notNull(),
+  /** navegador/aparelho, so para o admin identificar a linha */
+  userAgent: text("user_agent").notNull().default(""),
+  criadoEm: integer("criado_em", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  ultimoEnvioEm: integer("ultimo_envio_em", { mode: "timestamp" }),
+});
+
+export type PushInscricao = typeof pushInscricoes.$inferSelect;
+export type NovaPushInscricao = typeof pushInscricoes.$inferInsert;
+
+/* ------------------------------------------------------------------ */
+/* FILA DE WHATSAPP DO CLIENTE                                         */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Fila de disparo manual do WhatsApp.
+ *
+ * O WhatsApp do cliente é MANUAL por decisão de operação: o sistema monta a
+ * mensagem pronta e o link `wa.me`, e o admin dá o último clique. Assim não
+ * há custo por mensagem nem risco de banimento de número não oficial.
+ *
+ * Cada evento grava UMA linha com `chave` única (ex.: `venc:12:2026-08-22`),
+ * então a mesma cobrança nunca entra duas vezes na fila, mesmo que o cron
+ * rode várias vezes no dia.
+ *
+ * Quando um provedor oficial entrar, `enviarWhats()` passa a entregar sozinho
+ * e a linha já nasce com `status: "enviado"` — nenhum outro arquivo muda.
+ */
+export const filaWhats = sqliteTable(
+  "fila_whats",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    clienteId: integer("cliente_id")
+      .notNull()
+      .references(() => usuarios.id, { onDelete: "cascade" }),
+    /** um dos 7 eventos: vencimento | pagamento | acesso | convite | atraso | winback | promocao */
+    evento: text("evento").notNull(),
+    /** texto pronto, em pt-BR, já com o nome do cliente */
+    mensagem: text("mensagem").notNull(),
+    /** link wa.me com a mensagem embutida */
+    link: text("link").notNull().default(""),
+    /** telefone usado no link (vazio = cliente sem telefone cadastrado) */
+    telefone: text("telefone").notNull().default(""),
+    /** pendente | enviado | descartado */
+    status: text("status").notNull().default("pendente"),
+    /** dedupe do evento */
+    chave: text("chave").notNull().unique(),
+    criadoEm: integer("criado_em", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    enviadoEm: integer("enviado_em", { mode: "timestamp" }),
+  },
+  (t) => [index("idx_fila_whats_status").on(t.status, t.criadoEm)],
+);
+
+export type ItemFilaWhats = typeof filaWhats.$inferSelect;
+export type NovoItemFilaWhats = typeof filaWhats.$inferInsert;

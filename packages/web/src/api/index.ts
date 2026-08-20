@@ -32,6 +32,8 @@ import { ciclos } from "./routes/ciclos";
 import { senha } from "./routes/senha";
 import { upload } from "./routes/upload";
 import { marketing } from "./routes/marketing";
+import { push } from "./routes/push";
+import { filaWhatsRota } from "./routes/fila-whats";
 import { gerarBackupExcel } from "./lib/backup";
 import { processarLembretesVencimento } from "./lib/emails/cron";
 import { auth } from "./auth";
@@ -77,6 +79,8 @@ export const router = {
   upload,
   renovacao,
   marketing,
+  push,
+  filaWhats: filaWhatsRota,
   seed,
 };
 

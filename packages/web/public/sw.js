@@ -2,7 +2,7 @@
    Estratégia: network-first com fallback de cache. Nunca cacheia API, auth
    nem arquivos internos do dev server (Vite/HMR). */
 
-const CACHE = "ppn-v1";
+const CACHE = "ppn-v2";
 const SHELL = ["/", "/dashboard", "/manifest.webmanifest", "/images/icon-192.png"];
 
 self.addEventListener("install", (event) => {
@@ -63,5 +63,51 @@ self.addEventListener("fetch", (event) => {
           headers: { "Content-Type": "text/plain; charset=utf-8" },
         });
       }),
+  );
+});
+
+/* ------------------------------------------------------------------ */
+/* PUSH WEB                                                            */
+/* ------------------------------------------------------------------ */
+
+/* O servidor manda um JSON { titulo, corpo, url, tag }. Se vier vazio ou
+   quebrado, mostra um aviso genérico — notificação nunca pode falhar calada. */
+self.addEventListener("push", (event) => {
+  let dados = {};
+  try {
+    dados = event.data ? event.data.json() : {};
+  } catch {
+    dados = {};
+  }
+
+  const titulo = dados.titulo || "PLAYPLUSNOW";
+  const opcoes = {
+    body: dados.corpo || "Você tem um aviso novo.",
+    icon: "/images/icon-192.png",
+    badge: "/images/icon-192.png",
+    tag: dados.tag || "playplusnow",
+    renotify: true,
+    data: { url: dados.url || "/dashboard" },
+  };
+
+  event.waitUntil(self.registration.showNotification(titulo, opcoes));
+});
+
+/* Clique: se já existe uma aba do app aberta, foca e navega nela em vez de
+   abrir uma nova. */
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const destino = (event.notification.data && event.notification.data.url) || "/dashboard";
+
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((abas) => {
+      for (const aba of abas) {
+        if (new URL(aba.url).origin === self.location.origin && "focus" in aba) {
+          aba.navigate(destino).catch(() => undefined);
+          return aba.focus();
+        }
+      }
+      return self.clients.openWindow(destino);
+    }),
   );
 });

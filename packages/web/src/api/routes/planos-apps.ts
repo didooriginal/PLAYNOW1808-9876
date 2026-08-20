@@ -15,6 +15,7 @@ import {
 import { catalogoComOpcoes, resolverServico } from "../lib/planos";
 import { garantirFichaDaSessao } from "../lib/sessao";
 import { notificar } from "./notificacoes";
+import { avisarCliente } from "../lib/avisos-cliente";
 
 /**
  * OPÇÕES DE APLICATIVO (variantes) + FILA DE CONVITES.
@@ -321,6 +322,15 @@ export const planosDeApps = {
         .where(eq(convitesApps.id, input.id))
         .returning();
       if (!row) throw new ORPCError("NOT_FOUND", { message: "Convite não encontrado" });
+
+      // convite entregue: push automatico + WhatsApp na fila do admin
+      if (input.status === "enviado" || input.status === "ativo") {
+        await avisarCliente(row.clienteId, "convite", {
+          app: row.servico,
+          chave: `${row.id}:${input.status}`,
+        });
+      }
+
       return row;
     }),
 };
