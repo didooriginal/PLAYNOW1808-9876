@@ -890,6 +890,25 @@ export default function DashboardPage() {
                 "Mantenha seu contato, endereço e foto atualizados. Nome, e-mail e plano são alterados pelo suporte."}
               {active === "suporte" && "Relate um problema e acompanhe o andamento do chamado."}
             </p>
+            {/*
+              * QUEM ESTA LOGADO. O cliente costuma ter mais de um e-mail (o do
+              * cadastro, o do convite, o da familia) e nao tinha como saber com
+              * qual conta entrou sem abrir "Meus Dados". Fica logo abaixo do
+              * titulo, em toda aba.
+              */}
+            <div
+              data-testid="identidade-cliente"
+              className="mt-2 inline-flex max-w-full items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5"
+            >
+              <span className="grid size-6 shrink-0 place-items-center rounded-full bg-neon-red/15 font-display text-[10px] font-bold text-neon-red">
+                {initials}
+              </span>
+              <span className="truncate font-sans text-xs text-white/70">{cliente.nome}</span>
+              <span className="text-white/20">·</span>
+              {/* o e-mail aparece TAMBEM no celular: e a informacao que o cliente
+                  precisa conferir quando tem mais de uma conta */}
+              <span className="truncate font-sans text-xs text-white/45">{cliente.email}</span>
+            </div>
             </div>
             <AvisosCliente />
           </div>

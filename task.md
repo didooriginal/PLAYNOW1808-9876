@@ -49,3 +49,32 @@ Decisao: manter build.sourcemap condicional a ANALISAR=1 no vite.config.ts
 - vite.config.ts tem `build.sourcemap` condicional a ANALISAR=1 (backup /tmp/vite.config.bak)
   -> decidir se mantém (útil) antes do commit
 - Pronto = typecheck 3/3, build 2/2, screenshot ERROS: [], commit+push, deliver pt-BR
+
+## 6. Contas matrizes — radar do usuario (NOVO)
+- BUG DIAGNOSTICADO (causa raiz): existem DUAS fontes de verdade de ocupacao.
+  1) coluna contasMatrizes.vagasOcupadas -> e a que o alocador consulta
+     (jogos.ts:64, saude.ts, acessos.ts) e a que o admin edita na mao.
+  2) contagem viva de alocacoes ativas -> conta-card.tsx:620
+     `const ocupadas = vinculos.length` e o que aparece no card.
+  O form de edicao (conta-card.tsx:581) NAO manda vagas. O que acontece:
+  useInvalidarContas (queries/contas.ts:15) invalida contas+usuarios+alocacoes,
+  a lista de vinculos e refeita e o numero na tela salta para a contagem real.
+  Parece que salvar mexeu na vaga; na verdade trocou qual dos dois numeros
+  aparece. Alem disso sincronizarVagas (acessos.ts:27) sobrescreve
+  vagasOcupadas com a contagem de alocacoes -> apaga o ajuste manual do admin.
+  CORRECAO planejada:
+  - card passa a exibir a coluna vagasOcupadas (a autoritativa), e lista os
+    vinculos como "clientes vinculados" separado; quando divergirem, mostrar
+    aviso + botao sincronizar (procedure contas.sincronizar ja existe)
+  - travarVagas = true faz sincronizarVagas RETORNAR sem escrever, e
+    editarVagas/atualizar recusarem alteracao de vagas com mensagem clara
+- Ideia do usuario: "trava fisica" por conta = liga/desliga a alteracao de vagas.
+  Conta travada: vagas nao mudam por nada (nem recalculo, nem edicao).
+- Pagina de gestao de contas esta "muita conta solta" (49 contas). Precisa
+  reorganizar; usuario ainda nao sabe como -> eu proponho opcoes com base no
+  que existe (agrupar por servico, por ocupacao, vagas livres primeiro, busca).
+- Fazer junto da tarefa 2 (mesma tabela contas_matrizes, mesma migracao).
+
+## Ordem de execucao acordada
+4 (busca clientes) -> 3 (IPTV) -> 5 (email cancelamento) -> 2 + 6 (Netflix
+individual + trava de vagas + reorganizacao das contas)

@@ -250,35 +250,45 @@ export const templates = {
    * um unico objetivo: fazer o cliente instalar o app e mandar o MAC de volta
    * pelo painel.
    */
-  boasVindasIptv: (dados: { nome: string; linkApp: string; linkPainel: string }) => ({
+  boasVindasIptv: (dados: {
+    nome: string;
+    linkIos: string;
+    linkAndroid: string;
+    instrucaoTv: string;
+    linkPainel: string;
+  }) => ({
     assunto: "Seu IPTV: baixe o app e envie o endereco MAC",
     texto: [
-      `Olá, ${dados.nome}!`,
+      `Ola, ${dados.nome}!`,
       "",
-      "Seu plano de IPTV (PLAYPLUSNOW + Canais ao vivo) está confirmado. Faltam 3 passos rápidos:",
+      "Seu plano de IPTV (PLAYPLUSNOW + Canais ao vivo) esta confirmado. Faltam 3 passos rapidos:",
       "",
-      `1) Baixe o aplicativo Fun Play: ${dados.linkApp}`,
-      "   (o site tem a versão para Android/TV Box, Fire Stick, Smart TV e celular, além das lojas Google Play e App Store)",
-      "2) Ao abrir o aplicativo, localize o endereço MAC no canto inferior direito da tela.",
-      `3) Envie esse MAC para nós pelo seu painel: ${dados.linkPainel}`,
+      "1) Baixe o aplicativo no seu aparelho:",
+      `   - iPhone / iPad: ${dados.linkIos}`,
+      `   - Android (celular ou TV Box): ${dados.linkAndroid}`,
+      `   - Smart TV: ${dados.instrucaoTv}`,
+      "2) Ao abrir o aplicativo, localize o endereco MAC no canto inferior direito da tela.",
+      `3) Envie esse MAC para nos pelo seu painel: ${dados.linkPainel}`,
       "",
-      "O MAC tem o formato AA:BB:CC:DD:EE:FF. Assim que recebermos, liberamos os canais no seu aparelho e você é avisado no painel.",
+      "O MAC tem o formato AA:BB:CC:DD:EE:FF. Assim que recebermos, liberamos os canais no seu aparelho e voce e avisado no painel.",
     ].join("\n"),
     html: layoutEmail({
       titulo: "Falta 1 passo para liberar seus canais",
       corpo: `
-        <p>Olá, <strong>${dados.nome}</strong>!</p>
-        <p>Seu plano <strong>PLAYPLUSNOW + Canais ao vivo</strong> está confirmado. O IPTV é liberado pelo <strong>endereço MAC</strong> do seu aparelho, então precisamos que você faça isto:</p>
+        <p>Ola, <strong>${dados.nome}</strong>!</p>
+        <p>Seu plano <strong>PLAYPLUSNOW + Canais ao vivo</strong> esta confirmado. O IPTV e liberado pelo <strong>endereco MAC</strong> do seu aparelho, entao precisamos que voce faca isto:</p>
         <div style="background:rgba(255,255,255,0.05); padding:20px; border-radius:12px; margin:20px 0;">
-          <p style="margin:0 0 10px; color:#ffffff;"><strong>1.</strong> Baixe o aplicativo <strong>Fun Play</strong> no seu aparelho (TV Box, Fire Stick, Smart TV ou celular).</p>
-          <p style="margin:0 0 10px; color:#ffffff;"><strong>2.</strong> Abra o aplicativo e localize o <strong>endereço MAC no canto inferior direito da tela</strong>.</p>
-          <p style="margin:0; color:#ffffff;"><strong>3.</strong> Envie esse MAC para nós no seu painel, na aba <strong>Ativar IPTV</strong>.</p>
+          <p style="margin:0 0 12px; color:#ffffff;"><strong>1.</strong> Baixe o aplicativo no seu aparelho:</p>
+          <p style="margin:0 0 8px 16px; color:#ffffff;">iPhone / iPad: <a href="${dados.linkIos}" style="color:#22d3ee;">baixar XCloud Mobile na App Store</a></p>
+          <p style="margin:0 0 8px 16px; color:#ffffff;">Android (celular ou TV Box): <a href="${dados.linkAndroid}" style="color:#22d3ee;">baixar FUNPLAY na Play Store</a></p>
+          <p style="margin:0 0 12px 16px; color:#ffffff;">Smart TV: ${dados.instrucaoTv}</p>
+          <p style="margin:0 0 10px; color:#ffffff;"><strong>2.</strong> Abra o aplicativo e localize o <strong>endereco MAC no canto inferior direito da tela</strong>.</p>
+          <p style="margin:0; color:#ffffff;"><strong>3.</strong> Envie esse MAC para nos no seu painel, na aba <strong>Ativar IPTV</strong>.</p>
         </div>
-        <p style="color:#94a3b8; font-size:13px;">Downloads (Android/TV Box, Fire Stick, Smart TV, Google Play e App Store): <a href="${dados.linkApp}" style="color:#22d3ee;">${dados.linkApp}</a></p>
         <p style="color:#94a3b8; font-size:13px;">O MAC tem o formato <strong style="color:#ffffff;">AA:BB:CC:DD:EE:FF</strong>. Assim que recebermos, liberamos os canais no seu aparelho e avisamos no painel.</p>
       `,
-      botao: { texto: "Enviar meu endereço MAC", url: dados.linkPainel },
-      rodape: "Não conseguiu achar o MAC? Responda este e-mail ou abra um chamado no painel que a gente te guia.",
+      botao: { texto: "Enviar meu endereco MAC", url: dados.linkPainel },
+      rodape: "Nao conseguiu achar o MAC? Responda este e-mail ou abra um chamado no painel que a gente te guia.",
     }),
   }),
 };

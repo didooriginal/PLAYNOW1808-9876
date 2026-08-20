@@ -9,7 +9,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { enviarEmail } from "../services/email";
 import { templates } from "./emails/templates";
 import { enviarEmailReativacao } from "./reativacao";
-import { LINK_APP_IPTV, SLUGS_IPTV } from "./iptv";
+import { INSTRUCAO_TV_IPTV, LINKS_APP_IPTV, SLUGS_IPTV } from "./iptv";
 import { db } from "../database";
 import { resolverServicos, slugsDePacote } from "./planos";
 import {
@@ -401,7 +401,9 @@ export async function aplicarPedido(clienteId: number, pedido: Pedido) {
     try {
       const email = templates.boasVindasIptv({
         nome: cliente.nome,
-        linkApp: LINK_APP_IPTV,
+        linkIos: LINKS_APP_IPTV.ios,
+        linkAndroid: LINKS_APP_IPTV.android,
+        instrucaoTv: INSTRUCAO_TV_IPTV,
         linkPainel: `${process.env.WEBSITE_URL || "https://playplusnow.com.br"}/dashboard`,
       });
       await enviarEmail({

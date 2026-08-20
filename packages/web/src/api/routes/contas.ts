@@ -46,6 +46,12 @@ const contaInput = z.object({
   dataVencimento: z.string().default(""),
   /** cartão usado no pagamento, ex.: "Nubank final 4412" */
   cartaoUtilizado: z.string().default(""),
+  /** trava física: nada automático recalcula as vagas desta conta */
+  vagasTravadas: z.boolean().optional(),
+  /** conta liberada para receber convite individual (membro extra) */
+  liberaIndividual: z.boolean().optional(),
+  /** quantos convites individuais esta conta comporta */
+  convitesMaximos: z.number().int().min(0).max(10).optional(),
 });
 
 /**
@@ -276,11 +282,83 @@ export const contas = {
       return { ok: true, acao: input.acao, motivo: input.acao };
     }),
 
-  /** recalcula `vagasOcupadas` de todas as contas a partir das alocações ativas */
+  /**
+   * Sincroniza UMA conta: usado pelo aviso de divergência no card, quando o
+   * número gravado e as alocações ativas não batem. Conta travada não muda.
+   */
+  sincronizarUma: adminOnly
+    .input(z.object({ id: z.number().int() }))
+    .handler(async ({ input }) => {
+      const [conta] = await db.select().from(contasMatrizes).where(eq(contasMatrizes.id, input.id));
+      if (!conta) throw new ORPCError("NOT_FOUND", { message: "Conta matriz não encontrada" });
+      if (conta.vagasTravadas)
+        throw new ORPCError("BAD_REQUEST", {
+          message: "As vagas desta conta estão travadas. Destrave antes de sincronizar.",
+        });
+      const ocupadas = await sincronizarVagas(input.id);
+      return { ok: true, ocupadas };
+    }),
+
+  /**
+   * TRAVA DAS VAGAS — liga/desliga o recálculo automático desta conta.
+   * Com a trava ligada o número de vagas só muda quando o admin muda: era isso
+   * que fazia o valor "voltar sozinho" depois de salvar, porque a contagem de
+   * alocações sobrescrevia o que ele tinha acabado de conferir na matriz.
+   */
+  alternarTravaVagas: adminOnly
+    .input(z.object({ id: z.number().int(), travar: z.boolean() }))
+    .handler(async ({ input }) => {
+      const [row] = await db
+        .update(contasMatrizes)
+        .set({ vagasTravadas: input.travar })
+        .where(eq(contasMatrizes.id, input.id))
+        .returning();
+      if (!row) throw new ORPCError("NOT_FOUND", { message: "Conta matriz não encontrada" });
+      return row;
+    }),
+
+  /**
+   * Recalcula `vagasOcupadas` de todas as contas a partir das alocações
+   * ativas. Contas com a trava ligada são puladas de propósito.
+   */
   sincronizar: adminOnly.handler(async () => {
-    const contas = await db.select({ id: contasMatrizes.id }).from(contasMatrizes);
-    for (const c of contas) await sincronizarVagas(c.id);
-    return { contas: contas.length };
+    const contas = await db
+      .select({ id: contasMatrizes.id, vagasTravadas: contasMatrizes.vagasTravadas })
+      .from(contasMatrizes);
+    let puladas = 0;
+    for (const c of contas) {
+      if (c.vagasTravadas) {
+        puladas += 1;
+        continue;
+      }
+      await sincronizarVagas(c.id);
+    }
+    return { contas: contas.length - puladas, puladas };
+  }),
+
+  /**
+   * Divergência entre o número gravado (`vagasOcupadas`, que o alocador usa
+   * para decidir se ainda cabe cliente) e as alocações ativas de verdade.
+   * O card do admin mostra as duas e só oferece o "sincronizar" quando
+   * realmente diferem — antes a tela exibia a contagem viva e o alocador usava
+   * a coluna, então o mesmo número aparecia diferente em dois lugares.
+   */
+  divergencias: adminOnly.handler(async () => {
+    const linhas = await db
+      .select({
+        id: contasMatrizes.id,
+        rotulo: contasMatrizes.rotulo,
+        servico: contasMatrizes.servico,
+        gravadas: contasMatrizes.vagasOcupadas,
+        travada: contasMatrizes.vagasTravadas,
+        vivas: sql<number>`(
+          select count(*) from ${alocacoes}
+          where ${alocacoes.contaId} = ${contasMatrizes.id} and ${alocacoes.status} = 'ativo'
+        )`,
+      })
+      .from(contasMatrizes)
+      .where(eq(contasMatrizes.poolJogos, false));
+    return linhas.filter((l) => l.gravadas !== Number(l.vivas));
   }),
 
   remover: adminOnly.input(z.object({ id: z.number().int() })).handler(async ({ input }) => {

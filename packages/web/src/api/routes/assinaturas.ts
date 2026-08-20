@@ -63,6 +63,64 @@ function gerarReferencia(clienteId: number) {
 }
 
 /* ------------------------------------------------------------------ */
+/* AVISO DE CANCELAMENTO                                               */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Ponto único de aviso de cancelamento: e-mail de confirmação ao cliente +
+ * alerta ao admin. Serve tanto o cancelamento feito no painel (procedure
+ * `cancelar`) quanto o que chega pelo webhook do Mercado Pago — cancelamento
+ * feito fora do site, cartão recusado várias vezes, assinatura expirada.
+ *
+ * Quem chama só chama quando a assinatura ACABOU de virar cancelada, e o
+ * alerta do admin tem `chave` fixa por referência: o mesmo cancelamento nunca
+ * gera dois e-mails nem dois alertas.
+ */
+export async function avisarCancelamentoAssinatura(
+  assinatura: typeof tabelaAssinaturas.$inferSelect,
+  origem: "painel" | "webhook",
+) {
+  const [cliente] = await db.select().from(usuarios).where(eq(usuarios.id, assinatura.clienteId));
+  if (!cliente) return;
+
+  // e-mail ao cliente — nunca derruba o cancelamento em si
+  try {
+    const acessoAte = cliente.proximaCobranca
+      ? cliente.proximaCobranca.split("-").reverse().join("/")
+      : "";
+    const base = (process.env.WEBSITE_URL || "https://playplusnow.com.br").replace(/\/$/, "");
+    const modelo = templates.cancelamento({
+      nome: cliente.nome,
+      titulo: assinatura.titulo,
+      acessoAte,
+      linkPainel: `${base}/dashboard`,
+    });
+    await enviarEmail({
+      para: cliente.email,
+      assunto: modelo.assunto,
+      texto: modelo.texto,
+      html: modelo.html,
+    });
+  } catch (e) {
+    console.error("[Email] falha ao enviar a confirmação de cancelamento:", e);
+  }
+
+  await notificar({
+    escopo: "admin",
+    clienteId: cliente.id,
+    tipo: "pagamento",
+    severidade: "alerta",
+    titulo: "Assinatura no cartão cancelada",
+    mensagem:
+      origem === "painel"
+        ? `${cliente.nome} cancelou a recorrência de ${assinatura.titulo}.`
+        : `A recorrência de ${assinatura.titulo} (${cliente.nome}) foi cancelada no Mercado Pago.`,
+    destino: "clientes",
+    chave: `assin:cancelada:${assinatura.referencia}`,
+  });
+}
+
+/* ------------------------------------------------------------------ */
 /* BAIXA DE UMA COBRANÇA DA ASSINATURA                                 */
 /* ------------------------------------------------------------------ */
 
@@ -335,38 +393,10 @@ export const assinaturasRota = {
       .set({ status: "cancelled", canceladaEm: new Date(), atualizadoEm: new Date() })
       .where(eq(tabelaAssinaturas.id, atual.id));
 
-    // e-mail de confirmação do cancelamento — nunca derruba o cancelamento
-    try {
-      const acessoAte = cliente.proximaCobranca
-        ? cliente.proximaCobranca.split("-").reverse().join("/")
-        : "";
-      const base = (process.env.WEBSITE_URL || "https://playplusnow.com.br").replace(/\/$/, "");
-      const modelo = templates.cancelamento({
-        nome: cliente.nome,
-        titulo: atual.titulo,
-        acessoAte,
-        linkPainel: `${base}/dashboard`,
-      });
-      await enviarEmail({
-        para: cliente.email,
-        assunto: modelo.assunto,
-        texto: modelo.texto,
-        html: modelo.html,
-      });
-    } catch (e) {
-      console.error("[Email] falha ao enviar a confirmação de cancelamento:", e);
-    }
-
-    await notificar({
-      escopo: "admin",
-      clienteId: cliente.id,
-      tipo: "pagamento",
-      severidade: "alerta",
-      titulo: "Assinatura no cartão cancelada",
-      mensagem: `${cliente.nome} cancelou a recorrência de ${atual.titulo}.`,
-      destino: "clientes",
-      chave: `assin:cancelada:${atual.referencia}`,
-    });
+    await avisarCancelamentoAssinatura(
+      { ...atual, status: "cancelled", canceladaEm: new Date() },
+      "painel",
+    );
 
     return { ok: true };
   }),

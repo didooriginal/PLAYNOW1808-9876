@@ -120,6 +120,26 @@ export const contasMatrizes = sqliteTable("contas_matrizes", {
    */
   ativa: integer("ativa", { mode: "boolean" }).notNull().default(true),
 
+  /**
+   * TRAVA FÍSICA DAS VAGAS. Quando true, nada AUTOMÁTICO mexe nas vagas desta
+   * conta: `sincronizarVagas` sai sem escrever e o botão "sincronizar" pula a
+   * conta. O admin continua ajustando à mão quando quiser. Serve para a conta
+   * em que o admin sabe o número real de telas (a matriz cobra por tela) e não
+   * quer que uma contagem de alocações sobrescreva o valor conferido à mão.
+   */
+  vagasTravadas: integer("vagas_travadas", { mode: "boolean" }).notNull().default(false),
+
+  /**
+   * Conta liberada para CONVITE INDIVIDUAL (caso "Netflix individual"): o
+   * cliente manda o e-mail dele, o admin cadastra esse e-mail como membro
+   * extra AQUI e a própria Netflix envia o convite. Cada conta liberada
+   * comporta `convitesMaximos` convites. Contas não marcadas nunca aparecem
+   * na lista de destino do convite, para não furar o compartilhamento normal.
+   */
+  liberaIndividual: integer("libera_individual", { mode: "boolean" }).notNull().default(false),
+  /** quantos convites individuais esta conta comporta (padrão 2) */
+  convitesMaximos: integer("convites_maximos").notNull().default(2),
+
   /* ---- FUTEBOL AO VIVO ---- */
   /** conta do pool exclusivo de dias de jogo (descartável//alta rotatividade) */
   poolJogos: integer("pool_jogos", { mode: "boolean" }).notNull().default(false),

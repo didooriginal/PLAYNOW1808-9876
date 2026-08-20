@@ -153,6 +153,19 @@ import { useRodarSeed, useSeedStatus } from "../queries/seed";
 
 type Conta = NonNullable<ReturnType<typeof useContas>["data"]>[number];
 type Cliente = NonNullable<ReturnType<typeof useUsuarios>["data"]>[number];
+
+/**
+ * Deixa o texto comparavel na busca: minusculo, sem acento e sem espaco
+ * sobrando. Assim "Joao" acha "João" e vice-versa.
+ */
+function normalizarBusca(v: string) {
+  return v
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
 type Pacote = NonNullable<ReturnType<typeof usePacotes>["data"]>[number];
 
 /* ------------------------------------------------------------------ */
@@ -2196,6 +2209,7 @@ function ClientsTable({ compact = false }: { compact?: boolean }) {
   const remover = useRemoverUsuario();
   const atualizar = useAtualizarUsuario();
   const [aba, setAba] = useState<string>("todos");
+  const [busca, setBusca] = useState("");
   const [editandoVencimento, setEditandoVencimento] = useState<Cliente | null>(
     null,
   );
@@ -2213,8 +2227,26 @@ function ClientsTable({ compact = false }: { compact?: boolean }) {
       ? todos.length
       : todos.filter((c) => c.statusPagamento === id).length;
 
-  const filtrados =
+  const porStatus =
     aba === "todos" ? todos : todos.filter((c) => c.statusPagamento === aba);
+
+  /**
+   * Busca por nome, e-mail ou WhatsApp. Compara sem acento e sem
+   * pontuacao para "Joao"/"João" e "(11) 99999-8888"/"11999998888"
+   * acharem o mesmo cliente.
+   */
+  const filtrados = (() => {
+    const termo = normalizarBusca(busca);
+    if (!termo) return porStatus;
+    const soDigitos = termo.replace(/\D/g, "");
+    return porStatus.filter((c) => {
+      const alvo = normalizarBusca(`${c.nome ?? ""} ${c.email ?? ""}`);
+      if (alvo.includes(termo)) return true;
+      const fone = (c.telefone ?? "").replace(/\D/g, "");
+      return soDigitos.length >= 3 && fone.includes(soDigitos);
+    });
+  })();
+
   const rows = compact ? filtrados.slice(0, 5) : filtrados;
 
   return (
@@ -2230,6 +2262,40 @@ function ClientsTable({ compact = false }: { compact?: boolean }) {
           {rows.length} registros
         </span>
       </div>
+
+      {!compact && (
+        <div className="border-b border-white/8 px-5 py-3">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-white/30" />
+            <input
+              id="busca-clientes"
+              data-testid="busca-clientes"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="Buscar por nome, e-mail ou WhatsApp..."
+              aria-label="Buscar cliente por nome, e-mail ou WhatsApp"
+              className="w-full rounded-xl border border-white/10 bg-white/[0.04] py-2.5 pl-9 pr-9 font-sans text-sm text-white placeholder:text-white/25 focus:border-neon-cyan/50 focus:outline-none"
+            />
+            {busca && (
+              <button
+                type="button"
+                onClick={() => setBusca("")}
+                aria-label="Limpar busca"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-lg p-1 text-white/35 hover:bg-white/10 hover:text-white"
+              >
+                <X className="size-3.5" />
+              </button>
+            )}
+          </div>
+          {busca && (
+            <p className="mt-2 font-sans text-[11px] text-white/40">
+              {filtrados.length === 0
+                ? "Nenhum cliente encontrado para esta busca."
+                : `${filtrados.length} cliente(s) encontrado(s).`}
+            </p>
+          )}
+        </div>
+      )}
 
       {!compact && (
         <div

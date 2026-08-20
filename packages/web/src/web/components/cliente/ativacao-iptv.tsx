@@ -10,6 +10,7 @@ import {
   Radio,
   Send,
   TriangleAlert,
+  Tv,
   X,
 } from "lucide-react";
 import { GlassCard, NeonButton, Pill } from "../ui/kit";
@@ -44,6 +45,75 @@ const ESTILO: Record<string, { rotulo: string; classe: string }> = {
   cancelado: { rotulo: "Cancelado", classe: "border-white/15 bg-white/5 text-white/40" },
 };
 
+/** links de download padrao (fallback quando a API ainda nao respondeu) */
+const LINKS_PADRAO = {
+  ios: "https://apps.apple.com/br/app/xcloud-mobile/id6471106231",
+  android: "https://play.google.com/store/apps/details?id=com.funplusplay.app&hl=pt_BR",
+};
+const TV_PADRAO = "Na TV, procure o app FUNPLAY na loja da propria TV.";
+
+/**
+ * Onde baixar o app, por aparelho. Antes havia um link unico que mandava todo
+ * mundo para a mesma pagina — quem estava no iPhone nao conseguia instalar.
+ * A TV nao tem link: cada fabricante tem loja propria, entao ali vai a
+ * instrucao de buscar FUNPLAY.
+ */
+function DestinosDownload({
+  links,
+  instrucaoTv,
+  compacto = false,
+}: {
+  links: { ios: string; android: string };
+  instrucaoTv: string;
+  compacto?: boolean;
+}) {
+  const base = compacto
+    ? "flex items-center justify-center gap-1.5 rounded-xl border px-2.5 py-2 font-sans text-[11px] font-semibold transition"
+    : "inline-flex items-center gap-2 rounded-full border px-4 py-2 font-sans text-xs font-semibold transition";
+
+  return (
+    <div className={compacto ? "mt-2.5 grid grid-cols-3 gap-2" : "mt-4 flex flex-wrap gap-2"}>
+      <a
+        href={links.ios}
+        target="_blank"
+        rel="noreferrer"
+        className={`${base} border-neon-cyan/40 bg-neon-cyan/10 text-neon-cyan hover:bg-neon-cyan/20`}
+      >
+        <Download className="size-3.5 shrink-0" />
+        iPhone
+        {!compacto && <ExternalLink className="size-3" />}
+      </a>
+      <a
+        href={links.android}
+        target="_blank"
+        rel="noreferrer"
+        className={`${base} border-neon-cyan/40 bg-neon-cyan/10 text-neon-cyan hover:bg-neon-cyan/20`}
+      >
+        <Download className="size-3.5 shrink-0" />
+        Android
+        {!compacto && <ExternalLink className="size-3" />}
+      </a>
+      <div
+        className={`${base} cursor-default border-white/12 bg-white/[0.04] text-white/60`}
+        aria-label={instrucaoTv}
+      >
+        <Tv className="size-3.5 shrink-0" />
+        Smart TV
+      </div>
+      <p
+        className={
+          compacto
+            ? "col-span-3 font-sans text-[10.5px] leading-relaxed text-white/40"
+            : "w-full font-sans text-[11px] leading-relaxed text-white/40"
+        }
+      >
+        Na TV nao tem link: abra a loja de aplicativos da propria TV e procure por{" "}
+        <strong className="text-white/70">FUNPLAY</strong>.
+      </p>
+    </div>
+  );
+}
+
 export function AtivacaoIptv() {
   const { data, isPending } = useMinhaAtivacaoIptv();
   const enviar = useEnviarMac();
@@ -52,7 +122,8 @@ export function AtivacaoIptv() {
   const [dispositivo, setDispositivo] = useState("");
   const [copiado, setCopiado] = useState<number | null>(null);
 
-  const linkApp = data?.linkApp ?? "https://funplays.com.br/";
+  const links = data?.linksApp ?? LINKS_PADRAO;
+  const instrucaoTv = data?.instrucaoTv ?? TV_PADRAO;
   const pedidos = data?.pedidos ?? [];
   const pronto = macCompleto(mac);
 
@@ -142,16 +213,7 @@ export function AtivacaoIptv() {
             </div>
           ))}
         </div>
-        <a
-          href={linkApp}
-          target="_blank"
-          rel="noreferrer"
-          className="mt-4 inline-flex items-center gap-2 rounded-full border border-neon-cyan/40 bg-neon-cyan/10 px-4 py-2 font-sans text-xs font-semibold text-neon-cyan transition hover:bg-neon-cyan/20"
-        >
-          <Download className="size-3.5" />
-          Baixar o app Fun Play
-          <ExternalLink className="size-3" />
-        </a>
+        <DestinosDownload links={links} instrucaoTv={instrucaoTv} />
       </GlassCard>
 
       {/* FORMULARIO DO MAC */}
@@ -315,7 +377,8 @@ export function AtivacaoIptvCard() {
   const [dispositivo, setDispositivo] = useState("");
   const [verTodos, setVerTodos] = useState(false);
 
-  const linkApp = data?.linkApp ?? "https://funplays.com.br/";
+  const links = data?.linksApp ?? LINKS_PADRAO;
+  const instrucaoTv = data?.instrucaoTv ?? TV_PADRAO;
   const pronto = macCompleto(mac);
   const pedidos = (data?.pedidos ?? []).filter((p) => p.status !== "cancelado");
   const visiveis = verTodos ? pedidos : pedidos.slice(0, 2);
@@ -357,26 +420,23 @@ export function AtivacaoIptvCard() {
 
   return (
     <div className="relative mt-5 space-y-3">
-      {/* passo 1 — baixar o app */}
-      <a
-        href={linkApp}
-        target="_blank"
-        rel="noreferrer"
-        className="flex items-center gap-3 rounded-xl border border-neon-cyan/35 bg-neon-cyan/[0.08] p-3 transition hover:bg-neon-cyan/15"
-      >
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-neon-cyan/15">
-          <Download className="size-4 text-neon-cyan" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="font-display text-xs font-bold text-white">
-            1. Baixe o aplicativo Fun Play
+      {/* passo 1 — baixar o app, no destino certo de cada aparelho */}
+      <div className="rounded-xl border border-neon-cyan/35 bg-neon-cyan/[0.08] p-3">
+        <div className="flex items-center gap-3">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-neon-cyan/15">
+            <Download className="size-4 text-neon-cyan" />
           </div>
-          <div className="mt-0.5 font-sans text-[11px] text-white/45">
-            TV Box, Fire Stick, Smart TV ou celular
+          <div className="min-w-0 flex-1">
+            <div className="font-display text-xs font-bold text-white">
+              1. Baixe o aplicativo
+            </div>
+            <div className="mt-0.5 font-sans text-[11px] text-white/45">
+              Escolha o seu aparelho
+            </div>
           </div>
         </div>
-        <ExternalLink className="size-3.5 shrink-0 text-neon-cyan" />
-      </a>
+        <DestinosDownload links={links} instrucaoTv={instrucaoTv} compacto />
+      </div>
 
       {/* passo 2 — onde achar o MAC */}
       <div className="rounded-xl border border-white/8 bg-white/[0.03] p-3">

@@ -64,6 +64,24 @@ export function usePedirConvite() {
   );
 }
 
+/** contas liberadas para convite individual, com as vagas e quem está em cada */
+export function useContasDeConvite() {
+  return useQuery(orpc.planosDeApps.contasDeConvite.queryOptions({ staleTime: 15_000 }));
+}
+
+/** admin lança o convite na mão (cliente mandou o e-mail por fora) */
+export function useCriarConvite() {
+  const qc = useQueryClient();
+  return useMutation(
+    orpc.planosDeApps.criarConvite.mutationOptions({
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: orpc.planosDeApps.key() });
+        qc.invalidateQueries({ queryKey: orpc.usuarios.key() });
+      },
+    }),
+  );
+}
+
 /** admin move o convite: pendente → enviado → ativo (ou recusado) */
 export function useAtualizarConvite() {
   const qc = useQueryClient();

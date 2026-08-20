@@ -14,7 +14,10 @@ import {
   buscarPagamentoAutorizado,
 } from "./mercadopago";
 import { confirmarPagamento } from "../routes/pix";
-import { baixarCobrancaAssinatura } from "../routes/assinaturas";
+import {
+  avisarCancelamentoAssinatura,
+  baixarCobrancaAssinatura,
+} from "../routes/assinaturas";
 
 export type ResultadoWebhook = {
   ok: boolean;
@@ -93,6 +96,14 @@ async function tratarAssinatura(id: string): Promise<ResultadoWebhook> {
     return { ok: false, tratado: "assinatura", detalhe: "assinatura não encontrada" };
   }
 
+  /**
+   * Já estava cancelada antes desta notificação? Então o aviso ao cliente já
+   * saiu (pelo painel ou por um webhook anterior) e não repetimos nada — o
+   * Mercado Pago reenvia a mesma notificação várias vezes.
+   */
+  const jaCancelada = assinatura.status === "cancelled" || Boolean(assinatura.canceladaEm);
+  const cancelouAgora = remota.status === "cancelled" && !jaCancelada;
+
   await db
     .update(assinaturas)
     .set({
@@ -105,7 +116,27 @@ async function tratarAssinatura(id: string): Promise<ResultadoWebhook> {
     })
     .where(eq(assinaturas.id, assinatura.id));
 
-  return { ok: true, tratado: "assinatura", detalhe: `status ${remota.status}` };
+  /**
+   * Cancelamento que NÃO passou pelo nosso painel (cliente cancelou no app do
+   * Mercado Pago, cartão recusado várias vezes, assinatura expirada) agora
+   * também avisa: e-mail de confirmação ao cliente e alerta ao admin.
+   */
+  if (cancelouAgora) {
+    try {
+      await avisarCancelamentoAssinatura(
+        { ...assinatura, status: "cancelled", canceladaEm: new Date() },
+        "webhook",
+      );
+    } catch (e) {
+      console.error("[Webhook MP] falha ao avisar o cancelamento:", e);
+    }
+  }
+
+  return {
+    ok: true,
+    tratado: "assinatura",
+    detalhe: `status ${remota.status}${cancelouAgora ? ", cliente avisado" : ""}`,
+  };
 }
 
 /** cobrança individual gerada pela recorrência do cartão */

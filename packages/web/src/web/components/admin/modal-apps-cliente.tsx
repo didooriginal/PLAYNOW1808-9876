@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { brl, type ServiceId } from "@/lib/mock-data";
 import { AppIcon } from "../app-icon";
 import { Ajuda, Campo, Tooltip } from "../ui/tooltip";
-import { useAplicativos } from "../../queries/aplicativos";
+import { useCatalogoOpcoes } from "../../queries/planos-apps";
 import {
   useAdicionarAppAoCliente,
   useAppsDoCliente,
@@ -71,7 +71,7 @@ export function ModalAppsCliente({
   onClose: () => void;
 }) {
   const { data, isLoading } = useAppsDoCliente(cliente.id);
-  const { data: catalogo } = useAplicativos();
+  const { data: catalogo } = useCatalogoOpcoes();
   const adicionar = useAdicionarAppAoCliente();
   const remover = useRemoverAppDoCliente();
   const liberar = useLiberarVaga();
@@ -84,6 +84,8 @@ export function ModalAppsCliente({
     slug: string;
     nome: string;
     preco: number;
+    appSlug: string;
+    entrega: "vaga" | "convite";
   } | null>(null);
   const [liberacao, setLiberacao] = useState<"imediata" | "apos_pagamento">("apos_pagamento");
   const [cobrarPrimeiroMes, setCobrarPrimeiroMes] = useState(true);
@@ -95,7 +97,40 @@ export function ModalAppsCliente({
 
   const itens = data?.itens ?? [];
   const jaTem = new Set(itens.map((i) => i.servico));
-  const disponiveis = (catalogo ?? []).filter((a) => a.ativo && !jaTem.has(a.slug));
+  /**
+   * LISTA DO "ESCOLHER APP" — apps E opcoes.
+   *
+   * Antes vinha so de `aplicativos`, entao opcao nenhuma aparecia: era
+   * impossivel lancar a Netflix Individual (ou uma opcao de IPTV) para um
+   * cliente cadastrado a mao. Agora, quando o app tem opcoes ativas, cada
+   * opcao entra como um item proprio, com o preco e a entrega dela.
+   */
+  const disponiveis = (catalogo ?? [])
+    .filter((a) => a.ativo)
+    .flatMap((app) => {
+      const ativas = (app.opcoes ?? []).filter((o) => o.ativo);
+      if (ativas.length === 0) {
+        return [
+          {
+            chave: `app-${app.id}`,
+            slug: app.slug,
+            nome: app.nome,
+            preco: app.preco ?? 0,
+            appSlug: app.slug,
+            entrega: "vaga" as const,
+          },
+        ];
+      }
+      return ativas.map((opcao) => ({
+        chave: `opcao-${opcao.id}`,
+        slug: opcao.slug,
+        nome: `${app.nome} · ${opcao.nome}`,
+        preco: opcao.preco ?? 0,
+        appSlug: app.slug,
+        entrega: opcao.entrega === "convite" ? ("convite" as const) : ("vaga" as const),
+      }));
+    })
+    .filter((item) => !jaTem.has(item.slug));
   const erro = adicionar.error?.message ?? remover.error?.message ?? liberar.error?.message;
 
   return (
@@ -255,21 +290,31 @@ export function ModalAppsCliente({
             <div className="mt-3 grid max-h-[26vh] gap-2 overflow-y-auto pr-1">
               {disponiveis.map((app) => (
                 <button
-                  key={app.id}
+                  key={app.chave}
                   type="button"
+                  data-testid={`app-disponivel-${app.slug}`}
                   onClick={() => {
-                    setEscolhido({ slug: app.slug, nome: app.nome, preco: app.preco ?? 0 });
-                    setValorApp(String(app.preco ?? 0));
+                    setEscolhido({
+                      slug: app.slug,
+                      nome: app.nome,
+                      preco: app.preco,
+                      appSlug: app.appSlug,
+                      entrega: app.entrega,
+                    });
+                    setValorApp(String(app.preco));
                     setLiberacao("apos_pagamento");
                     setCobrarPrimeiroMes(true);
                   }}
                   className="flex items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.03] p-3 text-left transition-all hover:border-neon-cyan/50 hover:bg-white/[0.06]"
                 >
-                  <AppIcon id={app.slug as ServiceId} size="sm" active />
+                  <AppIcon id={app.appSlug as ServiceId} size="sm" active />
                   <div className="min-w-0 flex-1">
                     <div className="font-display text-sm font-bold text-white">{app.nome}</div>
                     <div className="font-sans text-[10px] text-white/30">
-                      Avulso · {brl(app.preco ?? 0)}/mês · ocupa uma vaga real
+                      Avulso · {brl(app.preco)}/mês ·{" "}
+                      {app.entrega === "convite"
+                        ? "convite do provedor (não ocupa vaga)"
+                        : "ocupa uma vaga real"}
                     </div>
                   </div>
                   <Plus className="size-4 text-white/20" />
@@ -292,7 +337,7 @@ export function ModalAppsCliente({
               className="mt-3 rounded-2xl border border-neon-cyan/25 bg-neon-cyan/[0.04] p-4"
             >
               <div className="flex items-center gap-3">
-                <AppIcon id={escolhido.slug as ServiceId} size="sm" active />
+                <AppIcon id={escolhido.appSlug as ServiceId} size="sm" active />
                 <div className="min-w-0 flex-1">
                   <div className="font-display text-sm font-bold text-white">
                     {escolhido.nome}
@@ -376,6 +421,16 @@ export function ModalAppsCliente({
                     ? "O acesso sai na hora e a cobrança vai na fatura."
                     : "O app fica preso como “aguardando pagamento” e é liberado sozinho quando a fatura for paga."}
                 </div>
+                {escolhido.entrega === "convite" && (
+                  <div
+                    data-testid="aviso-entrega-convite"
+                    className="mt-2 rounded-lg border border-neon-purple/25 bg-neon-purple/5 p-2 text-neon-purple"
+                  >
+                    Entrega por convite: não ocupa vaga de conta compartilhada. Depois de
+                    liberado, aparece no painel do cliente um card pedindo o e-mail dele — o
+                    pedido cai na aba Convites para você cadastrar como membro extra.
+                  </div>
+                )}
               </div>
 
               <button

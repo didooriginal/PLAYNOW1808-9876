@@ -8,10 +8,12 @@ import { db } from "../database";
 import { alocacoes, ativacoesIptv, usuarios } from "../database/schema";
 import { avisarCliente } from "../lib/avisos-cliente";
 import {
-  LINK_APP_IPTV,
+  INSTRUCAO_TV_IPTV,
+  LINKS_APP_IPTV,
   MAX_PENDENTES_IPTV,
   SLUGS_IPTV,
   normalizarMac,
+  telasContratadas,
 } from "../lib/iptv";
 
 /**
@@ -44,8 +46,8 @@ async function clienteDaSessao(authUserId: string) {
   return cliente;
 }
 
-/** true quando o cliente tem vaga ativa em algum app de IPTV */
-async function temIptv(clienteId: number) {
+/** slugs de IPTV que o cliente tem ativos (vazio = nenhum plano de IPTV) */
+async function slugsIptvAtivos(clienteId: number) {
   const rows = await db
     .select({ servico: alocacoes.servico })
     .from(alocacoes)
@@ -56,14 +58,17 @@ async function temIptv(clienteId: number) {
         inArray(alocacoes.servico, SLUGS_IPTV),
       ),
     );
-  return rows.length > 0;
+  return rows.map((r) => r.servico);
 }
 
 /** estado neutro: login sem ficha de cliente nao pode virar 404 em loop */
 const SEM_IPTV = {
   temIptv: false as const,
   bloqueado: false as const,
-  linkApp: LINK_APP_IPTV,
+  linksApp: LINKS_APP_IPTV,
+  instrucaoTv: INSTRUCAO_TV_IPTV,
+  telas: 1,
+  telasUsadas: 0,
   pedidos: [] as Array<typeof ativacoesIptv.$inferSelect>,
   pendente: null,
   ativos: [] as Array<typeof ativacoesIptv.$inferSelect>,
@@ -82,13 +87,20 @@ export const iptv = {
       .orderBy(desc(ativacoesIptv.criadoEm))
       .limit(20);
 
+    const slugs = await slugsIptvAtivos(cliente.id);
+    const ativos = pedidos.filter((p) => p.status === "ativado");
+
     return {
-      temIptv: await temIptv(cliente.id),
+      temIptv: slugs.length > 0,
       bloqueado: estaBloqueado(cliente.statusPagamento, cliente.confiancaAte),
-      linkApp: LINK_APP_IPTV,
+      linksApp: LINKS_APP_IPTV,
+      instrucaoTv: INSTRUCAO_TV_IPTV,
+      /** quantos aparelhos o plano dele permite ao mesmo tempo */
+      telas: telasContratadas(slugs),
+      telasUsadas: ativos.length,
       pedidos,
       pendente: pedidos.find((p) => p.status === "pendente") ?? null,
-      ativos: pedidos.filter((p) => p.status === "ativado"),
+      ativos,
     };
   }),
 
@@ -135,11 +147,29 @@ export const iptv = {
         });
       }
 
+      /**
+       * LIMITE DE TELAS: 1 tela = 1 aparelho ativo. Contamos ativados +
+       * pendentes, senão o cliente de 1 tela enfileirava vários MACs e o
+       * servidor estourava a conexão depois, sem ninguém entender por quê.
+       * Para liberar espaço ele cancela um aparelho antigo no próprio painel.
+       */
+      const slugs = await slugsIptvAtivos(cliente.id);
+      const telas = telasContratadas(slugs);
+      const ocupando = meus.filter((m) => m.status === "ativado" || m.status === "pendente").length;
+      if (ocupando >= telas) {
+        throw new ORPCError("CONFLICT", {
+          message:
+            telas === 1
+              ? "Seu plano é de 1 tela e já tem um aparelho em uso. Cancele o aparelho atual aqui no painel ou fale com a gente para subir para 2 telas."
+              : `Seu plano é de ${telas} telas e todas estão em uso. Cancele um aparelho aqui no painel para liberar espaço.`,
+        });
+      }
+
       const [row] = await db
         .insert(ativacoesIptv)
         .values({
           clienteId: cliente.id,
-          servicoSlug: SLUGS_IPTV[0]!,
+          servicoSlug: slugs[0] ?? SLUGS_IPTV[0]!,
           mac,
           dispositivo: input.dispositivo.trim(),
           status: "pendente",

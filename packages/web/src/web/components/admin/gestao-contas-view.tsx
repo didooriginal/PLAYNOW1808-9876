@@ -1,15 +1,18 @@
 import { useState } from "react";
 import {
   AlertTriangle,
+  ChevronDown,
   CreditCard,
   ExternalLink,
   Loader2,
   PiggyBank,
   Plus,
   RefreshCw,
+  Search,
   Settings2,
   Ticket,
   Wallet,
+  X,
 } from "lucide-react";
 import { AppIcon } from "../app-icon";
 import { GlassCard, NeonButton, Pill } from "../ui/kit";
@@ -454,14 +457,120 @@ function Parametros() {
 
 /* ------------------------------------------------------------------ */
 
+type ContaGift = NonNullable<ReturnType<typeof useGiftcards>["data"]>["contas"][number];
+
+/** tira acento e caixa para a busca achar "Netflix" digitando "netflix" */
+function normalizarBusca(v: string) {
+  return v
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+type FiltroSaldo = "todas" | "critico" | "ok";
+
+/**
+ * SECAO DE UM SERVICO — recolhivel, com o resumo do grupo no cabecalho
+ * (quantas contas, saldo somado, quantas em saldo critico). Com 49 contas na
+ * tela, o admin abre so o servico que quer mexer em vez de rolar tudo.
+ */
+function SecaoServico({
+  servico,
+  contas,
+  abrirPorPadrao,
+}: {
+  servico: string;
+  contas: ContaGift[];
+  /** com busca ou filtro ativo a secao ja nasce aberta: o admin filtrou para VER */
+  abrirPorPadrao: boolean;
+}) {
+  const criticas = contas.filter((c) => c.critico).length;
+  const [aberta, setAberta] = useState(abrirPorPadrao || criticas > 0);
+  const saldo = contas.reduce((s, c) => s + c.saldoGiftCard, 0);
+  const nome = serviceById(servico).name;
+
+  return (
+    <section className="rounded-3xl border border-white/8 bg-white/[0.02]">
+      <button
+        type="button"
+        onClick={() => setAberta((v) => !v)}
+        aria-expanded={aberta}
+        className="flex w-full items-center gap-3 px-4 py-3 text-left"
+      >
+        <AppIcon id={servico} size="sm" />
+        <div className="min-w-0">
+          <div className="truncate font-display text-sm font-bold text-white">{nome}</div>
+          <div className="font-sans text-[11px] text-white/35">
+            {contas.length} conta(s) · saldo {brl(saldo)}
+          </div>
+        </div>
+        <div className="ml-auto flex items-center gap-2">
+          {criticas > 0 && (
+            <Pill accent="red" icon={<AlertTriangle className="size-3" />}>
+              {criticas} crítica(s)
+            </Pill>
+          )}
+          <ChevronDown
+            className={cn(
+              "size-4 shrink-0 text-white/40 transition-transform",
+              aberta && "rotate-180",
+            )}
+          />
+        </div>
+      </button>
+
+      {aberta && (
+        <div className="grid gap-4 border-t border-white/8 p-4 lg:grid-cols-2 2xl:grid-cols-3">
+          {contas.map((c) => (
+            <ContaCard key={c.id} conta={c} />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 export function GestaoContasView() {
   const { data, isLoading } = useGiftcards();
   const varrer = useVarrerSaldos();
+
+  const [busca, setBusca] = useState("");
+  const [filtroServico, setFiltroServico] = useState("todos");
+  const [filtroSaldo, setFiltroSaldo] = useState<FiltroSaldo>("todas");
 
   const contas = data?.contas ?? [];
   const criticas = contas.filter((c) => c.critico);
   const saldoTotal = contas.reduce((s, c) => s + c.saldoGiftCard, 0);
   const custoTotal = contas.reduce((s, c) => s + c.custoMensal, 0);
+
+  /** servicos que realmente existem no estoque, para o seletor nao inventar opcao */
+  const servicos = [...new Set(contas.map((c) => c.servico))].sort((a, b) =>
+    serviceById(a).name.localeCompare(serviceById(b).name, "pt-BR"),
+  );
+
+  const termo = normalizarBusca(busca);
+  const filtradas = contas.filter((c) => {
+    if (filtroServico !== "todos" && c.servico !== filtroServico) return false;
+    if (filtroSaldo === "critico" && !c.critico) return false;
+    if (filtroSaldo === "ok" && c.critico) return false;
+    if (!termo) return true;
+    return normalizarBusca(`${c.nomeConta} ${c.email} ${serviceById(c.servico).name}`).includes(
+      termo,
+    );
+  });
+
+  /** agrupa por servico mantendo a ordem alfabetica do nome exibido */
+  const grupos = servicos
+    .map((s) => ({ servico: s, contas: filtradas.filter((c) => c.servico === s) }))
+    .filter((g) => g.contas.length > 0);
+
+  const filtrando = Boolean(termo) || filtroServico !== "todos" || filtroSaldo !== "todas";
+  const limpar = () => {
+    setBusca("");
+    setFiltroServico("todos");
+    setFiltroSaldo("todas");
+  };
 
   return (
     <div className="space-y-5">
@@ -506,10 +615,90 @@ export function GestaoContasView() {
 
       {isLoading && <p className="font-sans text-sm text-white/40">Carregando contas…</p>}
 
-      <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
-        {contas.map((c) => (
-          <ContaCard key={c.id} conta={c} />
+      {/*
+        * BARRA DE BUSCA E FILTROS. Com 49 contas matrizes, achar "a Netflix 12"
+        * rolando a pagina era o gargalo: aqui o admin digita o nome, o e-mail
+        * ou o servico e filtra por saldo em um clique.
+        */}
+      {contas.length > 0 && (
+        <div className="rounded-2xl border border-white/8 bg-white/[0.02] p-3">
+          <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-white/30" />
+              <input
+                data-testid="busca-contas"
+                aria-label="Buscar conta matriz por nome, e-mail ou serviço"
+                className={cn(inputCls, "pl-9 pr-9")}
+                placeholder="Buscar por nome, e-mail ou serviço"
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+              />
+              {busca && (
+                <button
+                  type="button"
+                  aria-label="Limpar busca"
+                  onClick={() => setBusca("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1 text-white/35 hover:bg-white/8 hover:text-white"
+                >
+                  <X className="size-3.5" />
+                </button>
+              )}
+            </div>
+            <select
+              aria-label="Filtrar por serviço"
+              className={cn(inputCls, "sm:w-48")}
+              value={filtroServico}
+              onChange={(e) => setFiltroServico(e.target.value)}
+            >
+              <option value="todos">Todos os serviços</option>
+              {servicos.map((s) => (
+                <option key={s} value={s}>
+                  {serviceById(s).name}
+                </option>
+              ))}
+            </select>
+            <select
+              aria-label="Filtrar por situação do saldo"
+              className={cn(inputCls, "sm:w-44")}
+              value={filtroSaldo}
+              onChange={(e) => setFiltroSaldo(e.target.value as FiltroSaldo)}
+            >
+              <option value="todas">Qualquer saldo</option>
+              <option value="critico">Só saldo crítico</option>
+              <option value="ok">Só saldo em dia</option>
+            </select>
+          </div>
+          {filtrando && (
+            <div className="mt-2 flex items-center gap-2">
+              <span className="font-sans text-[11px] text-white/40">
+                {filtradas.length} de {contas.length} conta(s)
+              </span>
+              <button
+                type="button"
+                onClick={limpar}
+                className="font-display text-[10px] font-bold uppercase tracking-widest text-neon-cyan hover:text-white"
+              >
+                limpar filtros
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="space-y-3">
+        {grupos.map((g) => (
+          <SecaoServico
+            key={`${g.servico}-${filtrando ? "f" : "n"}`}
+            servico={g.servico}
+            contas={g.contas}
+            abrirPorPadrao={filtrando}
+          />
         ))}
+        {!isLoading && contas.length > 0 && filtradas.length === 0 && (
+          <p className="rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-6 text-center font-sans text-sm text-white/35">
+            Nenhuma conta encontrada com esses filtros.
+          </p>
+        )}
       </div>
 
       <Parametros />

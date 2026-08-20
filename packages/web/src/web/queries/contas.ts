@@ -42,6 +42,26 @@ export function useEditarVagas() {
   return useMutation(orpc.contas.editarVagas.mutationOptions({ onSuccess: invalidar }));
 }
 
+/**
+ * TRAVA DAS VAGAS — com a trava ligada nada automático recalcula as vagas
+ * daquela conta (era o que fazia o número mudar sozinho depois de salvar).
+ */
+export function useAlternarTravaVagas() {
+  const invalidar = useInvalidarContas();
+  return useMutation(orpc.contas.alternarTravaVagas.mutationOptions({ onSuccess: invalidar }));
+}
+
+/** recalcula as vagas de UMA conta (aviso de divergência no card) */
+export function useSincronizarUmaConta() {
+  const invalidar = useInvalidarContas();
+  return useMutation(orpc.contas.sincronizarUma.mutationOptions({ onSuccess: invalidar }));
+}
+
+/** contas em que o número gravado e as alocações ativas não batem */
+export function useDivergenciasVagas() {
+  return useQuery(orpc.contas.divergencias.queryOptions({ staleTime: 15_000 }));
+}
+
 /** reposição: libera todas as vagas para realocação (sem apagar histórico) */
 export function useReporConta() {
   const invalidar = useInvalidarContas();

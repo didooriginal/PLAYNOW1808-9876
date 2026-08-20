@@ -23,8 +23,21 @@ import { resolverServico } from "./planos";
 
 const hojeIso = () => new Date().toISOString().slice(0, 10);
 
-/** recalcula `vagasOcupadas` da conta a partir das alocações ativas */
+/**
+ * Recalcula `vagasOcupadas` da conta a partir das alocações ativas.
+ *
+ * Conta com `vagasTravadas` fica intocada: o admin conferiu o número real de
+ * telas na matriz e essa contagem automática era justamente o que fazia o
+ * número "mudar sozinho" depois de salvar. Nesse caso devolvemos o valor
+ * gravado, sem escrever nada.
+ */
 export async function sincronizarVagas(contaId: number) {
+  const [conta] = await db
+    .select({ vagasTravadas: contasMatrizes.vagasTravadas, vagasOcupadas: contasMatrizes.vagasOcupadas })
+    .from(contasMatrizes)
+    .where(eq(contasMatrizes.id, contaId));
+  if (conta?.vagasTravadas) return conta.vagasOcupadas;
+
   const ativas = await db
     .select({ id: alocacoes.id })
     .from(alocacoes)

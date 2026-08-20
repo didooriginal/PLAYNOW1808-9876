@@ -86,6 +86,39 @@ async function fixarPadrao(aplicativoId: number, planoId: number) {
   await db.update(planosApps).set({ padrao: true }).where(eq(planosApps.id, planoId));
 }
 
+
+/**
+ * VAGA DE CONVITE DA CONTA MATRIZ.
+ * Cada conta liberada para individual comporta `convitesMaximos` convites
+ * (padrão 2, o limite de membro extra da Netflix). Aqui a gente confere se
+ * ainda cabe antes de amarrar o convite naquela conta — e se a conta está
+ * realmente liberada para individual, para não furar o compartilhamento.
+ */
+async function validarVagaDeConvite(contaId: number, conviteId?: number) {
+  const [conta] = await db.select().from(contasMatrizes).where(eq(contasMatrizes.id, contaId));
+  if (!conta) throw new ORPCError("NOT_FOUND", { message: "Conta matriz não encontrada" });
+  if (!conta.liberaIndividual)
+    throw new ORPCError("BAD_REQUEST", {
+      message: `A conta "${conta.rotulo}" não está liberada para convite individual. Marque "libera individual" nela primeiro.`,
+    });
+
+  const usados = await db
+    .select({ id: convitesApps.id })
+    .from(convitesApps)
+    .where(
+      and(
+        eq(convitesApps.contaId, contaId),
+        inArray(convitesApps.status, ["pendente", "enviado", "ativo"]),
+      ),
+    );
+  const ocupados = usados.filter((u) => u.id !== conviteId).length;
+  if (ocupados >= conta.convitesMaximos)
+    throw new ORPCError("BAD_REQUEST", {
+      message: `A conta "${conta.rotulo}" já está com ${ocupados} de ${conta.convitesMaximos} convites. Libere um convite ou escolha outra conta.`,
+    });
+  return conta;
+}
+
 export const planosDeApps = {
   /** catálogo agrupado (app + opções) — usado pela vitrine e pelo checkout */
   catalogo: base.handler(() => catalogoComOpcoes()),
@@ -300,6 +333,127 @@ export const planosDeApps = {
     }));
   }),
 
+  /**
+   * ADMIN LANÇA O CONVITE NA MÃO.
+   * Antes só existia o caminho do cliente (`pedirConvite`): se o cliente
+   * mandava o e-mail pelo WhatsApp, o admin não tinha por onde registrar e o
+   * convite ficava fora do sistema. Aqui ele cria a linha já apontando a conta
+   * matriz de onde o convite vai sair.
+   */
+  criarConvite: adminOnly
+    .input(
+      z.object({
+        clienteId: z.number().int(),
+        servico: z.string().min(1),
+        email: z.string().email("Informe um e-mail válido"),
+        contaId: z.number().int().nullable().optional(),
+        status: z.enum(["pendente", "enviado", "ativo"]).default("pendente"),
+        observacao: z.string().optional(),
+      }),
+    )
+    .handler(async ({ input }) => {
+      const servico = await resolverServico(input.servico);
+      if (!servico)
+        throw new ORPCError("NOT_FOUND", { message: "Essa opção não existe no catálogo" });
+      if (servico.entrega !== "convite")
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Essa opção é entregue por login e senha, não por convite.",
+        });
+
+      const email = input.email.trim().toLowerCase();
+      if (input.contaId) await validarVagaDeConvite(input.contaId);
+      if ((input.status === "enviado" || input.status === "ativo") && !input.contaId)
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Escolha de qual conta matriz o convite saiu.",
+        });
+
+      // mesmo cliente + mesmo serviço com pedido em aberto: atualiza em vez de duplicar
+      const [aberto] = await db
+        .select()
+        .from(convitesApps)
+        .where(
+          and(
+            eq(convitesApps.clienteId, input.clienteId),
+            eq(convitesApps.servico, servico.slug),
+            inArray(convitesApps.status, ["pendente", "enviado"]),
+          ),
+        );
+
+      const valores = {
+        email,
+        status: input.status,
+        contaId: input.contaId ?? null,
+        observacao: input.observacao ?? "",
+        atendidoEm: input.status === "pendente" ? null : new Date(),
+      };
+
+      const [row] = aberto
+        ? await db
+            .update(convitesApps)
+            .set(valores)
+            .where(eq(convitesApps.id, aberto.id))
+            .returning()
+        : await db
+            .insert(convitesApps)
+            .values({ clienteId: input.clienteId, servico: servico.slug, ...valores })
+            .returning();
+
+      if (row && (input.status === "enviado" || input.status === "ativo")) {
+        await avisarCliente(row.clienteId, "convite", {
+          app: row.servico,
+          chave: `${row.id}:${input.status}`,
+        });
+      }
+      return row;
+    }),
+
+  /**
+   * CONTAS QUE PODEM RECEBER CONVITE INDIVIDUAL, com as vagas de convite de
+   * cada uma e quem está em cada vaga. É a resposta para "qual cliente está em
+   * qual conta matriz", que antes não existia em lugar nenhum.
+   */
+  contasDeConvite: adminOnly.handler(async () => {
+    const contas = await db
+      .select()
+      .from(contasMatrizes)
+      .where(eq(contasMatrizes.liberaIndividual, true))
+      .orderBy(asc(contasMatrizes.servico), asc(contasMatrizes.rotulo));
+    if (contas.length === 0) return [];
+
+    const linhas = await db
+      .select()
+      .from(convitesApps)
+      .where(inArray(convitesApps.status, ["pendente", "enviado", "ativo"]));
+
+    const { usuarios } = await import("../database/schema");
+    const ids = [...new Set(linhas.map((l) => l.clienteId))];
+    const clientes = ids.length
+      ? await db.select().from(usuarios).where(inArray(usuarios.id, ids))
+      : [];
+    const nomePorId = new Map(clientes.map((c) => [c.id, c.nome]));
+
+    return contas.map((c) => {
+      const ocupantes = linhas
+        .filter((l) => l.contaId === c.id)
+        .map((l) => ({
+          conviteId: l.id,
+          clienteId: l.clienteId,
+          cliente: nomePorId.get(l.clienteId) ?? `Cliente #${l.clienteId}`,
+          email: l.email,
+          status: l.status,
+        }));
+      return {
+        id: c.id,
+        servico: c.servico,
+        rotulo: c.rotulo,
+        email: c.email,
+        convitesMaximos: c.convitesMaximos,
+        ocupantes,
+        livres: Math.max(c.convitesMaximos - ocupantes.length, 0),
+      };
+    });
+  }),
+
   /** admin marca o andamento: pendente → enviado → ativo (ou recusado) */
   atualizarConvite: adminOnly
     .input(
@@ -311,6 +465,21 @@ export const planosDeApps = {
       }),
     )
     .handler(async ({ input }) => {
+      const [antes] = await db.select().from(convitesApps).where(eq(convitesApps.id, input.id));
+      if (!antes) throw new ORPCError("NOT_FOUND", { message: "Convite não encontrado" });
+
+      /**
+       * De qual conta matriz saiu o convite é obrigatório ao marcar enviado ou
+       * ativo. Sem isso ninguém sabia em qual conta o cliente estava, e as
+       * duas vagas de convite de cada conta eram impossíveis de controlar.
+       */
+      const contaFinal = input.contaId !== undefined ? input.contaId : antes.contaId;
+      if ((input.status === "enviado" || input.status === "ativo") && !contaFinal)
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Escolha de qual conta matriz o convite saiu antes de marcar como enviado.",
+        });
+      if (contaFinal) await validarVagaDeConvite(contaFinal, input.id);
+
       const [row] = await db
         .update(convitesApps)
         .set({

@@ -11,6 +11,8 @@ import {
   RefreshCw,
   SlidersHorizontal,
   Power,
+  Lock,
+  LockOpen,
   Trash2,
   UserMinus,
   UserPlus,
@@ -28,11 +30,13 @@ import { SelectServico } from "./select-servico";
 import { brl, serviceById } from "@/lib/mock-data";
 import {
   useAlternarContaAtiva,
+  useAlternarTravaVagas,
   useContas,
   useAtualizarConta,
   useEditarVagas,
   useRemoverConta,
   useReporConta,
+  useSincronizarUmaConta,
 } from "../../queries/contas";
 import {
   useAlocarCliente,
@@ -396,6 +400,8 @@ function EditorConta({
     cartaoUtilizado: conta.cartaoUtilizado ?? "",
     regiao: conta.regiao ?? "BR",
     observacao: conta.observacao ?? "",
+    liberaIndividual: conta.liberaIndividual,
+    convitesMaximos: conta.convitesMaximos,
   });
   const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
@@ -543,6 +549,49 @@ function EditorConta({
             onChange={(e) => set("regiao", e.target.value)}
           />
         </Campo>
+        {/*
+          * CONVITE INDIVIDUAL (membro extra). Só as contas marcadas aqui
+          * aparecem como destino do convite, para o individual não furar o
+          * estoque do compartilhado.
+          */}
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-2.5 sm:col-span-2">
+          <label className="flex items-center gap-2 font-sans text-xs text-white/70">
+            <input
+              type="checkbox"
+              checked={form.liberaIndividual}
+              onChange={(e) => set("liberaIndividual", e.target.checked)}
+              className="size-4 accent-[#22d3ee]"
+            />
+            Liberada para convite individual (membro extra)
+          </label>
+          {form.liberaIndividual && (
+            <div className="mt-2 flex items-center gap-2">
+              <label
+                htmlFor={`ec-convites-${conta.id}`}
+                className="font-sans text-[11px] text-white/40"
+              >
+                Convites que esta conta comporta
+              </label>
+              <input
+                id={`ec-convites-${conta.id}`}
+                type="number"
+                min={0}
+                max={10}
+                value={form.convitesMaximos}
+                onWheel={(e) => e.currentTarget.blur()}
+                onChange={(e) => {
+                  const n = Number(e.target.value);
+                  set(
+                    "convitesMaximos",
+                    Number.isFinite(n) && n >= 0 ? Math.min(10, n) : form.convitesMaximos,
+                  );
+                }}
+                className="w-16 rounded-xl border border-white/10 bg-white/[0.04] px-2 py-1.5 text-center font-display text-xs font-bold text-white focus:border-neon-cyan/60 focus:outline-none"
+              />
+            </div>
+          )}
+        </div>
+
         <div className="sm:col-span-2">
           <Campo
             label="Observação"
@@ -616,10 +665,22 @@ export function ContaMatrizCard({
   vinculos: Vinculo[];
 }) {
   const service = serviceById(acc.servico);
-  const ocupadas = vinculos.length;
+  /**
+   * FONTE DE VERDADE DAS VAGAS = `acc.vagasOcupadas`, a coluna que o alocador
+   * usa para decidir se ainda cabe cliente. O card mostrava a contagem viva de
+   * vínculos (`vinculos.length`), então o mesmo número aparecia diferente aqui
+   * e no alocador — era isso que dava a impressão de "mudar sozinho ao salvar".
+   * A contagem viva continua visível logo abaixo, como conferência.
+   */
+  const ocupadas = acc.vagasOcupadas;
+  const vinculadas = vinculos.length;
+  const divergente = vinculadas !== ocupadas;
   const pct = Math.round((ocupadas / Math.max(acc.totalVagas, 1)) * 100);
   const full = ocupadas >= acc.totalVagas;
   const nearly = !full && pct >= 75;
+
+  const trava = useAlternarTravaVagas();
+  const sincronizarUma = useSincronizarUmaConta();
 
   const [editando, setEditando] = useState(false);
   const [editandoConta, setEditandoConta] = useState(false);
@@ -740,6 +801,79 @@ export function ContaMatrizCard({
               : `${acc.totalVagas - ocupadas} vaga(s) livre(s)`}
           </span>
         </div>
+
+        {/* trava fisica: com ela ligada nada automatico recalcula as vagas */}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            aria-label={
+              acc.vagasTravadas
+                ? "Destravar as vagas desta conta"
+                : "Travar as vagas desta conta"
+            }
+            disabled={trava.isPending}
+            onClick={() => trava.mutate({ id: acc.id, travar: !acc.vagasTravadas })}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-display text-[10px] font-bold uppercase tracking-widest transition-colors",
+              acc.vagasTravadas
+                ? "border-neon-cyan/50 bg-neon-cyan/12 text-neon-cyan"
+                : "border-white/12 text-white/40 hover:text-white",
+            )}
+          >
+            {trava.isPending ? (
+              <Loader2 className="size-3 animate-spin" />
+            ) : acc.vagasTravadas ? (
+              <Lock className="size-3" />
+            ) : (
+              <LockOpen className="size-3" />
+            )}
+            {acc.vagasTravadas ? "vagas travadas" : "travar vagas"}
+          </button>
+          <span className="font-sans text-[10px] text-white/30">
+            {acc.vagasTravadas
+              ? "só muda quando você mudar"
+              : `${vinculadas} vínculo(s) ativo(s) no sistema`}
+          </span>
+        </div>
+
+        {/* numero gravado x alocacoes reais: mostra a diferenca em vez de esconder */}
+        {divergente && (
+          <div className="mt-2 rounded-xl border border-amber-400/35 bg-amber-400/8 px-3 py-2">
+            <p className="font-sans text-[11px] text-amber-200/90">
+              O número gravado é {ocupadas}, mas existem {vinculadas} cliente(s)
+              alocado(s) de verdade.
+            </p>
+            {acc.vagasTravadas ? (
+              <p className="mt-1 font-sans text-[10px] text-white/40">
+                As vagas estão travadas — destrave se quiser igualar ao real.
+              </p>
+            ) : (
+              <button
+                type="button"
+                disabled={sincronizarUma.isPending}
+                onClick={() =>
+                  sincronizarUma.mutate(
+                    { id: acc.id },
+                    { onSuccess: () => marcarSalvo() },
+                  )
+                }
+                className="mt-1.5 inline-flex items-center gap-1.5 font-display text-[10px] font-bold uppercase tracking-widest text-amber-200 hover:text-white"
+              >
+                {sincronizarUma.isPending ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <RefreshCw className="size-3" />
+                )}
+                igualar ao real ({vinculadas})
+              </button>
+            )}
+            {sincronizarUma.isError && (
+              <p className="mt-1 font-sans text-[10px] text-neon-red">
+                {sincronizarUma.error?.message}
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* meta */}
@@ -793,7 +927,7 @@ export function ContaMatrizCard({
       >
         <span className="flex items-center gap-2">
           <Users className="size-3.5" />
-          {ocupadas} cliente(s) vinculado(s)
+          {vinculadas} cliente(s) vinculado(s)
         </span>
         <ChevronDown
           className={cn(
