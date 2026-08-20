@@ -197,20 +197,24 @@ export function extrairCodigo(texto: string): { codigo: string; trecho: string }
 /* IDENTIFICAÇÃO DO SERVIÇO                                            */
 /* ------------------------------------------------------------------ */
 
-/** apelidos extras por slug — o que aparece no domínio/assunto do e-mail */
+/**
+ * Apelidos que valem em QUALQUER lugar (remetente, assunto, corpo). Só entram
+ * aqui palavras que praticamente nao existem fora do streaming: "crunchyroll"
+ * casa no corpo sem risco, "record" nao.
+ */
 const APELIDOS: Record<string, string[]> = {
   netflix: ["netflix"],
   "netflix-individual": [],
   disney: ["disney", "disneyplus"],
-  prime: ["primevideo", "amazon", "amazonvideo"],
-  hbomax: ["hbomax", "hbo", "max.com", "warnermedia", "wbd"],
+  prime: ["primevideo", "amazonvideo"],
+  hbomax: ["hbomax", "warnermedia"],
   paramount: ["paramount"],
-  appletv: ["apple", "icloud", "appletv"],
+  appletv: ["appletv"],
   spotify: ["spotify"],
-  youtube: ["youtube", "google", "googlemail"],
+  youtube: ["youtube"],
   "youtube-individual": [],
   crunchyroll: ["crunchyroll"],
-  globoplay: ["globoplay", "globo"],
+  globoplay: ["globoplay"],
   "globoplay-premium": [],
   deezer: ["deezer"],
   canva: ["canva"],
@@ -219,13 +223,13 @@ const APELIDOS: Record<string, string[]> = {
   premiere: ["premiere"],
   combate: ["combate"],
   looke: ["looke"],
-  recordplus: ["recordplus", "record"],
+  recordplus: ["recordplus"],
   "brasil-paralelo": ["brasilparalelo"],
   kocowa: ["kocowa"],
-  vikki: ["viki", "rakuten"],
+  vikki: [],
   funplay: ["funplay"],
-  clarotv: ["clarotv", "claro"],
-  skytv: ["skytv", "sky"],
+  clarotv: ["clarotv"],
+  skytv: ["skytv"],
   unitv: ["unitv"],
   "unitv-vitalicio": [],
   univer: ["univer"],
@@ -233,13 +237,45 @@ const APELIDOS: Record<string, string[]> = {
   iptv: [],
 };
 
-async function identificarServico(remetente: string, assunto: string, corpo: string) {
+/**
+ * Apelidos GENERICOS: só valem no DOMINIO do remetente.
+ *
+ * Motivo real: o alias "record" casava com o assunto de spam "YOU GOT
+ * RECORDED!" e sete e-mails de chantagem entraram no painel como se fossem
+ * do Record+ — poluindo a estatistica de "e-mail sem codigo" e escondendo a
+ * falha de verdade. Palavra curta e comum ("record", "claro", "sky", "globo",
+ * "apple", "google", "hbo", "amazon", "viki") so conta quando esta no dominio
+ * de quem enviou.
+ */
+const APELIDOS_DOMINIO: Record<string, string[]> = {
+  prime: ["amazon", "primevideo"],
+  hbomax: ["hbo", "max.com", "wbd"],
+  appletv: ["apple", "icloud"],
+  youtube: ["google", "googlemail", "youtube"],
+  globoplay: ["globo"],
+  recordplus: ["record"],
+  clarotv: ["claro"],
+  skytv: ["sky"],
+  vikki: ["viki", "rakuten"],
+};
+
+/** dominio de quem enviou: "algo@mail.record.com.br" -> "mail.record.com.br" */
+function dominioDoRemetente(remetente: string) {
+  const bruto = remetente.includes("<")
+    ? (remetente.split("<").pop() ?? "").replace(">", "")
+    : remetente;
+  const dominio = bruto.split("@").pop() ?? "";
+  return normalizar(dominio).replace(/[^a-z0-9.-]/g, "");
+}
+
+export async function identificarServico(remetente: string, assunto: string, corpo: string) {
   const apps = await db
     .select({ slug: aplicativos.slug, nome: aplicativos.nome })
     .from(aplicativos);
 
   const alvoForte = normalizar(`${remetente} ${assunto}`).replace(/[^a-z0-9.]/g, "");
   const alvoFraco = normalizar(corpo).replace(/[^a-z0-9.]/g, "");
+  const dominio = dominioDoRemetente(remetente);
 
   const candidatos = apps
     .map((app) => {
@@ -249,9 +285,14 @@ async function identificarServico(remetente: string, assunto: string, corpo: str
         ...(APELIDOS[app.slug] ?? []).map((a) => a.replace(/[^a-z0-9.]/g, "")),
       ].filter((c) => c.length >= 3);
 
-      const forte = chaves.some((c) => alvoForte.includes(c));
+      const chavesDominio = (APELIDOS_DOMINIO[app.slug] ?? [])
+        .map((a) => a.replace(/[^a-z0-9.-]/g, ""))
+        .filter((c) => c.length >= 3);
+
+      const forte =
+        chaves.some((c) => alvoForte.includes(c)) || chavesDominio.some((c) => dominio.includes(c));
       const fraco = chaves.some((c) => alvoFraco.includes(c));
-      const maiorChave = Math.max(...chaves.map((c) => c.length), 0);
+      const maiorChave = Math.max(...chaves.map((c) => c.length), ...chavesDominio.map((c) => c.length), 0);
       return { app, peso: forte ? 2 : fraco ? 1 : 0, maiorChave };
     })
     .filter((c) => c.peso > 0)
@@ -392,6 +433,59 @@ async function purgar() {
     .where(and(lt(emailsRecebidos.recebidoEm, limiteCaixa), eq(emailsRecebidos.fixado, false)));
 }
 
+/**
+ * AVISO DE FALHA REAL NA EXTRACAO
+ * ------------------------------------------------------------------
+ * Antes isso era so um `console.warn` — ou seja, ninguem via. Codigo que nao
+ * e extraido nao chega no cliente, e a gente so descobria pela reclamacao.
+ *
+ * Mas nem todo e-mail sem codigo e problema: "Um novo aparelho esta usando
+ * sua conta", spam e phishing legitimamente nao tem codigo nenhum. Alertar
+ * em todos viraria ruido e o alerta perderia o valor.
+ *
+ * Entao so avisa quando o e-mail REALMENTE parecia trazer um codigo:
+ *   a) o corpo veio cru e truncado (Worker antigo publicado na Cloudflare) —
+ *      o codigo ficou depois do corte, e isso e sempre falha nossa; ou
+ *   b) o texto tem um rotulo de codigo ("codigo de verificacao", "seu codigo")
+ *      e mesmo assim nenhum numero de 4 a 6 digitos foi encontrado.
+ *
+ * `chave` inclui a hora: no maximo um alerta por serviço por hora, mesmo que
+ * dez e-mails quebrem em sequencia (a chave e unica no banco).
+ */
+async function alertarEmailSemCodigo(dados: {
+  servicoSlug: string;
+  assunto: string;
+  remetente: string;
+  tamanho: number;
+  cruTruncado: boolean;
+  textoDoEmail: string;
+}) {
+  const alvo = normalizar(dados.textoDoEmail);
+  const temRotulo = ROTULOS.some((r) => alvo.includes(r));
+  if (!dados.cruTruncado && !temRotulo) return;
+  // sem serviço identificado + sem corpo truncado = spam. Não é falha nossa.
+  if (dados.servicoSlug === "desconhecido" && !dados.cruTruncado) return;
+
+  const hora = new Date().toISOString().slice(0, 13);
+  await notificar({
+    escopo: "admin",
+    tipo: "otp",
+    severidade: "alerta",
+    titulo: dados.cruTruncado
+      ? "Código perdido: o Worker antigo ainda está publicado"
+      : `Código não extraído (${dados.servicoSlug})`,
+    mensagem: dados.cruTruncado
+      ? `O e-mail "${dados.assunto}" chegou cru e cortado em ${dados.tamanho} caracteres, ` +
+        "então o código ficou fora do pedaço que recebemos. Republique " +
+        "docs/email-worker-standalone.js no painel da Cloudflare (Workers & Pages → " +
+        "Edit code → colar → Deploy) para parar de perder código."
+      : `O e-mail "${dados.assunto}" (de ${dados.remetente}) fala em código, mas nenhum ` +
+        "número de 4 a 6 dígitos foi encontrado. Veja o e-mail inteiro na Caixa de Entrada " +
+        "e, se houver código, vincule na mão.",
+    chave: `otp-sem-codigo:${dados.cruTruncado ? "cru" : "rotulo"}:${dados.servicoSlug}:${hora}`,
+  });
+}
+
 export async function registrarEmail(entrada: EmailBruto) {
   const cabecalhos = lerCabecalhos(entrada.corpo);
   const remetente = (entrada.remetente || cabecalhos.remetente || "").trim();
@@ -440,6 +534,14 @@ export async function registrarEmail(entrada: EmailBruto) {
       `[codigos] e-mail sem código · servico=${servicoSlug} · assunto="${assunto}" · ` +
         `corpo=${entrada.corpo.length} chars${cruTruncado ? " · CORPO CRU TRUNCADO (Worker antigo publicado?)" : ""}`,
     );
+    await alertarEmailSemCodigo({
+      servicoSlug,
+      assunto,
+      remetente,
+      tamanho: entrada.corpo.length,
+      cruTruncado,
+      textoDoEmail: `${assunto}\n${corpoLimpo}`,
+    });
     return { ok: false as const, motivo: "Nenhum código de 4 a 6 dígitos encontrado" };
   }
 
