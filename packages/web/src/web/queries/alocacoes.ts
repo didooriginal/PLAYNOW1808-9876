@@ -14,9 +14,18 @@ export function useHistoricoConta(contaId: number, enabled = true) {
   );
 }
 
-export function useClientesDisponiveis(contaId: number, enabled = true) {
+/**
+ * Clientes que ainda cabem na conta. A busca roda no servidor (nome, e-mail ou #id)
+ * e a resposta vem limitada — lista grande nao pode descer inteira para o navegador.
+ */
+export function useClientesDisponiveis(contaId: number, enabled = true, busca = "", limite = 30) {
   return useQuery(
-    orpc.alocacoes.disponiveis.queryOptions({ input: { contaId }, enabled, staleTime: 10_000 }),
+    orpc.alocacoes.disponiveis.queryOptions({
+      input: { contaId, busca: busca.trim() || undefined, limite },
+      enabled,
+      staleTime: 10_000,
+      placeholderData: (anterior) => anterior,
+    }),
   );
 }
 

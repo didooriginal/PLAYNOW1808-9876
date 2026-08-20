@@ -28,6 +28,16 @@ import {
 } from "../lib/cobranca-apps";
 import { resolverServico } from "../lib/planos";
 
+
+/** minusculas sem acento — usado na busca de clientes */
+function semAcento(valor: string) {
+  return valor
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
 /**
  * O alocador vive em `api/lib/acessos.ts` (junto da fila de espera e da
  * realocação). Reexportado aqui porque várias rotas já importavam daqui.
@@ -190,20 +200,44 @@ export const alocacoes = {
 
   /** clientes que ainda não têm vaga ativa na conta — alimenta o seletor do admin */
   disponiveis: adminOnly
-    .input(z.object({ contaId: z.number().int() }))
+    .input(
+      z.object({
+        contaId: z.number().int(),
+        busca: z.string().max(120).optional(),
+        limite: z.number().int().min(1).max(200).optional(),
+      }),
+    )
     .handler(async ({ input }) => {
       const ativas = await db
         .select({ clienteId: tabelaAlocacoes.clienteId })
         .from(tabelaAlocacoes)
         .where(and(eq(tabelaAlocacoes.contaId, input.contaId), eq(tabelaAlocacoes.status, "ativo")));
-      const ocupados = ativas.map((a) => a.clienteId);
+      const ocupados = new Set(ativas.map((a) => a.clienteId));
 
       const todos = await db
         .select({ id: usuarios.id, nome: usuarios.nome, email: usuarios.email })
         .from(usuarios)
         .where(eq(usuarios.admin, false));
 
-      return todos.filter((u) => !ocupados.includes(u.id));
+      const livres = todos.filter((u) => !ocupados.has(u.id));
+      const limite = input.limite ?? 30;
+      const termo = semAcento(input.busca ?? "");
+
+      // sem termo: devolve so o comeco da lista (o campo tem busca no admin)
+      if (!termo) {
+        return { total: livres.length, itens: livres.slice(0, limite) };
+      }
+
+      // casa por INICIO de palavra: "mai" nao pode trazer todo mundo por causa de "gmail"
+      const partes = termo.replace(/#/g, " ").split(/\s+/).filter(Boolean);
+      const achados = livres.filter((u) => {
+        const pedacos = semAcento(`${u.nome} ${u.email} ${u.id}`)
+          .split(/[^a-z0-9]+/)
+          .filter(Boolean);
+        return partes.every((parte) => pedacos.some((t) => t.startsWith(parte)));
+      });
+
+      return { total: achados.length, itens: achados.slice(0, limite) };
     }),
 
   /** todas as alocações ativas de um cliente (usado na ficha do cliente) */

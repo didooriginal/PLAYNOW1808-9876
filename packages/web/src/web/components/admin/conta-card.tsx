@@ -40,10 +40,10 @@ import {
 } from "../../queries/contas";
 import {
   useAlocarCliente,
-  useClientesDisponiveis,
   useLiberarVaga,
   useMapaAlocacoes,
 } from "../../queries/alocacoes";
+import { SeletorCliente } from "./seletor-cliente";
 
 type Conta = NonNullable<ReturnType<typeof useContas>["data"]>[number];
 type Vinculo = NonNullable<
@@ -101,10 +101,13 @@ function ClientesVinculados({
   vinculos: Vinculo[];
 }) {
   const [alocando, setAlocando] = useState(false);
-  const [escolhido, setEscolhido] = useState<number | "">("");
+  const [escolhido, setEscolhido] = useState<{
+    id: number;
+    nome: string;
+    email: string;
+  } | null>(null);
   /** aviso de troca: o cliente saiu de outra conta do mesmo app */
   const [movidoDe, setMovidoDe] = useState<string[]>([]);
-  const disponiveis = useClientesDisponiveis(conta.id, alocando);
   const alocar = useAlocarCliente();
   const liberar = useLiberarVaga();
   const livres = conta.totalVagas - vinculos.length;
@@ -164,23 +167,12 @@ function ClientesVinculados({
 
       {alocando ? (
         <div className="mt-3 space-y-2">
-          <select
-            aria-label="Cliente que vai ocupar a vaga"
-            value={escolhido}
-            onChange={(e) =>
-              setEscolhido(e.target.value ? Number(e.target.value) : "")
-            }
-            className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 font-sans text-xs text-white focus:border-neon-cyan/50 focus:outline-none"
-          >
-            <option value="" className="bg-[#09090b]">
-              Selecione o cliente...
-            </option>
-            {(disponiveis.data ?? []).map((c) => (
-              <option key={c.id} value={c.id} className="bg-[#09090b]">
-                {c.nome} · {c.email}
-              </option>
-            ))}
-          </select>
+          <SeletorCliente
+            contaId={conta.id}
+            valor={escolhido}
+            onEscolher={setEscolhido}
+            autoFocus
+          />
           {alocar.isError && (
             <p className="font-sans text-[11px] text-neon-red">
               {alocar.error?.message}
@@ -196,10 +188,10 @@ function ClientesVinculados({
               onClick={() =>
                 escolhido &&
                 alocar.mutate(
-                  { clienteId: Number(escolhido), contaId: conta.id },
+                  { clienteId: escolhido.id, contaId: conta.id },
                   {
                     onSuccess: (res) => {
-                      setEscolhido("");
+                      setEscolhido(null);
                       setAlocando(false);
                       setMovidoDe(
                         res?.trocou
