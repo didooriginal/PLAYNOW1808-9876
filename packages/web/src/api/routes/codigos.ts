@@ -284,12 +284,42 @@ async function identificarCliente(destinatario: string, servicoSlug: string) {
    * caminho novo via Cloudflare Email Routing.
    */
   const contas = await db
-    .select({ id: contasMatrizes.id })
+    .select({ id: contasMatrizes.id, email: contasMatrizes.email, servico: contasMatrizes.servico })
     .from(contasMatrizes)
     .where(or(eq(contasMatrizes.email, email), eq(contasMatrizes.emailCaptura, email)));
   if (!contas.length) return { clienteId: null as number | null, contaIds: [] as number[] };
 
-  const contaIds = contas.map((c) => c.id);
+  let contaIds = contas.map((c) => c.id);
+
+  /*
+   * CONTAS IRMAS (mesmo Gmail, servicos diferentes).
+   *
+   * Um mesmo Gmail hospeda varias matrizes: playnowplus07@gmail.com e login da
+   * 145 (Disney), 166 (Netflix) e 192 (Globoplay). Mas o encaminhamento do
+   * Gmail aponta para UM endereco de captura so — no caso, netflix166@. Logo o
+   * e-mail do Disney+ chega em netflix166@ e casava apenas a conta 166, que nao
+   * tem vaga de Disney: o codigo ficava sem dono e o pedido do cliente na conta
+   * 145 nunca era atendido.
+   *
+   * Aqui, quando o servico do e-mail NAO bate com a conta que recebeu, o dono e
+   * procurado nas irmas do MESMO e-mail de login cujo servico bate com o
+   * e-mail. O filtro por familia de servico e o que impede entregar o codigo de
+   * um app para quem assinou outro.
+   */
+  const familia = slugsDaFamilia(servicoSlug);
+  const jaBate = servicoSlug === "desconhecido" || contas.some((c) => familia.includes(c.servico));
+  if (!jaBate) {
+    const logins = [...new Set(contas.map((c) => c.email).filter(Boolean))];
+    if (logins.length) {
+      const irmas = await db
+        .select({ id: contasMatrizes.id })
+        .from(contasMatrizes)
+        .where(
+          and(inArray(contasMatrizes.email, logins), inArray(contasMatrizes.servico, familia)),
+        );
+      if (irmas.length) contaIds = irmas.map((c) => c.id);
+    }
+  }
 
   const vagas = await db
     .select({ clienteId: alocacoes.clienteId })
