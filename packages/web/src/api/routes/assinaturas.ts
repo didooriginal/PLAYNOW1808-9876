@@ -95,12 +95,17 @@ export async function avisarCancelamentoAssinatura(
       acessoAte,
       linkPainel: `${base}/dashboard`,
     });
-    await enviarEmail({
+    const envio = await enviarEmail({
       para: cliente.email,
       assunto: modelo.assunto,
       texto: modelo.texto,
       html: modelo.html,
     });
+    // o enviarEmail nao lanca: sem este log um "sem_provedor" passava calado
+    if (!envio.ok)
+      console.error(
+        `[Email] confirmacao de cancelamento nao saiu para ${cliente.email}: ${envio.motivo} - ${envio.erro}`,
+      );
   } catch (e) {
     console.error("[Email] falha ao enviar a confirmação de cancelamento:", e);
   }
