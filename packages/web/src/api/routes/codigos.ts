@@ -5,7 +5,7 @@ import { adminOnly, authed } from "../middleware/auth";
 import { notificar } from "./notificacoes";
 import { estaBloqueado } from "../lib/cobranca";
 import { db } from "../database";
-import { decodificarAssunto, limparCorpoEmail } from "../lib/email-mime";
+import { decodificarAssunto, limparCorpoEmail, pareceEmailBruto } from "../lib/email-mime";
 import {
   alocacoes,
   aplicativos,
@@ -58,6 +58,9 @@ const ROTULOS = [
   "use este codigo",
   "insira o codigo",
   "codigo de verificacao",
+  "senha de uso unico",
+  "senha de acesso unico",
+  "codigo de acesso unico",
   "codigo de acesso",
   "codigo de seguranca",
   "codigo temporario",
@@ -67,8 +70,10 @@ const ROTULOS = [
   "verification code",
   "security code",
   "access code",
+  "one-time passcode",
   "one-time code",
   "one-time",
+  "passcode",
   "codigo",
   "otp",
   "pin",
@@ -391,7 +396,20 @@ export async function registrarEmail(entrada: EmailBruto) {
     recebidoEm: new Date(),
   });
 
-  if (!achado) return { ok: false as const, motivo: "Nenhum código de 4 a 6 dígitos encontrado" };
+  if (!achado) {
+    /*
+     * DIAGNOSTICO: corpo cru + tamanho redondo = Worker ANTIGO publicado na
+     * Cloudflare, que manda o MIME inteiro cortado (20.000 chars) em vez do
+     * texto limpo. Nesse caso o codigo nem chega aqui — nao ha o que extrair.
+     * Foi exatamente o que derrubou todos os e-mails do Disney+.
+     */
+    const cruTruncado = pareceEmailBruto(entrada.corpo) && entrada.corpo.length >= 19_000;
+    console.warn(
+      `[codigos] e-mail sem código · servico=${servicoSlug} · assunto="${assunto}" · ` +
+        `corpo=${entrada.corpo.length} chars${cruTruncado ? " · CORPO CRU TRUNCADO (Worker antigo publicado?)" : ""}`,
+    );
+    return { ok: false as const, motivo: "Nenhum código de 4 a 6 dígitos encontrado" };
+  }
 
   const { clienteId, contaIds } = await identificarCliente(destinatario, servicoSlug);
 

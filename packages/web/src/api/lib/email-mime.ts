@@ -70,11 +70,17 @@ export function removerHtml(html: string): string {
     .replace(/<head[\s\S]*?<\/head>/gi, " ")
     .replace(/<!--[\s\S]*?-->/g, " ")
     .replace(/<[^>]*>/g, " ")
-    .replace(/&nbsp;/gi, " ")
     .replace(/&amp;/gi, "&")
     .replace(/&lt;/gi, "<")
     .replace(/&gt;/gi, ">")
     .replace(/&#(\d+);/g, (_t, n: string) => String.fromCharCode(Number(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (_t, n: string) => String.fromCharCode(Number.parseInt(n, 16)))
+    // invisiveis: zero-width, joiner, soft hyphen, BOM. O preheader do Disney+
+    // enche o topo do e-mail com centenas deles e empurrava o codigo para longe
+    // do rotulo ("seu codigo de acesso unico"), estourando a janela de busca.
+    .replace(/[\u200b-\u200d\u2060\ufeff\u00ad]/g, " ")
+    // qualquer entidade nomeada que sobrou (&nbsp; &zwnj; &zwj; &ensp; ...)
+    .replace(/&[a-z][a-z0-9]{1,10};/gi, " ")
     .replace(/[ \t]+/g, " ");
 }
 
