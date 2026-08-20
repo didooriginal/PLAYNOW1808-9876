@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { ORPCError } from "@orpc/server";
 import { base } from "../__core/app";
 import { adminOnly, authed } from "../middleware/auth";
@@ -117,6 +117,26 @@ async function validarVagaDeConvite(contaId: number, conviteId?: number) {
       message: `A conta "${conta.rotulo}" já está com ${ocupados} de ${conta.convitesMaximos} convites. Libere um convite ou escolha outra conta.`,
     });
   return conta;
+}
+
+/**
+ * UMA LINHA POR CLIENTE + SERVICO.
+ *
+ * Antes o reaproveitamento so olhava `pendente`/`enviado`: se o convite tinha
+ * sido `recusado` e o cliente mandava o e-mail de novo, nascia uma segunda
+ * linha para o mesmo cliente e servico. Resultado visto em teste: a fila do
+ * admin mostrava duas linhas do mesmo pedido e cada tela podia responder por
+ * uma delas (o painel do cliente lia uma, o admin marcava a outra). Agora
+ * sempre reaproveitamos a linha mais recente, qualquer que seja o status.
+ */
+async function conviteDoCliente(clienteId: number, servicoSlug: string) {
+  const [linha] = await db
+    .select()
+    .from(convitesApps)
+    .where(and(eq(convitesApps.clienteId, clienteId), eq(convitesApps.servico, servicoSlug)))
+    .orderBy(desc(convitesApps.id))
+    .limit(1);
+  return linha;
 }
 
 export const planosDeApps = {
@@ -271,20 +291,11 @@ export const planosDeApps = {
 
       const email = input.email.trim().toLowerCase();
 
-      // reaproveita o pedido em aberto em vez de empilhar duplicatas na fila
-      const [aberto] = await db
-        .select()
-        .from(convitesApps)
-        .where(
-          and(
-            eq(convitesApps.clienteId, ficha.id),
-            eq(convitesApps.servico, servico.slug),
-            inArray(convitesApps.status, ["pendente", "enviado"]),
-          ),
-        );
+      // reaproveita a linha do cliente em vez de empilhar duplicatas na fila
+      const aberto = await conviteDoCliente(ficha.id, servico.slug);
 
       if (aberto) {
-        if (aberto.email === email) {
+        if (aberto.email === email && (aberto.status === "pendente" || aberto.status === "enviado")) {
           await avisarPedidoConvite(ficha, servico, email, "cliente reenviou o mesmo pedido");
           return aberto;
         }
@@ -361,23 +372,23 @@ export const planosDeApps = {
         });
 
       const email = input.email.trim().toLowerCase();
+
+      // sem isso, um clienteId inexistente estourava a FK e voltava 500 seco
+      const { usuarios } = await import("../database/schema");
+      const [cliente] = await db.select().from(usuarios).where(eq(usuarios.id, input.clienteId));
+      if (!cliente)
+        throw new ORPCError("NOT_FOUND", {
+          message: `Cliente #${input.clienteId} nao existe mais na base.`,
+        });
+
       if (input.contaId) await validarVagaDeConvite(input.contaId);
       if ((input.status === "enviado" || input.status === "ativo") && !input.contaId)
         throw new ORPCError("BAD_REQUEST", {
           message: "Escolha de qual conta matriz o convite saiu.",
         });
 
-      // mesmo cliente + mesmo serviço com pedido em aberto: atualiza em vez de duplicar
-      const [aberto] = await db
-        .select()
-        .from(convitesApps)
-        .where(
-          and(
-            eq(convitesApps.clienteId, input.clienteId),
-            eq(convitesApps.servico, servico.slug),
-            inArray(convitesApps.status, ["pendente", "enviado"]),
-          ),
-        );
+      // mesmo cliente + mesmo servico: atualiza a linha existente em vez de duplicar
+      const aberto = await conviteDoCliente(input.clienteId, servico.slug);
 
       const valores = {
         email,
