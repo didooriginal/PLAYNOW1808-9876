@@ -45,8 +45,35 @@ Tabelas aplicadas (`bun run db:push`): `pacotes`, `contas_matrizes`, `usuarios`,
    ```
 3. Reinicie o dev server.
 
-Comandos de schema: `bun run db:push` (aplica direto), `bun run db:generate` +
-`bun run db:migrate` (migrations versionadas).
+Comandos de schema: `bun run db:colunas` (PADRAO - aditivo e seguro),
+`bun run db:generate` + `bun run db:migrate` (migrations versionadas) e
+`bun run db:push` (PERIGOSO, ver aviso abaixo).
+
+### PERIGO: `db:push` apaga dados ao adicionar coluna NOT NULL
+
+Em 20/08/2026 o `drizzle-kit push` (dialect `turso`) apagou as **56 linhas de
+`contas_matrizes`** ao adicionar tres colunas NOT NULL. O plano que ele executa e:
+
+```sql
+delete from contas_matrizes;
+ALTER TABLE `contas_matrizes` ADD `vagas_travadas` integer DEFAULT false NOT NULL;
+...
+```
+
+O `delete from` vem antes dos `ALTER`. Com TTY o drizzle-kit pergunta antes; o
+`--force` (usado para rodar sem TTY no sandbox) aceita a perda sem perguntar.
+Reproduzido em banco local: 5 linhas -> 0 linhas.
+
+**Regra:** para adicionar colunas use sempre
+
+```bash
+bun run db:colunas            # mostra o plano (dry run)
+bun run db:colunas -- aplicar # roda so ALTER TABLE ... ADD COLUMN
+```
+
+Ele compara `schema.ts` com o banco e nunca roda DELETE/DROP. Use `db:push`
+apenas para criar tabela nova ou mudanca de tipo, com `bun run db:backup`
+antes, com TTY, lendo o plano statement por statement - **nunca com `--force`**.
 
 ## Scripts novos (criados nesta restauração)
 

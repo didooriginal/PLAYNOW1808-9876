@@ -14,6 +14,7 @@
     "preview": "bun run build && vite preview",
     "db:generate": "bun --env-file=../../.env drizzle-kit generate",
     "db:migrate": "bun --env-file=../../.env drizzle-kit migrate",
+    "db:colunas": "bun --env-file=../../.env scripts/db-colunas.ts",
     "db:push": "bun --env-file=../../.env drizzle-kit push",
     "seed": "bun --env-file=../../.env scripts/seed.ts",
     "admin": "bun --env-file=../../.env scripts/admin.ts",
