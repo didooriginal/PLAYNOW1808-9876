@@ -1,7 +1,5 @@
-import type { ComponentType } from "react";
-import { SiCrunchyroll, SiSpotify, SiYoutube } from "react-icons/si";
 import { cn } from "@/lib/utils";
-import { serviceById, type ServiceId } from "@/lib/mock-data";
+import { serviceById } from "@/lib/mock-data";
 
 /**
  * ÍCONE DE APP.
@@ -9,8 +7,12 @@ import { serviceById, type ServiceId } from "@/lib/mock-data";
  * Prioridade de renderização:
  *  1. Logo OFICIAL do app (PNG quadrado em /images/apps/<slug>.png, baixado da
  *     App Store — mesma arte que o cliente vê na TV/celular). Preenche o tile.
- *  2. Glyph de marca monocromático (react-icons/si) para casos sem logo oficial.
- *  3. Sigla (`mono`) da cor da marca, para qualquer serviço ainda sem arte.
+ *  2. Sigla (`mono`) da cor da marca, para qualquer serviço ainda sem arte.
+ *
+ * NAO importar `react-icons` aqui: o pacote nao faz tree-shaking e arrastava
+ * 5 MB para o bundle principal por causa de 3 glyphs que nunca renderizavam
+ * (spotify, youtube e crunchyroll ja tem PNG oficial). Precisa de icone novo?
+ * Salve o PNG em /images/apps/ ou use `lucide-react`.
  *
  * IPTV e Futebol Ao Vivo usam logos PRÓPRIAS da PLAYPLUSNOW (não há marca de
  * terceiro), geradas na identidade da casa: neon sobre fundo quase preto.
@@ -44,25 +46,11 @@ const OFFICIAL_LOGOS = new Set<string>([
   "jogos",
 ]);
 
-/** fallback de marca monocromática quando não há PNG oficial */
-const brandIcons: Partial<Record<ServiceId, ComponentType<{ className?: string }>>> = {
-  spotify: SiSpotify,
-  youtube: SiYoutube,
-  crunchyroll: SiCrunchyroll,
-};
-
 const boxSizes = {
   xs: "size-8 rounded-lg text-[10px]",
   sm: "size-10 rounded-xl text-xs",
   md: "size-14 rounded-2xl text-sm",
   lg: "size-16 rounded-2xl text-base",
-};
-
-const glyphSizes = {
-  xs: "size-4",
-  sm: "size-5",
-  md: "size-7",
-  lg: "size-8",
 };
 
 export function AppIcon({
@@ -94,7 +82,6 @@ export function AppIcon({
             ? `0 0 22px -4px ${service.color}aa, inset 0 1px 0 rgba(255,255,255,0.14)`
             : `inset 0 1px 0 rgba(255,255,255,0.08)`,
         }}
-        title={service.name}
       >
         <img
           src={`/images/apps/${id}.png`}
@@ -108,9 +95,7 @@ export function AppIcon({
     );
   }
 
-  // 2/3) glyph de marca ou ícone genérico sobre o tile de vidro
-  const Brand = brandIcons[id as ServiceId];
-
+  // 2) sigla da marca sobre o tile de vidro
   return (
     <span
       className={cn(
@@ -126,13 +111,12 @@ export function AppIcon({
           : `inset 0 1px 0 rgba(255,255,255,0.08)`,
         color: service.color,
       }}
-      title={service.name}
+      role="img"
+      aria-label={service.name}
     >
-      {Brand ? (
-        <Brand className={glyphSizes[size]} />
-      ) : (
-        <span className="font-display font-extrabold tracking-tight">{service.mono}</span>
-      )}
+      <span aria-hidden className="font-display font-extrabold tracking-tight">
+        {service.mono}
+      </span>
     </span>
   );
 }

@@ -22,6 +22,7 @@ export default defineConfig(({ mode }) => {
 				"@": path.resolve(__dirname, "./src/web"),
 			},
 		},
+		build: { sourcemap: process.env.ANALISAR === "1" },
 		server: {
 			port: 4200,
 			strictPort: true,

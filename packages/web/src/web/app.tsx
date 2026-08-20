@@ -1,21 +1,27 @@
 import { Suspense, lazy, useEffect } from "react";
 import { Route, Switch } from "wouter";
 import Index from "./pages/index";
-import LoginPage from "./pages/login";
-import SignupPage from "./pages/signup";
-import EsqueciSenhaPage from "./pages/esqueci-senha";
-import RedefinirSenhaPage from "./pages/redefinir-senha";
 import { Provider } from "./components/provider";
 import { AdminRoute, Carregando, ProtectedRoute } from "./components/protected-route";
-import { AgentFeedback } from "@runablehq/website-runtime";
 
 /**
  * CODE SPLITTING.
- * A landing e as telas de login sao o que 99% das visitas carregam, entao ficam
- * no bundle principal. Painel do cliente, painel admin, checkout e as paginas
- * institucionais viram chunks separados — quem so olha a home nao baixa o admin
- * inteiro.
+ * SO a landing fica no bundle principal — e a unica pagina que praticamente
+ * toda visita abre, e no iPhone cada kB de JS a mais custa tempo de tela branca
+ * (o Safari e bem mais lento que o Chrome para interpretar JS).
+ *
+ * Todo o resto vira chunk separado e baixa junto do clique: login, cadastro,
+ * recuperacao de senha, painel do cliente, painel admin, checkout e paginas
+ * institucionais. Medido em iPhone/4G: as telas de auth sozinhas custavam
+ * ~31 kB de JS em TODA visita a home, inclusive de quem nunca faz login.
+ *
+ * O AgentFeedback (website-runtime) tambem sai do bundle: ele so roda em DEV,
+ * mas o import estatico arrastava ~40 kB para producao.
  */
+const LoginPage = lazy(() => import("./pages/login"));
+const SignupPage = lazy(() => import("./pages/signup"));
+const EsqueciSenhaPage = lazy(() => import("./pages/esqueci-senha"));
+const RedefinirSenhaPage = lazy(() => import("./pages/redefinir-senha"));
 const DashboardPage = lazy(() => import("./pages/dashboard"));
 const AdminPage = lazy(() => import("./pages/admin"));
 const SetupPage = lazy(() => import("./pages/setup"));
@@ -23,6 +29,12 @@ const CheckoutPage = lazy(() => import("./pages/checkout"));
 const TermosPage = lazy(() => import("./pages/termos"));
 const PrivacidadePage = lazy(() => import("./pages/privacidade"));
 const TutoriaisPage = lazy(() => import("./pages/tutoriais"));
+
+/* Do not remove — off by default, activated by parent iframe via postMessage.
+   Carregado sob demanda para nao pesar o bundle de producao. */
+const AgentFeedback = lazy(() =>
+  import("@runablehq/website-runtime").then((m) => ({ default: m.AgentFeedback })),
+);
 
 /**
  * TRAVA DA RODA DO MOUSE EM CAMPO NUMÉRICO.
@@ -81,7 +93,11 @@ function App() {
         </Switch>
       </Suspense>
       {/* Do not remove — off by default, activated by parent iframe via postMessage */}
-      {import.meta.env.DEV && <AgentFeedback />}
+      {import.meta.env.DEV && (
+        <Suspense fallback={null}>
+          <AgentFeedback />
+        </Suspense>
+      )}
     </Provider>
   );
 }
