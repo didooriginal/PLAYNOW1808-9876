@@ -62,6 +62,7 @@ import { useMinhasFaturas, rotuloCompetencia, dataBr } from "../queries/faturas"
 import { useMinhaTelaNetflix } from "../queries/netflix";
 import { useMinhaAtivacaoIptv } from "../queries/iptv";
 import { ChecklistBoasVindas } from "../components/cliente/boas-vindas";
+import { PopupApp } from "../components/cliente/popup-app";
 import { ContadorVencimento, FaixaConfianca } from "../components/cliente/contador";
 import { TelaBloqueio } from "../components/cliente/bloqueio";
 import { AvisosCliente } from "../components/cliente/avisos";
@@ -841,6 +842,7 @@ export default function DashboardPage() {
   return (
     <div className="relative min-h-screen">
       {precisaAceitarTermos && <ChecklistBoasVindas nome={cliente.nome} />}
+      {!precisaAceitarTermos && <PopupApp />}
       <NeonBackdrop />
       <PanelShell
         nav={nav}
